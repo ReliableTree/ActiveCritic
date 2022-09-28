@@ -3,12 +3,13 @@ import copy
 from pyclbr import Function
 from tkinter.messagebox import NO
 from typing import Dict, Optional, Tuple, Union
+from matplotlib.pyplot import step
 
 import numpy as np
 import torch
 from ActiveCritic.model_src.whole_sequence_model import (
     WholeSequenceActor, WholeSequenceCritic, WholeSequenceModelSetup)
-from ActiveCritic.utils.pytorch_utils import make_partially_observed_seq 
+from ActiveCritic.utils.pytorch_utils import make_partially_observed_seq
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
@@ -29,6 +30,8 @@ class ActiveCriticPolicySetup:
         self.epoch_len: int = None
         self.opt_steps: int = None
         self.device: Str = None
+        self.inference_opt_lr: float = None
+        self.optimize: bool = None
         self.writer = None
         self.plotter = None
 
@@ -40,7 +43,6 @@ class ActiveCriticPolicy(BaseModel):
         action_space,
         actor: WholeSequenceActor,
         critic: WholeSequenceCritic,
-        return_mode=0,
         acps: ActiveCriticPolicySetup = None
     ):
 
@@ -48,19 +50,11 @@ class ActiveCriticPolicy(BaseModel):
 
         self.actor = actor
         self.critic = critic
-        self.return_mode = return_mode
         self.optim_run = 0
-        self.max_steps = acps.opt_steps
         self.last_update = 0
         self.last_goal = None
         self.current_step = 0
         self.args_obj = acps
-        self.reset_state()
-
-
-    def reset_state(self):
-        self.best_expected_success = None
-        self.scores = []
 
     def predict(
         self,
@@ -70,96 +64,94 @@ class ActiveCriticPolicy(BaseModel):
         deterministic: bool = False,
     ) -> torch.Tensor:
         vec_obsv = self.args_obj.extractor.forward(
-            observation).unsqueeze(1).to(self.args_obj.device)
+            observation).to(self.args_obj.device).unsqueeze(1)
 
         if (self.last_goal is None) or (self.args_obj.new_epoch(self.last_goal, vec_obsv)):
-            if self.best_expected_success is not None:
-                self.scores.append((self.best_expected_success > self.args_obj.optimisation_threshold).type(torch.bool))
             self.current_step = 0
             self.last_goal = vec_obsv
-            self.action_seq = None
-            self.obs_seq = vec_obsv
+            self.current_result = None
+            action_seq = None
+            self.obs_seq = torch.zeros(
+                size=[observation.shape[0], self.args_obj.epoch_len, observation.shape[-1]], device=self.args_obj.device)
         else:
-            self.obs_seq = torch.cat((self.obs_seq, vec_obsv), dim=1)
             self.current_step += 1
-        model_inpt, self.act_dim = make_partially_observed_seq(
-            obs=self.obs_seq, acts=self.action_seq, seq_len=self.args_obj.epoch_len, act_space=self.action_space)
-        self.action_seq = self.forward(
-            inpt=model_inpt).gen_trj.detach()
-        print(f'current step: {self.current_step}')
-        return self.action_seq[:, self.current_step].cpu().numpy()
+            action_seq = self.current_result.gen_trj
 
+        self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
 
-    def forward(self, inpt):
-        main_signal_state_dict = copy.deepcopy(
-            self.actor.model.state_dict())
-        gen_result = self.actor.forward(inpt).gen_trj
-        if self.return_mode == 0:
-            result = ACPOptResult(gen_trj=gen_result)
+        self.current_result = self.forward(
+            observation_seq=self.obs_seq, action_seq=action_seq, optimize=self.args_obj.optimize, current_step=self.current_step)
+        return self.current_result.gen_trj[:, self.current_step].cpu().numpy()
+
+    def forward(self, observation_seq: torch.Tensor, action_seq: torch.Tensor, optimize: bool, current_step: int):
+        actions = self.actor.forward(observation_seq)
+        if action_seq is not None:
+            actions = self.proj_actions(
+                action_seq, actions, current_step)
+        expected_success = self.get_critic_score(
+            acts=actions, obs_seq=observation_seq)
+
+        if not optimize:
+            result = ACPOptResult(
+                gen_trj=actions, expected_succes_before=expected_success.detach())
             return result
-        elif self.return_mode == 1:
-            opt_gen_result = torch.clone(gen_result.detach())
-            opt_gen_result.requires_grad_(True)
 
-            optimizer = torch.optim.Adam([opt_gen_result], lr=self.lr)
-            best_expected_success = None
-            best_expected_mean = 0
-            best_trj = torch.clone(gen_result)
-            step = 0
-            if self.critic.model is not None:
-                self.critic.model.eval()
-            gen_result = gen_result.detach()
-            while best_expected_mean < self.args_obj.optimisation_threshold and (step <= self.max_steps):
+        else:
+            actions, expected_success_opt = self.optimize_act_sequence(
+                actions=actions, observations=observation_seq, current_step=current_step)
 
-                critic_input, _ = make_partially_observed_seq(
-                    obs=self.obs_seq, acts=opt_gen_result, seq_len=self.args_obj.epoch_len, act_space=self.action_space)
+            return ACPOptResult(
+                gen_trj=actions.detach(),
+                expected_succes_before=expected_success,
+                expected_succes_after=expected_success_opt)
 
-                critic_result = self.critic.forward(inputs=critic_input)
+    def optimize_act_sequence(self, actions: torch.Tensor, observations: torch.Tensor, current_step: int):
+        optimized_actions = torch.clone(actions.detach())
+        optimized_actions.requires_grad_(True)
+        optimizer = torch.optim.Adam(
+            [optimized_actions], lr=self.args_obj.inference_opt_lr)
+        expected_success = torch.zeros(
+            size=[actions.shape[0]], dtype=torch.float, device=actions.device)
+        goal_label = torch.ones_like(expected_success)
+        step = 0
+        if self.critic.model is not None:
+            self.critic.model.eval()
+        while (not torch.all(expected_success >= self.args_obj.optimisation_threshold)) and (step <= self.args_obj.opt_steps):
 
-                goal_label = torch.ones_like(critic_result)
-                critic_loss = self.critic.loss_fct(
-                    inpt=critic_result, success=goal_label)
+            optimized_actions, expected_success = self.inference_opt_step(
+                org_actions=actions,
+                opt_actions=optimized_actions,
+                obs_seq=observations,
+                optimizer=optimizer,
+                goal_label=goal_label,
+                current_step=current_step)
+            step += 1
 
-                if best_expected_success is None:
-                    best_expected_success = torch.clone(critic_result)
-                    best_trj = opt_gen_result.detach()
-                    expected_succes_before = torch.clone(critic_result)
-                else:
-                    improve_mask = (critic_result >
-                                    best_expected_success).reshape(-1)
-                    best_expected_success[improve_mask] = critic_result[improve_mask].detach(
-                    )
-                    best_trj[improve_mask] = opt_gen_result[improve_mask].detach()
-                self.best_expected_success = best_expected_success
-                best_expected_mean = best_expected_success.mean()
+        return optimized_actions, expected_success
 
-                optimizer.zero_grad()
-                critic_loss.backward()
-                optimizer.step()
+    def inference_opt_step(self, org_actions: torch.Tensor, opt_actions: torch.Tensor, obs_seq: torch.Tensor, optimizer: torch.optim.Optimizer, goal_label: torch.Tensor, current_step: int):
+        critic_result = self.get_critic_score(
+            acts=opt_actions, obs_seq=obs_seq)
+        critic_loss, lp, ln = self.critic.loss_fct(
+            result=critic_result, label=goal_label)
 
-                with torch.no_grad():
-                    opt_gen_result[:, :self.current_step,
-                                   :] = gen_result[:, :self.current_step, :]
+        optimizer.zero_grad()
+        critic_loss.backward()
+        optimizer.step()
 
-                assert torch.equal(opt_gen_result[:, :self.current_step, :],
-                                   gen_result[:, :self.current_step, :]), 'previous actions changed'
-                assert not torch.equal(
-                    opt_gen_result, gen_result), 'nothing changed'
+        actions = self.proj_actions(
+            org_actions=org_actions, new_actions=opt_actions, current_step=current_step)
 
-                self.writer(
-                    {str(self.optim_run) + ' in optimisation ': best_expected_mean.detach()}, train=False, step=step)
-                mask = torch.zeros(gen_result.size(0), dtype=torch.bool)
-                mask[0] = True
+        return actions, critic_result
 
-                self.plotter(
-                    label=gen_result.detach(),
-                    trj=gen_result.detach(),
-                    inpt=inpt,
-                    mask=mask,
-                    opt_trj=best_trj.detach(),
-                    name='in active critic'
-                )
-                step += 1
-            self.actor.model.load_state_dict(
-                main_signal_state_dict, strict=False)
-            return ACPOptResult(gen_trj=best_trj.detach(), inpt_trj=gen_result.detach(), expected_succes_before=expected_succes_before, expected_succes_after=best_expected_mean)
+    def get_critic_score(self, acts, obs_seq):
+        critic_input = make_partially_observed_seq(
+            obs=obs_seq, acts=acts, seq_len=self.args_obj.epoch_len, act_space=self.action_space)
+
+        critic_result = self.critic.forward(inputs=critic_input)
+        return critic_result
+
+    def proj_actions(self, org_actions: torch.Tensor, new_actions: torch.Tensor, current_step: int):
+        with torch.no_grad():
+            new_actions[:, :current_step] = org_actions[:, :current_step]
+        return new_actions

@@ -1,5 +1,12 @@
 import numpy as np
 import torch as th
+from ActiveCritic.metaworld.metaworld.envs import \
+    ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
+from ActiveCritic.metaworld.metaworld.policies import *
+from gym.wrappers import TimeLimit
+from imitation.data.wrappers import RolloutInfoWrapper
+from stable_baselines3.common.vec_env import DummyVecEnv
+
 
 class DummyExtractor:
     def __init__(self):
@@ -10,6 +17,46 @@ class DummyExtractor:
             features = th.tensor(features)
         return features
 
-def new_epoch(current_obs, check_obsvs):
-    result =  not th.equal(current_obs.reshape(-1)[-3:], check_obsvs.reshape(-1)[-3:])
+
+def make_policy_dict():
+    policy_dict = {}
+    for key in ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE:
+        string_arr = key.split('-')
+        v2_ind = string_arr.index('v2')
+        string_arr = string_arr[:v2_ind]
+        policy_name = ''
+        for i, string in enumerate(string_arr):
+            policy_name += string
+            string_arr[i] = string.capitalize()
+        entry = 'policy_dict["' + str(policy_name) + '"] = [Sawyer'
+        for string in string_arr:
+            entry += string
+        entry += 'V2Policy(), "' + key + '"]'
+        try:
+            exec(entry)
+        except (NameError):
+            pass
+    return policy_dict
+
+
+def new_epoch_pap(current_obs, check_obsvs):
+    result = not th.equal(current_obs.reshape(-1)
+                          [-3:], check_obsvs.reshape(-1)[-3:])
     return result
+
+
+def new_epoch_reach(current_obs, check_obsvs):
+    return new_epoch_pap(current_obs, check_obsvs)
+
+
+def make_dummy_vec_env(name, seq_len):
+    policy_dict = make_policy_dict()
+
+    env_tag = name
+    max_episode_steps = seq_len
+    env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
+    env._freeze_rand_vec = False
+    timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
+    dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(timelimit)])
+    return dv1, policy_dict[env_tag][0]
+

@@ -38,10 +38,7 @@ def make_partially_observed_seq(obs: th.Tensor, acts: th.Tensor, seq_len: int, a
     # obs: batch, seq, dim
     result = fill_tensor(result, obs, start_dim=0)
     if acts is not None:
-        assert obs.shape[1]-1  == acts.shape[1], "Observations and actions don't match."
         result = fill_tensor(result, acts, start_dim=obs.shape[-1])
-    else:
-        assert obs.shape[1] == 1, 'No actions have not been given to the model.'
     return result
 
 

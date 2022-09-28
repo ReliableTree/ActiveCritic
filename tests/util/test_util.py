@@ -3,7 +3,14 @@ import unittest
 import gym
 import numpy as np
 import torch as th
+from ActiveCritic.metaworld.metaworld.envs import \
+    ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
+from ActiveCritic.utils.gym_utils import make_policy_dict, new_epoch_reach
 from ActiveCritic.utils.pytorch_utils import make_partially_observed_seq
+from gym.wrappers import TimeLimit
+from imitation.data.wrappers import RolloutInfoWrapper
+from stable_baselines3.common.vec_env import DummyVecEnv
+from ActiveCritic.utils.gym_utils import DummyExtractor
 
 
 class TestUtils(unittest.TestCase):
@@ -48,3 +55,23 @@ class TestUtils(unittest.TestCase):
                         obs), 'Observation not correctly inserted into sequence.'
         assert th.equal(pos[:, :acts.shape[1], obs.shape[2]:],
                         acts), 'Not all actions have been inserted correctly.'
+
+    def test_new_epoch(self):
+        policy_dict = make_policy_dict()
+        env_tag = 'reach'
+        max_episode_steps = 5
+        re = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
+        re._freeze_rand_vec = False
+        timelimit = TimeLimit(env=re, max_episode_steps=max_episode_steps)
+        dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(timelimit)])
+        de = DummyExtractor()
+        obs1 = de.forward(dv1.reset())
+        self.assertFalse(new_epoch_reach(obs1, obs1), 'new_epoch cant diff the same input.')
+
+        obs2_np, _,_,_ = dv1.step(np.array([[0,1,0,0]]))
+        obs2 = de.forward(obs2_np)
+        
+        self.assertFalse(th.equal(obs2, obs1), 'new observation after step is same as old one.') 
+        self.assertFalse(new_epoch_reach(obs1, obs2), 'Same epoch, different observation. Should not be a new epoch.') 
+        new_obs = de.forward(dv1.reset())
+        self.assertTrue(new_epoch_reach(obs1, new_obs), 'New epoch was not recognized.')

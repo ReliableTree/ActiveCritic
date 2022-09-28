@@ -1,11 +1,19 @@
-import torch as th
-import numpy as np
 import gym
-
-from ActiveCritic.model_src.transformer import generate_square_subsequent_mask
-from ActiveCritic.model_src.whole_sequence_model import WholeSequenceActor, WholeSequenceCritic, WholeSequenceModelSetup
-from ActiveCritic.model_src.transformer import TransformerModel, CriticTransformer, ModelSetup
-
+import numpy as np
+import torch as th
+from ActiveCritic.metaworld.metaworld.envs import \
+    ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
+from ActiveCritic.model_src.transformer import (
+    CriticTransformer, ModelSetup, TransformerModel,
+    generate_square_subsequent_mask)
+from ActiveCritic.model_src.whole_sequence_model import (
+    WholeSequenceActor, WholeSequenceCritic, WholeSequenceModelSetup)
+from ActiveCritic.policy.active_critic_policy import ActiveCriticPolicySetup
+from ActiveCritic.utils.gym_utils import (DummyExtractor, make_policy_dict,
+                                          new_epoch_reach)
+from ActiveCritic.utils.pytorch_utils import make_partially_observed_seq
+from imitation.data.wrappers import RolloutInfoWrapper
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 
 def make_seq_encoding_data(batch_size, seq_len, ntoken, d_out, device = 'cuda'):
@@ -73,3 +81,15 @@ def make_obs_act_space(obs_dim, action_dim):
     action_space = gym.spaces.box.Box(
         np.array(action_low), np.array(action_high), (action_dim,), float)
     return observation_space, action_space
+
+def make_acps(seq_len, extractor, new_epoch):
+    acps = ActiveCriticPolicySetup()
+    acps.device='cuda'
+    acps.epoch_len=seq_len
+    acps.extractor=extractor
+    acps.new_epoch=new_epoch
+    acps.opt_steps=100
+    acps.optimisation_threshold=0.9
+    acps.inference_opt_lr = 1e-1
+    acps.optimize = True
+    return acps
