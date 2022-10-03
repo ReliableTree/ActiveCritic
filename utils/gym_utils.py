@@ -6,6 +6,8 @@ from ActiveCritic.metaworld.metaworld.policies import *
 from gym.wrappers import TimeLimit
 from imitation.data.wrappers import RolloutInfoWrapper
 from stable_baselines3.common.vec_env import DummyVecEnv
+from imitation.data import rollout
+from stable_baselines3.common.type_aliases import GymEnv
 
 
 class DummyExtractor:
@@ -58,5 +60,69 @@ def make_dummy_vec_env(name, seq_len):
     env._freeze_rand_vec = False
     timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
     dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(timelimit)])
-    return dv1, policy_dict[env_tag][0]
+    vec_expert = ImitationLearningWrapper(
+        policy=policy_dict[env_tag][0], env=dv1)
+    return dv1, vec_expert
 
+
+def parse_sampled_transitions(transitions, new_epoch, extractor):
+    observations = []
+    actions = []
+    rewards = []
+    epch_actions = []
+    epch_observations = []
+    epch_rewards = []
+    check_obsvs = extractor.forward(transitions[0]['obs'])
+    for i in range(len(transitions)):
+        current_obs = extractor.forward(features=transitions[i]['obs'])
+
+        if new_epoch(current_obs, check_obsvs):
+            check_obsvs = current_obs
+            rewards.append(epch_rewards)
+            observations.append(epch_observations)
+            actions.append(epch_actions)
+
+            epch_actions = []
+            epch_observations = []
+            epch_rewards = []
+
+        epch_observations.append(current_obs.numpy())
+        epch_actions.append(transitions[i]['acts'])
+        epch_rewards.append(transitions[i]['infos']['in_place_reward'])
+
+    observations.append(epch_observations)
+    actions.append(epch_actions)
+    rewards.append(epch_rewards)
+
+    actions = th.tensor(np.array(actions), dtype=th.float)
+    observations = th.tensor(np.array(observations), dtype=th.float)
+    rewards = th.tensor(np.array(rewards), dtype=th.float)
+    return actions, observations, rewards
+
+
+def sample_expert_transitions(policy, env, episodes):
+
+    expert = policy
+
+    print(f"Sampling expert transitions. {episodes}")
+    rollouts = rollout.rollout(
+        expert,
+        env,
+        rollout.make_sample_until(min_timesteps=None, min_episodes=episodes),
+        unwrap=True,
+        exclude_infos=False
+    )
+    return rollout.flatten_trajectories(rollouts)
+
+
+class ImitationLearningWrapper:
+    def __init__(self, policy, env: GymEnv):
+        self.observation_space = env.observation_space
+        self.action_space = env.action_space
+        self.policy = policy
+
+    def predict(self, obsv, deterministic=None):
+        actions = []
+        for obs in obsv:
+            actions.append(self.policy.get_action(obs))
+        return actions

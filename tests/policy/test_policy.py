@@ -3,10 +3,8 @@ import unittest
 import gym
 import numpy as np
 import torch as th
-from ActiveCritic.model_src.transformer import (CriticTransformer, ModelSetup,
-                                                TransformerModel)
-from ActiveCritic.model_src.whole_sequence_model import (
-    WholeSequenceActor, WholeSequenceCritic, WholeSequenceModelSetup)
+from ActiveCritic.model_src.transformer import TransformerModel
+from ActiveCritic.model_src.whole_sequence_model import WholeSequenceModel
 from ActiveCritic.policy.active_critic_policy import (ACPOptResult,
                                                       ActiveCriticPolicy,
                                                       ActiveCriticPolicySetup)
@@ -22,19 +20,18 @@ class TestPolicy(unittest.TestCase):
     def setup_ac(self):
         seq_len = 50
         d_output = 2
-        d_result = 1
         obs_dim = 3
         batch_size = 2
         wsm_actor_setup = make_wsm_setup(
-            seq_len=seq_len, d_output=d_output, model_class=TransformerModel)
+            seq_len=seq_len, d_output=d_output)
         wsm_critic_setup = make_wsm_setup(
-            seq_len=seq_len, d_output=d_output, model_class=CriticTransformer, d_result=d_result)
+            seq_len=seq_len, d_output=1)
         acps = make_acps(
             seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_pap)
         obs_space, acts_space = make_obs_act_space(
             obs_dim=obs_dim, action_dim=d_output)
-        actor = WholeSequenceActor(wsm_actor_setup)
-        critic = WholeSequenceCritic(wsm_critic_setup)
+        actor = WholeSequenceModel(wsm_actor_setup)
+        critic = WholeSequenceModel(wsm_critic_setup)
         ac = ActiveCriticPolicy(observation_space=obs_space, action_space=acts_space,
                                 actor=actor, critic=critic, acps=acps)
         return ac, acps, d_output, obs_dim, batch_size
@@ -45,13 +42,13 @@ class TestPolicy(unittest.TestCase):
         d_result = 1
         d_output = env.action_space.shape[0]
         wsm_actor_setup = make_wsm_setup(
-            seq_len=seq_len, d_output=d_output, model_class=TransformerModel)
+            seq_len=seq_len, d_output=d_output)
         wsm_critic_setup = make_wsm_setup(
-            seq_len=seq_len, d_output=d_output, model_class=CriticTransformer, d_result=d_result)
+            seq_len=seq_len, d_output=1)
         acps = make_acps(
             seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach)
-        actor = WholeSequenceActor(wsm_actor_setup)
-        critic = WholeSequenceCritic(wsm_critic_setup)
+        actor = WholeSequenceModel(wsm_actor_setup)
+        critic = WholeSequenceModel(wsm_critic_setup)
         ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
                                 actor=actor, critic=critic, acps=acps)
         return ac, acps, env
@@ -79,14 +76,14 @@ class TestPolicy(unittest.TestCase):
         org_obs_seq = 2*th.ones([batch_size, current_step+1, obs_dim],
                                 device=acps.device, dtype=th.float, requires_grad=False)
         optimizer = th.optim.Adam([opt_actions], lr=1e-1)
-        goal_label = th.ones([batch_size], device=acps.device, dtype=th.float)
+        goal_label = th.ones([batch_size, acps.epoch_len, 1], device=acps.device, dtype=th.float)
 
         actions, critic_result = ac.inference_opt_step(
             org_actions=org_actions, opt_actions=opt_actions, obs_seq=obs_seq, optimizer=optimizer, goal_label=goal_label, current_step=current_step)
 
         last_critic_result = th.clone(critic_result.detach())
 
-        for i in range(3):
+        for i in range(1):
             actions, critic_result = ac.inference_opt_step(
                 org_actions=org_actions, opt_actions=opt_actions, obs_seq=obs_seq, optimizer=optimizer, goal_label=goal_label, current_step=current_step)
             self.assertTrue(th.equal(
@@ -147,3 +144,6 @@ class TestPolicy(unittest.TestCase):
                 aob = th.tensor(all_observations).transpose(0,1)[:,:50]
                 self.assertTrue(th.equal(aob.to('cuda'), ac.obs_seq), 'Observation sequence was overridden')
                 self.assertTrue(ac.current_result.expected_succes_before < ac.current_result.expected_succes_after, 'In inference optimisation wetn wrong.')
+
+if __name__ == '__main__':
+    unittest.main()

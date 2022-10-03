@@ -14,11 +14,9 @@ class ModelSetup:
         self.d_model = 512
         self.nlayers = 4
         self.seq_len = 100
-        self.d_result = None
         self.ntoken = -1
         self.dropout = 0.2
         self.device = 'cuda'
-        self.model_class:TransformerModel = TransformerModel
 
 class TransformerModel(nn.Module):
 
@@ -63,17 +61,6 @@ class TransformerModel(nn.Module):
         output = self.decoder(output)
         return output
 
-class CriticTransformer(TransformerModel):
-    def __init__(self,model_setup:ModelSetup):
-        super().__init__(model_setup=model_setup)        
-        self.result_encoder = nn.Linear(
-                        self.model_setup.d_output * self.model_setup.seq_len, self.model_setup.d_result)
-                        
-    def forward(self, src: Tensor) -> Tensor:
-        pre_result = super().forward(src)
-        pre_result = pre_result.reshape(pre_result.size(0), -1)
-        result = self.result_encoder(pre_result)
-        return result
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:
     """Generates an upper-triangular matrix of -inf, with zeros on diag."""

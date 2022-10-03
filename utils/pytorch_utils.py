@@ -59,3 +59,22 @@ def add_max_val_to_dict(dict, key, val, tm):
 
 def calcMSE(a, b):
     return ((a.squeeze() - b.squeeze())**2).mean()
+
+
+def apply_triu(inpt, diagonal):
+    exp_inpt = inpt.unsqueeze(1)
+    shape = exp_inpt.shape
+    # shape = batch, 1, seq, dims...
+    exp_inpt = exp_inpt.repeat([1, shape[2], *[1]*(len(shape)-2)])
+    mask = th.triu(th.ones(
+        [shape[2], shape[2]], device=inpt.device), diagonal=diagonal).T
+    # batch, seq, seq, dims...
+    exp_out = exp_inpt * mask[None, :, :, None]
+    return exp_out
+
+
+def make_part_obs_data(actions, observations, rewards):
+    acts = actions.repeat([1, actions.shape[1], 1]).reshape([-1, actions.shape[1], actions.shape[2]])
+    rews = rewards.repeat([1, rewards.shape[1]]).reshape([-1,rewards.shape[1]])
+    obsv = apply_triu(observations, diagonal=0).reshape([-1, observations.shape[-2], observations.shape[-1]])
+    return acts, obsv, rews

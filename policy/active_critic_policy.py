@@ -7,8 +7,7 @@ from matplotlib.pyplot import step
 
 import numpy as np
 import torch
-from ActiveCritic.model_src.whole_sequence_model import (
-    WholeSequenceActor, WholeSequenceCritic, WholeSequenceModelSetup)
+from ActiveCritic.model_src.whole_sequence_model import WholeSequenceModel
 from ActiveCritic.utils.pytorch_utils import make_partially_observed_seq
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -41,8 +40,8 @@ class ActiveCriticPolicy(BaseModel):
         self,
         observation_space,
         action_space,
-        actor: WholeSequenceActor,
-        critic: WholeSequenceCritic,
+        actor: WholeSequenceModel,
+        critic: WholeSequenceModel,
         acps: ActiveCriticPolicySetup = None
     ):
 
@@ -90,7 +89,7 @@ class ActiveCriticPolicy(BaseModel):
                 action_seq, actions, current_step)
         expected_success = self.get_critic_score(
             acts=actions, obs_seq=observation_seq)
-
+        expected_success = expected_success[:,-1]
         if not optimize:
             result = ACPOptResult(
                 gen_trj=actions, expected_succes_before=expected_success.detach())
@@ -111,8 +110,9 @@ class ActiveCriticPolicy(BaseModel):
         optimizer = torch.optim.Adam(
             [optimized_actions], lr=self.args_obj.inference_opt_lr)
         expected_success = torch.zeros(
-            size=[actions.shape[0]], dtype=torch.float, device=actions.device)
-        goal_label = torch.ones_like(expected_success)
+            size=[actions.shape[0], 1, self.critic.wsms.model_setup.d_output], dtype=torch.float, device=actions.device)
+        goal_label = torch.ones(
+            size=[actions.shape[0], self.critic.wsms.model_setup.seq_len, self.critic.wsms.model_setup.d_output], dtype=torch.float, device=actions.device)
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()
@@ -132,7 +132,7 @@ class ActiveCriticPolicy(BaseModel):
     def inference_opt_step(self, org_actions: torch.Tensor, opt_actions: torch.Tensor, obs_seq: torch.Tensor, optimizer: torch.optim.Optimizer, goal_label: torch.Tensor, current_step: int):
         critic_result = self.get_critic_score(
             acts=opt_actions, obs_seq=obs_seq)
-        critic_loss, lp, ln = self.critic.loss_fct(
+        critic_loss = self.critic.loss_fct(
             result=critic_result, label=goal_label)
 
         optimizer.zero_grad()
@@ -141,14 +141,13 @@ class ActiveCriticPolicy(BaseModel):
 
         actions = self.proj_actions(
             org_actions=org_actions, new_actions=opt_actions, current_step=current_step)
-
-        return actions, critic_result
+        return actions, critic_result[:,-1]
 
     def get_critic_score(self, acts, obs_seq):
         critic_input = make_partially_observed_seq(
             obs=obs_seq, acts=acts, seq_len=self.args_obj.epoch_len, act_space=self.action_space)
 
-        critic_result = self.critic.forward(inputs=critic_input)
+        critic_result = self.critic.forward(inputs=critic_input) #batch_size, seq_len, 1
         return critic_result
 
     def proj_actions(self, org_actions: torch.Tensor, new_actions: torch.Tensor, current_step: int):
