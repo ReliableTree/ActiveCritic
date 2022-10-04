@@ -1,5 +1,4 @@
 import sys
-sys.path.append('C:/Users/Hendrik/PycharmProjects') # go to parent dir
 
 import math
 from typing import Tuple
@@ -8,7 +7,7 @@ import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from ActiveCritic.model_src.base_transformer import DebugTEL, DebugTE
+from model_src.base_transformer import DebugTEL, DebugTE
 
 class ModelSetup:
     def __init__(self) -> None:

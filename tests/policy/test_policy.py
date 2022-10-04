@@ -1,18 +1,14 @@
 import unittest
 
-import gym
-import numpy as np
 import torch as th
-from ActiveCritic.model_src.transformer import TransformerModel
-from ActiveCritic.model_src.whole_sequence_model import WholeSequenceModel
-from ActiveCritic.policy.active_critic_policy import (ACPOptResult,
-                                                      ActiveCriticPolicy,
-                                                      ActiveCriticPolicySetup)
-from ActiveCritic.tests.test_utils.utils import (make_acps, make_obs_act_space,
-                                                 make_wsm_setup)
-from ActiveCritic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
-                                          make_policy_dict, new_epoch_pap,
-                                          new_epoch_reach)
+
+from model_src.whole_sequence_model import WholeSequenceModel
+from policy.active_critic_policy import (ActiveCriticPolicy)
+from tests.test_utils.utils import (make_acps, make_obs_act_space,
+                                    make_wsm_setup)
+from utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
+                             new_epoch_pap,
+                             new_epoch_reach)
 
 
 class TestPolicy(unittest.TestCase):
@@ -71,21 +67,23 @@ class TestPolicy(unittest.TestCase):
                               device=acps.device, dtype=th.float, requires_grad=False)
         opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2*th.ones([batch_size, current_step+1, obs_dim],
-                            device=acps.device, dtype=th.float, requires_grad=False)
-        org_obs_seq = 2*th.ones([batch_size, current_step+1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
+        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
+                              device=acps.device, dtype=th.float, requires_grad=False)
+        org_obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
+                                  device=acps.device, dtype=th.float, requires_grad=False)
         optimizer = th.optim.Adam([opt_actions], lr=1e-1)
         goal_label = th.ones([batch_size, acps.epoch_len, 1], device=acps.device, dtype=th.float)
 
         actions, critic_result = ac.inference_opt_step(
-            org_actions=org_actions, opt_actions=opt_actions, obs_seq=obs_seq, optimizer=optimizer, goal_label=goal_label, current_step=current_step)
+            org_actions=org_actions, opt_actions=opt_actions, obs_seq=obs_seq, optimizer=optimizer,
+            goal_label=goal_label, current_step=current_step)
 
         last_critic_result = th.clone(critic_result.detach())
 
         for i in range(1):
             actions, critic_result = ac.inference_opt_step(
-                org_actions=org_actions, opt_actions=opt_actions, obs_seq=obs_seq, optimizer=optimizer, goal_label=goal_label, current_step=current_step)
+                org_actions=org_actions, opt_actions=opt_actions, obs_seq=obs_seq, optimizer=optimizer,
+                goal_label=goal_label, current_step=current_step)
             self.assertTrue(th.equal(
                 org_actions[:, :current_step], actions[:, :current_step]), 'org_actions were overwritten')
             self.assertFalse(th.equal(
@@ -100,16 +98,14 @@ class TestPolicy(unittest.TestCase):
         current_step = 1
         ac, acps, act_dim, obs_dim, batch_size = self.setup_ac()
 
-
         org_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                              device=acps.device, dtype=th.float, requires_grad=False)
+                               device=acps.device, dtype=th.float, requires_grad=False)
         opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2*th.ones([batch_size, current_step+1, obs_dim],
-                            device=acps.device, dtype=th.float, requires_grad=False)
-        org_obs_seq = 2*th.ones([batch_size, current_step+1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-
+        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
+                              device=acps.device, dtype=th.float, requires_grad=False)
+        org_obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
+                                  device=acps.device, dtype=th.float, requires_grad=False)
 
         actions, expected_success = ac.optimize_act_sequence(
             actions=opt_actions, observations=obs_seq, current_step=current_step)
@@ -117,7 +113,8 @@ class TestPolicy(unittest.TestCase):
             org_actions[:, :current_step], actions[:, :current_step]), 'org_actions were overwritten')
 
         self.assertFalse(th.equal(actions[:, current_step:], org_actions[:,
-                         current_step:]), 'seq optimisation did not change the actions')
+                                                             current_step:]),
+                         'seq optimisation did not change the actions')
 
         self.assertTrue(th.all(
             expected_success >= ac.args_obj.optimisation_threshold), 'optimisation does not work.')
@@ -136,14 +133,17 @@ class TestPolicy(unittest.TestCase):
             all_taken_actions.append(action)
             obsv, rew, dones, info = env.step(action)
             all_observations.append(obsv)
-            self.assertTrue(len(th.nonzero(ac.obs_seq[:,ac.current_step+1:])) == 0, 'unobserved seq is not 0') 
+            self.assertTrue(len(th.nonzero(ac.obs_seq[:, ac.current_step + 1:])) == 0, 'unobserved seq is not 0')
             if new_epoch_reach(last_obsv, th.tensor(obsv)):
                 self.assertTrue(ac.current_step == ac.args_obj.epoch_len - 1, 'Steps are counted wrong')
-                ata = th.tensor(all_taken_actions).transpose(0,1)
-                self.assertTrue(th.equal(ata.to('cuda'), ac.current_result.gen_trj), 'Actual action sequence differs from saved action sequence. Maybe problem with backprop?')
-                aob = th.tensor(all_observations).transpose(0,1)[:,:50]
+                ata = th.tensor(all_taken_actions).transpose(0, 1)
+                self.assertTrue(th.equal(ata.to('cuda'), ac.current_result.gen_trj),
+                                'Actual action sequence differs from saved action sequence. Maybe problem with backprop?')
+                aob = th.tensor(all_observations).transpose(0, 1)[:, :50]
                 self.assertTrue(th.equal(aob.to('cuda'), ac.obs_seq), 'Observation sequence was overridden')
-                self.assertTrue(ac.current_result.expected_succes_before < ac.current_result.expected_succes_after, 'In inference optimisation wetn wrong.')
+                self.assertTrue(ac.current_result.expected_succes_before < ac.current_result.expected_succes_after,
+                                'In inference optimisation wetn wrong.')
+
 
 if __name__ == '__main__':
     unittest.main()

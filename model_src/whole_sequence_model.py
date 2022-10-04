@@ -2,8 +2,8 @@ from abc import ABC, abstractclassmethod, abstractmethod
 import typing
 import torch as th
 import torch.nn as nn
-from ActiveCritic.model_src.transformer import TransformerModel, ModelSetup
-from ActiveCritic.utils.pytorch_utils import calcMSE
+from model_src.transformer import TransformerModel, ModelSetup
+from utils.pytorch_utils import calcMSE
 
 
 class WholeSequenceModelSetup:

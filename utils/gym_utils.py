@@ -1,6 +1,6 @@
 import numpy as np
 import torch as th
-from ActiveCritic.metaworld.metaworld.envs import \
+from metaworld.metaworld.envs import \
     ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
 from ActiveCritic.metaworld.metaworld.policies import *
 from gym.wrappers import TimeLimit

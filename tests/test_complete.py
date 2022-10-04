@@ -1,10 +1,9 @@
-from ast import main
 from unicodedata import name
 import unittest
-from ActiveCritic.tests.nn_model.test_transformers import TestTransformerModel
-from ActiveCritic.tests.nn_model.test_whole_sequence_model import TestWholeSequenceModel
-from ActiveCritic.tests.util.test_util import TestUtils
-from ActiveCritic.tests.policy.test_policy import TestPolicy
+from tests.nn_model.test_transformers import TestTransformerModel
+from tests.nn_model.test_whole_sequence_model import TestWholeSequenceModel
+from tests.util.test_util import TestUtils
+from tests.policy.test_policy import TestPolicy
 import gym
 
 if __name__ == '__main__':

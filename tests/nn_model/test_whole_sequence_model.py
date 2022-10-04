@@ -1,7 +1,7 @@
-from ActiveCritic.model_src.whole_sequence_model import WholeSequenceModel
-from ActiveCritic.model_src.transformer import ModelSetup, TransformerModel
+from model_src.whole_sequence_model import WholeSequenceModel
+from model_src.transformer import ModelSetup, TransformerModel
 import torch as th
-from ActiveCritic.tests.test_utils.utils import make_mask_data, make_seq_encoding_data, make_critic_data, make_wsm_setup
+from tests.test_utils.utils import make_mask_data, make_seq_encoding_data, make_critic_data, make_wsm_setup
 import unittest
 
 

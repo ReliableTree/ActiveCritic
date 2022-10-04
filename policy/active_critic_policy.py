@@ -7,8 +7,8 @@ from matplotlib.pyplot import step
 
 import numpy as np
 import torch
-from ActiveCritic.model_src.whole_sequence_model import WholeSequenceModel
-from ActiveCritic.utils.pytorch_utils import make_partially_observed_seq
+from model_src.whole_sequence_model import WholeSequenceModel
+from utils.pytorch_utils import make_partially_observed_seq
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
