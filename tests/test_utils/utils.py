@@ -1,19 +1,11 @@
-import gym
 import numpy as np
 import torch as th
-from ActiveCritic.metaworld.metaworld.envs import \
-    ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
 from ActiveCritic.model_src.transformer import (
     CriticTransformer, ModelSetup, TransformerModel,
     generate_square_subsequent_mask)
 from ActiveCritic.model_src.whole_sequence_model import (
     WholeSequenceActor, WholeSequenceCritic, WholeSequenceModelSetup)
 from ActiveCritic.policy.active_critic_policy import ActiveCriticPolicySetup
-from ActiveCritic.utils.gym_utils import (DummyExtractor, make_policy_dict,
-                                          new_epoch_reach)
-from ActiveCritic.utils.pytorch_utils import make_partially_observed_seq
-from imitation.data.wrappers import RolloutInfoWrapper
-from stable_baselines3.common.vec_env import DummyVecEnv
 
 
 def make_seq_encoding_data(batch_size, seq_len, ntoken, d_out, device = 'cuda'):

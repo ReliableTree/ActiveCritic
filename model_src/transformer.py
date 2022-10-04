@@ -1,3 +1,6 @@
+import sys
+sys.path.append('C:/Users/Hendrik/PycharmProjects') # go to parent dir
+
 import math
 from typing import Tuple
 
@@ -5,6 +8,7 @@ import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from ActiveCritic.model_src.base_transformer import DebugTEL, DebugTE
 
 class ModelSetup:
     def __init__(self) -> None:
@@ -38,15 +42,15 @@ class TransformerModel(nn.Module):
         nlayers = self.model_setup.nlayers
         dropout = self.model_setup.dropout
         self.pos_encoder = PositionalEncoding(d_model, dropout)
-        encoder_layers = TransformerEncoderLayer(d_model, nhead, d_hid, dropout, batch_first=True)
-        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+        encoder_layers = DebugTEL(d_model, nhead, d_hid, dropout, batch_first=True)
+        self.transformer_encoder = DebugTE(encoder_layers, nlayers)
         self.encoder = nn.Linear(ntoken, d_model)
         self.decoder = nn.Linear(d_model, d_output)
         self.to(self.model_setup.device)
         self.lazy_init = True
 
 
-    def forward(self, src: Tensor, mask = None) -> Tensor:
+    def forward(self, src: Tensor, mask = None, return_attention=False) -> Tensor:
         """
         Args:
             src: Tensor, shape [seq_len, batch_size]
@@ -59,9 +63,15 @@ class TransformerModel(nn.Module):
             self._lazy_init(src)
         src = self.encoder(src) * math.sqrt(self.model_setup.d_model)
         src = self.pos_encoder(src)
-        output = self.transformer_encoder.forward(src=src, mask=mask)
+        if return_attention:
+            output, attention = self.transformer_encoder.forward(src=src, mask=mask, return_attention=return_attention)
+        else:
+            output = self.transformer_encoder.forward(src=src, mask=mask)
         output = self.decoder(output)
-        return output
+        if return_attention:
+            return output, attention
+        else:
+            return output
 
 class CriticTransformer(TransformerModel):
     def __init__(self,model_setup:ModelSetup):
