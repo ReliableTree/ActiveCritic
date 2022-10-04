@@ -1,11 +1,13 @@
+import gym
 import numpy as np
 import torch as th
-from ActiveCritic.model_src.transformer import (
-    CriticTransformer, ModelSetup, TransformerModel,
-    generate_square_subsequent_mask)
-from ActiveCritic.model_src.whole_sequence_model import (
-    WholeSequenceActor, WholeSequenceCritic, WholeSequenceModelSetup)
-from ActiveCritic.policy.active_critic_policy import ActiveCriticPolicySetup
+from ActiveCritic.metaworld.metaworld.envs import \
+    ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
+from ActiveCritic.model_src.transformer import (ModelSetup, generate_square_subsequent_mask)
+from ActiveCritic.model_src.whole_sequence_model import (WholeSequenceModelSetup, WholeSequenceModel)
+from ActiveCritic.policy.active_critic_policy import ActiveCriticPolicySetup, ActiveCriticPolicy
+from ActiveCritic.utils.gym_utils import (DummyExtractor, new_epoch_reach)
+from ActiveCritic.utils.gym_utils import make_dummy_vec_env
 
 
 def make_seq_encoding_data(batch_size, seq_len, ntoken, d_out, device = 'cuda'):
@@ -42,7 +44,7 @@ def make_policy_obs_action(seq_len, ntoken, d_out, diff_ele, device = 'cuda'):
     
     return o, a
 
-def make_wsm_setup(seq_len, d_output, model_class, d_result=-1, device='cuda'):
+def make_wsm_setup(seq_len, d_output, d_result=-1, device='cuda'):
     wsm = WholeSequenceModelSetup()
     wsm.model_setup = ModelSetup()
     seq_len = seq_len
@@ -58,7 +60,6 @@ def make_wsm_setup(seq_len, d_output, model_class, d_result=-1, device='cuda'):
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.Adam
     wsm.optimizer_kwargs = {}
-    wsm.model_setup.model_class:TransformerModel = model_class
     wsm.model_setup.d_result = d_result
     return wsm
 
@@ -81,7 +82,24 @@ def make_acps(seq_len, extractor, new_epoch):
     acps.extractor=extractor
     acps.new_epoch=new_epoch
     acps.opt_steps=100
-    acps.optimisation_threshold=0.9
+    acps.optimisation_threshold=0.5
     acps.inference_opt_lr = 1e-1
     acps.optimize = True
     return acps
+
+def setup_ac_reach():
+    seq_len = 5
+    env, gt_policy = make_dummy_vec_env('reach', seq_len=seq_len)
+    d_result = 1
+    d_output = env.action_space.shape[0]
+    wsm_actor_setup = make_wsm_setup(
+        seq_len=seq_len, d_output=d_output)
+    wsm_critic_setup = make_wsm_setup(
+        seq_len=seq_len, d_output=1)
+    acps = make_acps(
+        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach)
+    actor = WholeSequenceModel(wsm_actor_setup)
+    critic = WholeSequenceModel(wsm_critic_setup)
+    ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
+                            actor=actor, critic=critic, acps=acps)
+    return ac, acps, env

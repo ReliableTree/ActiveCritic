@@ -5,8 +5,8 @@ import numpy as np
 import torch as th
 from ActiveCritic.metaworld.metaworld.envs import \
     ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
-from ActiveCritic.utils.gym_utils import make_policy_dict, new_epoch_reach
-from ActiveCritic.utils.pytorch_utils import make_partially_observed_seq
+from ActiveCritic.utils.gym_utils import make_policy_dict, new_epoch_reach, make_dummy_vec_env, sample_expert_transitions, parse_sampled_transitions
+from ActiveCritic.utils.pytorch_utils import make_partially_observed_seq, make_part_obs_data
 from gym.wrappers import TimeLimit
 from imitation.data.wrappers import RolloutInfoWrapper
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -75,3 +75,40 @@ class TestUtils(unittest.TestCase):
         self.assertFalse(new_epoch_reach(obs1, obs2), 'Same epoch, different observation. Should not be a new epoch.') 
         new_obs = de.forward(dv1.reset())
         self.assertTrue(new_epoch_reach(obs1, new_obs), 'New epoch was not recognized.')
+
+    def test_collect_new_transitions(self):
+        seq_len = 100
+        episodes = 2
+        name = 'reach'
+        env, exp = make_dummy_vec_env(name=name, seq_len=seq_len)
+        transitions = sample_expert_transitions(policy=exp.predict, env=env, episodes=episodes)
+        actions, observations, rewards = parse_sampled_transitions(transitions=transitions, new_epoch=new_epoch_reach, extractor=DummyExtractor())
+        
+        
+        self.assertTrue( list(actions.shape) == [episodes, seq_len, env.action_space.shape[0]])
+        self.assertTrue(list(observations.shape) == [episodes, seq_len, env.observation_space.shape[0]])
+        self.assertTrue(list(rewards.shape) == [episodes, seq_len])
+        self.assertTrue(th.all(rewards[:,-1] == 1))
+
+    def test_part_observ_seq(self):
+        epsiodes = 2
+        seq_len = 5
+        env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
+        transitions = sample_expert_transitions(policy=expert.predict, env=env, episodes=epsiodes)
+        actions, observations, rewards = parse_sampled_transitions(transitions=transitions, new_epoch=new_epoch_reach, extractor=DummyExtractor())
+        acts, obsv, rews = make_part_obs_data(actions=actions, observations=observations, rewards=rewards)
+        
+        assert list(acts.shape) == [epsiodes*seq_len, seq_len, env.action_space.shape[0]]
+        assert list(obsv.shape) == [epsiodes*seq_len, seq_len, env.observation_space.shape[0]]
+        assert list(rews.shape) == [epsiodes*seq_len, seq_len]
+
+        for i in range(seq_len*epsiodes):
+            org_index = int(i/seq_len)
+            part_obs = th.clone(observations[org_index])
+            part_obs[i%seq_len + 1 :] = 0
+            assert th.equal(obsv[i], part_obs)
+            assert th.equal(acts[i], actions[org_index])
+
+
+if __name__ == '__main__':
+    unittest.main()
