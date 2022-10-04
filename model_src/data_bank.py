@@ -50,3 +50,4 @@ if __name__ == '__main__':
 
     h1 = db1.filter('name', 'hendrik')
     print([db1.keys[h] for h in h2])
+    print('hello')
