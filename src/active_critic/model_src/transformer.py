@@ -5,9 +5,7 @@ from typing import Tuple
 
 import torch
 from torch import nn, Tensor
-import torch.nn.functional as F
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from model_src.base_transformer import DebugTEL, DebugTE
+from active_critic.model_src.base_transformer import DebugTEL, DebugTE
 
 class ModelSetup:
     def __init__(self) -> None:

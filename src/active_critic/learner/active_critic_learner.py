@@ -2,10 +2,10 @@ import imp
 from gym.envs.mujoco import MujocoEnv
 import torch.nn as nn
 import torch as th
-from ActiveCritic.learner.active_critic_args import ActiveCriticLearnerArgs
-from ActiveCritic.policy.active_critic_policy import ActiveCriticPolicy
-from ActiveCritic.utils.tboard_graphs import TBoardGraphs
-from ActiveCritic.utils.dataset import DatasetAC
+from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
+from active_critic.policy.active_critic_policy import ActiveCriticPolicy
+from active_critic.utils.tboard_graphs import TBoardGraphs
+from active_critic.utils.dataset import DatasetAC
 from torch.utils.data.dataloader import DataLoader
 
 class ActiveCriticLearner(nn.Module):

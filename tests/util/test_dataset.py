@@ -1,6 +1,6 @@
 import unittest
 import torch as th
-from ActiveCritic.utils.dataset import DatasetAC
+from active_critic.utils.dataset import DatasetAC
 
 class TestDataset(unittest.TestCase):
 

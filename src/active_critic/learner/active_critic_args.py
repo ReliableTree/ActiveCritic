@@ -1,6 +1,6 @@
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from typing import Optional, Union
-from ActiveCritic.policy.active_critic_policy import ActiveCriticPolicySetup
+from active_critic.policy.active_critic_policy import ActiveCriticPolicySetup
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 import torch

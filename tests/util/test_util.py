@@ -3,14 +3,14 @@ import unittest
 import gym
 import numpy as np
 import torch as th
-from ActiveCritic.metaworld.metaworld.envs import \
+from metaworld.envs import \
     ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
-from ActiveCritic.utils.gym_utils import make_policy_dict, new_epoch_reach, make_dummy_vec_env, sample_expert_transitions, parse_sampled_transitions
-from ActiveCritic.utils.pytorch_utils import make_partially_observed_seq, make_part_obs_data
+from active_critic.utils.gym_utils import make_policy_dict, new_epoch_reach, make_dummy_vec_env, sample_expert_transitions, parse_sampled_transitions
+from active_critic.utils.pytorch_utils import make_partially_observed_seq, make_part_obs_data
 from gym.wrappers import TimeLimit
 from imitation.data.wrappers import RolloutInfoWrapper
 from stable_baselines3.common.vec_env import DummyVecEnv
-from ActiveCritic.utils.gym_utils import DummyExtractor
+from active_critic.utils.gym_utils import DummyExtractor
 
 
 class TestUtils(unittest.TestCase):

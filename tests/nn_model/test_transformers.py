@@ -1,8 +1,8 @@
 import unittest
-from model_src.transformer import ModelSetup, TransformerModel, generate_square_subsequent_mask
+from active_critic.model_src.transformer import ModelSetup, TransformerModel, generate_square_subsequent_mask
 import torch as th
-from utils.pytorch_utils import calcMSE
-from tests.test_utils.utils import make_seq_encoding_data, make_mask_data, make_critic_data
+from active_critic.utils.pytorch_utils import calcMSE
+from active_critic.utils.test_utils import make_seq_encoding_data, make_mask_data, make_critic_data
 
 
 class TestTransformerModel(unittest.TestCase):

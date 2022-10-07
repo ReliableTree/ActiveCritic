@@ -1,13 +1,15 @@
-from model_src.whole_sequence_model import WholeSequenceModel
-from model_src.transformer import ModelSetup, TransformerModel
+from active_critic.model_src.whole_sequence_model import WholeSequenceModel
+from active_critic.model_src.transformer import ModelSetup, TransformerModel
 import torch as th
-from tests.test_utils.utils import make_mask_data, make_seq_encoding_data, make_critic_data, make_wsm_setup
+from active_critic.utils.test_utils import make_mask_data, make_seq_encoding_data, make_critic_data, make_wsm_setup
 import unittest
 
 
 class TestWholeSequenceModel(unittest.TestCase):
 
     def test_WholeSequenceActor(self):
+        th.manual_seed(0)
+
         seq_len = 6
         ntoken = 3
         d_output = 2

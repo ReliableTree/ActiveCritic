@@ -3,12 +3,11 @@ import copy
 from pyclbr import Function
 from tkinter.messagebox import NO
 from typing import Dict, Optional, Tuple, Union
-from matplotlib.pyplot import step
 
 import numpy as np
 import torch
-from model_src.whole_sequence_model import WholeSequenceModel
-from utils.pytorch_utils import make_partially_observed_seq
+from active_critic.model_src.whole_sequence_model import WholeSequenceModel
+from active_critic.utils.pytorch_utils import make_partially_observed_seq
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
@@ -89,7 +88,7 @@ class ActiveCriticPolicy(BaseModel):
                 action_seq, actions, current_step)
         expected_success = self.get_critic_score(
             acts=actions, obs_seq=observation_seq)
-        expected_success = expected_success[:,-1]
+        expected_success = expected_success
         if not optimize:
             result = ACPOptResult(
                 gen_trj=actions, expected_succes_before=expected_success.detach())
@@ -110,13 +109,12 @@ class ActiveCriticPolicy(BaseModel):
         optimizer = torch.optim.Adam(
             [optimized_actions], lr=self.args_obj.inference_opt_lr)
         expected_success = torch.zeros(
-            size=[actions.shape[0], 1, self.critic.wsms.model_setup.d_output], dtype=torch.float, device=actions.device)
-        goal_label = torch.ones(
             size=[actions.shape[0], self.critic.wsms.model_setup.seq_len, self.critic.wsms.model_setup.d_output], dtype=torch.float, device=actions.device)
+        goal_label = torch.ones_like(expected_success)
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()
-        while (not torch.all(expected_success >= self.args_obj.optimisation_threshold)) and (step <= self.args_obj.opt_steps):
+        while (not torch.all(expected_success[:,-1] >= self.args_obj.optimisation_threshold)) and (step <= self.args_obj.opt_steps):
 
             optimized_actions, expected_success = self.inference_opt_step(
                 org_actions=actions,
@@ -141,7 +139,7 @@ class ActiveCriticPolicy(BaseModel):
 
         actions = self.proj_actions(
             org_actions=org_actions, new_actions=opt_actions, current_step=current_step)
-        return actions, critic_result[:,-1]
+        return actions, critic_result
 
     def get_critic_score(self, acts, obs_seq):
         critic_input = make_partially_observed_seq(

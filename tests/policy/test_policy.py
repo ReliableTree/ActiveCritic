@@ -2,11 +2,11 @@ import unittest
 
 import torch as th
 
-from model_src.whole_sequence_model import WholeSequenceModel
-from policy.active_critic_policy import (ActiveCriticPolicy)
-from tests.test_utils.utils import (make_acps, make_obs_act_space,
+from active_critic.model_src.whole_sequence_model import WholeSequenceModel
+from active_critic.policy.active_critic_policy import ActiveCriticPolicy
+from active_critic.utils.test_utils import (make_acps, make_obs_act_space,
                                     make_wsm_setup)
-from utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
+from active_critic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
                              new_epoch_pap,
                              new_epoch_reach)
 
@@ -89,7 +89,7 @@ class TestPolicy(unittest.TestCase):
             self.assertFalse(th.equal(
                 opt_actions[:, current_step:], org_actions[:, current_step:]), 'opt actions did not change')
             self.assertTrue(
-                th.all(critic_result > last_critic_result), 'optimisation does not work.')
+                th.all(critic_result.mean(dim=[1,2]) > last_critic_result.mean(dim=[1,2])), 'optimisation does not work.')
             last_critic_result = th.clone(critic_result.detach())
 
     def test_seq_optimizer(self):
@@ -115,9 +115,8 @@ class TestPolicy(unittest.TestCase):
         self.assertFalse(th.equal(actions[:, current_step:], org_actions[:,
                                                              current_step:]),
                          'seq optimisation did not change the actions')
-
         self.assertTrue(th.all(
-            expected_success >= ac.args_obj.optimisation_threshold), 'optimisation does not work.')
+            expected_success[:,-1] >= ac.args_obj.optimisation_threshold), 'optimisation does not work.')
         self.assertTrue(th.equal(obs_seq, org_obs_seq),
                         'Observations were changed.')
 
@@ -141,8 +140,9 @@ class TestPolicy(unittest.TestCase):
                                 'Actual action sequence differs from saved action sequence. Maybe problem with backprop?')
                 aob = th.tensor(all_observations).transpose(0, 1)[:, :50]
                 self.assertTrue(th.equal(aob.to('cuda'), ac.obs_seq), 'Observation sequence was overridden')
-                self.assertTrue(ac.current_result.expected_succes_before < ac.current_result.expected_succes_after,
-                                'In inference optimisation wetn wrong.')
+
+                self.assertTrue(ac.current_result.expected_succes_before.mean() < ac.current_result.expected_succes_after.mean(),
+                                'In inference optimisation went wrong.')
 
 
 if __name__ == '__main__':

@@ -1,8 +1,8 @@
 import numpy as np
 import torch as th
-from metaworld.metaworld.envs import \
+from metaworld.envs import \
     ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
-from ActiveCritic.metaworld.metaworld.policies import *
+from metaworld.policies import *
 from gym.wrappers import TimeLimit
 from imitation.data.wrappers import RolloutInfoWrapper
 from stable_baselines3.common.vec_env import DummyVecEnv
