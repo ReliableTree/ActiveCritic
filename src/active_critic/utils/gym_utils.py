@@ -135,7 +135,8 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, episodes:int=1):
         policy.reset()
         transitions = sample_expert_transitions(
             policy.predict, env, episodes)
-        expected_rewards = policy.score_history
+        expected_rewards_after = policy.score_history_after
+        expected_rewards_before = policy.score_history_before
         datas = parse_sampled_transitions(
             transitions=transitions, new_epoch=policy.args_obj.new_epoch, extractor=policy.args_obj.extractor)
         device_data = []
@@ -143,4 +144,4 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, episodes:int=1):
             device_data.append(data.to(policy.args_obj.device))
         actions, observations, rewards = device_data
         rewards = rewards.unsqueeze(-1)
-        return actions, observations, rewards, expected_rewards
+        return actions, observations, rewards, expected_rewards_before, expected_rewards_after

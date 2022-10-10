@@ -58,7 +58,8 @@ class ActiveCriticPolicy(BaseModel):
     def reset(self):
         self.last_goal = None
         self.current_step = 0
-        self.score_history = None
+        self.score_history_after = None
+        self.score_history_before = None
 
     def reset_epoch(self, vec_obsv: th.Tensor):
         self.current_step = 0
@@ -66,12 +67,20 @@ class ActiveCriticPolicy(BaseModel):
         self.current_result = None
         self.obs_seq = th.zeros(
             size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
-        if self.score_history is None:
-            self.score_history = th.zeros(
-                size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output])
+            
+        if self.score_history_after is None:
+            self.score_history_after = th.zeros(
+                size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output], device=self.args_obj.device)
         else:
-            self.score_history = th.cat((self.score_history, th.zeros(
-                size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output])))
+            self.score_history_after = th.cat((self.score_history_after, th.zeros(
+                size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output], device=self.args_obj.device)))
+
+        if self.score_history_before is None:
+            self.score_history_before = th.zeros(
+                size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output], device=self.args_obj.device)
+        else:
+            self.score_history_before = th.cat((self.score_history_before, th.zeros(
+                size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output], device=self.args_obj.device)))
 
     def predict(
         self,
@@ -96,11 +105,11 @@ class ActiveCriticPolicy(BaseModel):
             observation_seq=self.obs_seq, action_seq=action_seq, optimize=self.args_obj.optimize, current_step=self.current_step)
         batch_size = self.current_result.expected_succes_before.shape[0]
         if self.args_obj.optimize:
-            self.score_history[-batch_size:,
+            self.score_history_after[-batch_size:,
                             self.current_step] = self.current_result.expected_succes_after[:, self.current_step]
-        else:
-            self.score_history[-batch_size:,
-                            self.current_step] = self.current_result.expected_succes_before[:, self.current_step]
+
+        self.score_history_before[-batch_size:,
+                        self.current_step] = self.current_result.expected_succes_before[:, self.current_step]
 
         return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
 

@@ -127,13 +127,14 @@ class TestUtils(unittest.TestCase):
         ac, acps, env = setup_ac_reach()
         acl = ActiveCriticLearner(ac_policy=ac, env=env, network_args_obj=acla)
         env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
-        actions, observations, rewards, expected_rewards = sample_new_episode(
+        actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
             policy=ac,
             env=env,
             new_epoch=new_epoch_reach,
             extractor=DummyExtractor(),
             episodes=epsiodes,
             device='cuda')
+            
         exp_act_shp = [epsiodes, seq_len, env.action_space.shape[0]]
         self.assertTrue( list(actions.shape) == exp_act_shp)
 
@@ -144,7 +145,7 @@ class TestUtils(unittest.TestCase):
         self.assertTrue( list(rewards.shape) == exp_rew_shp)
 
         exp_exp_rew_shp = [epsiodes, seq_len, ac.critic.wsms.model_setup.d_output]
-        self.assertTrue( list(expected_rewards.shape) == exp_exp_rew_shp)
+        self.assertTrue( list(expected_rewards_before.shape) == exp_exp_rew_shp)
 
 
 if __name__ == '__main__':

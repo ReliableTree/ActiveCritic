@@ -27,6 +27,8 @@ class TestUtils(unittest.TestCase):
         acla.logname = 'test_acl'
         acla.tboard = False
         acla.batch_size = 32
+        acla.val_every = 10000
+        acla.validation_episodes = 5
         seq_len = 5
         epsiodes = 2
         ac, acps, env = setup_ac_reach(seq_len=seq_len)
@@ -56,7 +58,7 @@ class TestUtils(unittest.TestCase):
     def test_sample_new_epsiode(self):
         acl, env, expert, seq_len, epsiodes, device = self.make_acl()
 
-        actions, observations, rewards, expected_rewards = sample_new_episode(
+        actions, observations, rewards,expected_rewards_before, expected_rewards_after = sample_new_episode(
             policy=acl.policy,
             env=env,
             episodes=1,
@@ -66,7 +68,7 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(list(observations.shape) == [
                         1, seq_len, env.observation_space.shape[0]])
         self.assertTrue(list(rewards.shape) == [1, seq_len, 1])
-        self.assertTrue(list(expected_rewards.shape) == [1, seq_len, 1])
+        self.assertTrue(list(expected_rewards_after.shape) == [1, seq_len, 1])
 
     def test_convergence(self):
         acl, env, expert, seq_len, epsiodes, device = self.make_acl()

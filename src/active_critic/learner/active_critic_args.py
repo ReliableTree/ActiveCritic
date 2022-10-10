@@ -12,3 +12,5 @@ class ActiveCriticLearnerArgs:
         self.data_path:str = None
         self.device:str = None
         self.batch_size:int = None
+        self.validation_episodes:int = None
+        self.val_every:int= None

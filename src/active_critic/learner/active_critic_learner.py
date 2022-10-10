@@ -1,7 +1,9 @@
 from email import policy
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel
+from cv2 import MSER
 from gym.envs.mujoco import MujocoEnv
 from matplotlib.pyplot import polar
+from sklearn.utils import resample
 import torch.nn as nn
 import torch as th
 from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
@@ -10,7 +12,7 @@ from active_critic.utils.tboard_graphs import TBoardGraphs
 from active_critic.utils.dataset import DatasetAC
 from torch.utils.data.dataloader import DataLoader
 from active_critic.utils.gym_utils import sample_new_episode
-from active_critic.utils.pytorch_utils import make_part_obs_data
+from active_critic.utils.pytorch_utils import make_part_obs_data, calcMSE
 import tensorflow as tf
 
 class ACLScores:
@@ -90,7 +92,7 @@ class ActiveCriticLearner(nn.Module):
         return loss_critic
 
     def add_training_data(self):
-        actions, observations, rewards, expected_rewards = sample_new_episode(
+        actions, observations, rewards, _, _ = sample_new_episode(
             policy=self.policy,
             env=self.env,
             episodes=1)
@@ -125,20 +127,8 @@ class ActiveCriticLearner(nn.Module):
                 'Loss Critic': mean_critic
             }
             self.write_tboard_scalar(debug_dict=debug_dict, train=True)
-
-    def update_min_scores(self, name, score):
-        if name in self.scores:
-            if self.scores[name] > score:
-                self.scores[name] = score
-        else:
-            self.scores[name] = score
-
-    def update_max_scores(self, name, score):
-        if name in self.scores:
-            if self.scores[name] < score:
-                self.scores[name] = score
-        else:
-            self.scores[name] = score
+            if (epoch+1)%self.network_args.val_every == 0:
+                self.run_validation() 
 
 
     def write_tboard_scalar(self, debug_dict, train, step=None):
@@ -152,6 +142,25 @@ class ActiveCriticLearner(nn.Module):
                 else:
                     self.tboard.addValidationScalar(para, value, step)
 
+    def run_validation(self):
+        actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
+            policy=self.policy,
+            env=self.env,
+            episodes=self.network_args.validation_episodes)
+
+        last_reward = rewards[:,-1]
+        last_expected_rewards_before = expected_rewards_before[:, -1]
+        last_expected_reward_after = expected_rewards_after[:, -1]
+        self.analyze_critic_scores(last_reward, last_expected_rewards_before, '')
+        self.analyze_critic_scores(last_reward, last_expected_reward_after, ' optimized')
+        success = (last_reward == 1)
+        success = success.type(th.float)
+        debug_dict = {
+            'Success Rate' : success.mean(),
+            'Reward': last_reward.mean()
+        }
+        self.write_tboard_scalar(debug_dict=debug_dict, train=False)
+
 
 
     def torch2tf(self, inpt):
@@ -162,34 +171,30 @@ class ActiveCriticLearner(nn.Module):
 
     def tf2torch(self, inpt):
         if inpt is not None:
-            return torch.tensor(inpt.numpy(), device=self.device)
+            return th.tensor(inpt.numpy(), device=self.device)
         else:
             return None
 
-    def analyze_critic_scores(self, success, expected_success):
-        success.reshape(-1)
+    def analyze_critic_scores(self, reward:th.Tensor, expected_reward:th.Tensor, add:str):
+        success = reward == 1
+        expected_success = expected_reward >= 0.95
+        success = success.reshape(-1)
         fail = ~success
         expected_success = expected_success.reshape(-1)
         expected_fail = ~ expected_success
 
-        expected_success_float = expected_success.type(torch.float)
-        expected_fail_float = expected_fail.type(torch.float)
-        fail_float = fail.type(torch.float).reshape(-1)
-        success_float = success.type(torch.float).reshape(-1)
+        expected_success_float = expected_success.type(th.float)
+        expected_fail_float = expected_fail.type(th.float)
+        fail_float = fail.type(th.float).reshape(-1)
+        success_float = success.type(th.float).reshape(-1)
+
 
         tp = (expected_success_float * success_float)[success == 1].mean()
         if success_float.sum() == 0:
-            tp = torch.tensor(0)
+            tp = th.tensor(0)
         fp = (expected_success_float * fail_float)[fail == 1].mean()
         tn = (expected_fail_float * fail_float)[fail == 1].mean()
         fn = (expected_fail_float * success_float)[success == 1].mean()
-
-        if self.policy.return_mode == 0:
-            add = ' '
-        elif self.policy.return_mode == 1:
-            add = ' optimized '
-        elif self.policy.return_mode == 2:
-            add = ' label '
 
         debug_dict = {}
 
@@ -197,10 +202,9 @@ class ActiveCriticLearner(nn.Module):
         debug_dict['false positive' + add] = fp
         debug_dict['true negative' + add] = tn
         debug_dict['false negative' + add] = fn
-        debug_dict['tailor success' +
-                   add] = (expected_success == success).type(torch.float).mean()
-        debug_dict['tailor expected success' +
-                   add] = (expected_success).type(torch.float).mean()
+        debug_dict['critic success' + add] = (expected_success == success).type(th.float).mean()
+        debug_dict['critic expected success' + add] = expected_success.type(th.float).mean()
+        debug_dict['critic L2 error reward' + add] = calcMSE(reward, expected_reward)
 
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 

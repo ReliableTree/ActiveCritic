@@ -154,7 +154,8 @@ class TestPolicy(unittest.TestCase):
         obsv = env.reset()
         all_taken_actions = []
         all_observations = [obsv]
-        all_scores = []
+        all_scores_after = []
+        all_scores_before = []
         ac.reset()
         epsiodes = 2
         for i in range(epsiodes*ac.args_obj.epoch_len):
@@ -162,36 +163,47 @@ class TestPolicy(unittest.TestCase):
             all_taken_actions.append(action)
             obsv, rew, dones, info = env.step(action)
             all_observations.append(obsv)
-            all_scores.append(ac.current_result.expected_succes_after)
+            all_scores_after.append(ac.current_result.expected_succes_after)
+            all_scores_before.append(ac.current_result.expected_succes_before)
             assert len(th.nonzero(ac.obs_seq[:, ac.current_step+1:])) == 0
             if (i+1) % 5 == 0:
                 all_taken_actions = []
                 all_observations = [obsv]
 
-        all_scores_th = th.tensor(np.array([s.detach().cpu().numpy() for s in all_scores]).reshape(
-            [epsiodes, ac.args_obj.epoch_len, ac.args_obj.epoch_len, 1]))
+        all_scores_after_th = th.tensor(np.array([s.detach().cpu().numpy() for s in all_scores_after]).reshape(
+            [epsiodes, ac.args_obj.epoch_len, ac.args_obj.epoch_len, 1]), device=ac.args_obj.device)
+        all_scores_before_th = th.tensor(np.array([s.detach().cpu().numpy() for s in all_scores_before]).reshape(
+            [epsiodes, ac.args_obj.epoch_len, ac.args_obj.epoch_len, 1]), device=ac.args_obj.device)
+        
         for i in range(epsiodes):
-            for j in range(all_scores_th.shape[1]):
+            for j in range(all_scores_after_th.shape[1]):
                 assert th.equal(
-                    all_scores_th[i, j, j], ac.score_history[i, j]), 'score history of ac is corrupted.'
+                    all_scores_after_th[i, j, j], ac.score_history_after[i, j]), 'scores after history of ac is corrupted.'
+
+        for i in range(epsiodes):
+            for j in range(all_scores_before_th.shape[1]):
+                assert th.equal(
+                    all_scores_before_th[i, j, j], ac.score_history_before[i, j]), 'scores before history of ac is corrupted.'
 
         for i in range(epsiodes*ac.args_obj.epoch_len):
             action = ac.predict(obsv)
             all_taken_actions.append(action)
             obsv, rew, dones, info = env.step(action)
             all_observations.append(obsv)
-            all_scores.append(ac.current_result.expected_succes_after)
+            all_scores_after.append(ac.current_result.expected_succes_after)
             assert len(th.nonzero(ac.obs_seq[:, ac.current_step+1:])) == 0
             if (i+1) % 5 == 0:
                 all_taken_actions = []
                 all_observations = [obsv]
 
         self.assertTrue(
-            ac.score_history.shape[0] == 2*epsiodes, 'Scores are not properly appended.')
+            ac.score_history_after.shape[0] == 2*epsiodes, 'Scores after are not properly appended.')
+        self.assertTrue(
+            ac.score_history_before.shape[0] == 2*epsiodes, 'Scores before are not properly appended.')
 
         all_taken_actions = []
         all_observations = [obsv]
-        all_scores = []
+        all_scores_after = []
         ac.reset()
         epsiodes = 2
         for i in range(epsiodes*ac.args_obj.epoch_len):
@@ -199,13 +211,13 @@ class TestPolicy(unittest.TestCase):
             all_taken_actions.append(action)
             obsv, rew, dones, info = env.step(action)
             all_observations.append(obsv)
-            all_scores.append(ac.current_result.expected_succes_after)
+            all_scores_after.append(ac.current_result.expected_succes_after)
             assert len(th.nonzero(ac.obs_seq[:, ac.current_step+1:])) == 0
             if (i+1) % 5 == 0:
                 all_taken_actions = []
                 all_observations = [obsv]
         self.assertTrue(
-            ac.score_history.shape[0] == 2, 'Epochs reset did not work.')
+            ac.score_history_after.shape[0] == 2, 'Epochs reset did not work.')
 
 
 if __name__ == '__main__':
