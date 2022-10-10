@@ -1,5 +1,6 @@
 import torch as th
 from prettytable import PrettyTable
+from abc import ABC, abstractclassmethod
 
 
 def count_parameters(model):
@@ -61,7 +62,7 @@ def calcMSE(a, b):
     return ((a.squeeze() - b.squeeze())**2).mean()
 
 
-def apply_triu(inpt, diagonal):
+def apply_triu(inpt:th.Tensor, diagonal:th.Tensor):
     exp_inpt = inpt.unsqueeze(1)
     shape = exp_inpt.shape
     # shape = batch, 1, seq, dims...
@@ -73,8 +74,8 @@ def apply_triu(inpt, diagonal):
     return exp_out
 
 
-def make_part_obs_data(actions, observations, rewards):
+def make_part_obs_data(actions:th.Tensor, observations:th.Tensor, rewards:th.Tensor):
     acts = actions.repeat([1, actions.shape[1], 1]).reshape([-1, actions.shape[1], actions.shape[2]])
-    rews = rewards.repeat([1, rewards.shape[1]]).reshape([-1,rewards.shape[1]])
+    rews = rewards.repeat([1, rewards.shape[1], 1]).reshape([-1, actions.shape[1], 1])
     obsv = apply_triu(observations, diagonal=0).reshape([-1, observations.shape[-2], observations.shape[-1]])
     return acts, obsv, rews

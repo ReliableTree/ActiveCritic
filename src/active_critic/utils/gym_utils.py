@@ -1,3 +1,4 @@
+from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 import numpy as np
 import torch as th
 from metaworld.envs import \
@@ -8,6 +9,8 @@ from imitation.data.wrappers import RolloutInfoWrapper
 from stable_baselines3.common.vec_env import DummyVecEnv
 from imitation.data import rollout
 from stable_baselines3.common.type_aliases import GymEnv
+from gym import Env
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 
 class DummyExtractor:
@@ -65,7 +68,7 @@ def make_dummy_vec_env(name, seq_len):
     return dv1, vec_expert
 
 
-def parse_sampled_transitions(transitions, new_epoch, extractor):
+def parse_sampled_transitions(transitions, new_epoch, extractor, device='cuda'):
     observations = []
     actions = []
     rewards = []
@@ -94,9 +97,9 @@ def parse_sampled_transitions(transitions, new_epoch, extractor):
     actions.append(epch_actions)
     rewards.append(epch_rewards)
 
-    actions = th.tensor(np.array(actions), dtype=th.float)
-    observations = th.tensor(np.array(observations), dtype=th.float)
-    rewards = th.tensor(np.array(rewards), dtype=th.float)
+    actions = th.tensor(np.array(actions), dtype=th.float, device=device)
+    observations = th.tensor(np.array(observations), dtype=th.float, device=device)
+    rewards = th.tensor(np.array(rewards), dtype=th.float, device=device)
     return actions, observations, rewards
 
 
@@ -126,3 +129,18 @@ class ImitationLearningWrapper:
         for obs in obsv:
             actions.append(self.policy.get_action(obs))
         return actions
+
+def sample_new_episode(policy:ActiveCriticPolicy, env:Env, episodes:int=1):
+        policy.eval()
+        policy.reset()
+        transitions = sample_expert_transitions(
+            policy.predict, env, episodes)
+        expected_rewards = policy.score_history
+        datas = parse_sampled_transitions(
+            transitions=transitions, new_epoch=policy.args_obj.new_epoch, extractor=policy.args_obj.extractor)
+        device_data = []
+        for data in datas:
+            device_data.append(data.to(policy.args_obj.device))
+        actions, observations, rewards = device_data
+        rewards = rewards.unsqueeze(-1)
+        return actions, observations, rewards, expected_rewards

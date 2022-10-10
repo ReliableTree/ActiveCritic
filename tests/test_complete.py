@@ -1,9 +1,8 @@
-from unicodedata import name
 import unittest
-from tests.nn_model.test_transformers import TestTransformerModel
-from tests.nn_model.test_whole_sequence_model import TestWholeSequenceModel
-from tests.util.test_util import TestUtils
-from tests.policy.test_policy import TestPolicy
+from nn_model.test_transformers import TestTransformerModel
+from nn_model.test_whole_sequence_model import TestWholeSequenceModel
+from util.test_util import TestUtils
+from policy.test_policy import TestPolicy
 import gym
 
 if __name__ == '__main__':

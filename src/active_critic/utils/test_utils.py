@@ -44,7 +44,7 @@ def make_policy_obs_action(seq_len, ntoken, d_out, diff_ele, device = 'cuda'):
     
     return o, a
 
-def make_wsm_setup(seq_len, d_output, d_result=-1, device='cuda'):
+def make_wsm_setup(seq_len, d_output, device='cuda'):
     wsm = WholeSequenceModelSetup()
     wsm.model_setup = ModelSetup()
     seq_len = seq_len
@@ -60,7 +60,6 @@ def make_wsm_setup(seq_len, d_output, d_result=-1, device='cuda'):
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.Adam
     wsm.optimizer_kwargs = {}
-    wsm.model_setup.d_result = d_result
     return wsm
 
 def make_obs_act_space(obs_dim, action_dim):
@@ -75,7 +74,7 @@ def make_obs_act_space(obs_dim, action_dim):
         np.array(action_low), np.array(action_high), (action_dim,), float)
     return observation_space, action_space
 
-def make_acps(seq_len, extractor, new_epoch):
+def make_acps(seq_len, extractor, new_epoch, batch_size = 32):
     acps = ActiveCriticPolicySetup()
     acps.device='cuda'
     acps.epoch_len=seq_len
@@ -85,12 +84,12 @@ def make_acps(seq_len, extractor, new_epoch):
     acps.optimisation_threshold=0.5
     acps.inference_opt_lr = 1e-1
     acps.optimize = True
+    acps.batch_size = 32
     return acps
 
-def setup_ac_reach():
-    seq_len = 5
+def setup_ac_reach(seq_len = 5):
+    seq_len = seq_len
     env, gt_policy = make_dummy_vec_env('reach', seq_len=seq_len)
-    d_result = 1
     d_output = env.action_space.shape[0]
     wsm_actor_setup = make_wsm_setup(
         seq_len=seq_len, d_output=d_output)

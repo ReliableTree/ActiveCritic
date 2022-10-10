@@ -34,20 +34,20 @@ class TestWholeSequenceModel(unittest.TestCase):
         wsa = WholeSequenceModel(wsms=wsa_setup)
         data = inpt_seq, outpt_seq, success
         for i in range(3000):
-            res = wsa.optimizer_step(data=data)
-        self.assertTrue(res['Trajectory Loss '] < 1e-2,
+            res = wsa.optimizer_step(inputs=inpt_seq, label=outpt_seq)
+        self.assertTrue(res['Loss '] < 1e-2,
                         'Actor did not converge.')
 
-        res = wsa.optimizer_step(data=data, prefix='test')
-        self.assertTrue('Trajectory Loss test' in res)
+        res = wsa.optimizer_step(inputs=inpt_seq, label=outpt_seq, prefix='test')
+        self.assertTrue('Loss test' in res)
 
         wsa.init_model()
-        res = wsa.optimizer_step(data=data)
-        self.assertTrue(res['Trajectory Loss '] > 1e-1,
+        res = wsa.optimizer_step(inputs=inpt_seq, label=outpt_seq)
+        self.assertTrue(res['Loss '] > 1e-1,
                         'Init Model did not cange the parameters.')
         for i in range(3000):
-            res = wsa.optimizer_step(data=data)
-        self.assertTrue(res['Trajectory Loss '] < 1e-2,
+            res = wsa.optimizer_step(inputs=inpt_seq, label=outpt_seq)
+        self.assertTrue(res['Loss '] < 1e-2,
                         'Did not converge after reinit.')
 
 

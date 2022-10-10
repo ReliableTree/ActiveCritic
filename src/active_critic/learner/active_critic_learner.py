@@ -1,5 +1,7 @@
-import imp
+from email import policy
+from active_critic.model_src.whole_sequence_model import WholeSequenceModel
 from gym.envs.mujoco import MujocoEnv
+from matplotlib.pyplot import polar
 import torch.nn as nn
 import torch as th
 from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
@@ -7,6 +9,18 @@ from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 from active_critic.utils.tboard_graphs import TBoardGraphs
 from active_critic.utils.dataset import DatasetAC
 from torch.utils.data.dataloader import DataLoader
+from active_critic.utils.gym_utils import sample_new_episode
+from active_critic.utils.pytorch_utils import make_part_obs_data
+import tensorflow as tf
+
+class ACLScores:
+    def __init__(self) -> None:
+        self.mean_actor = [float('inf')]
+        self.mean_critic = [float('inf')]
+
+    def update_min_score(self, old_score, new_score):
+        if old_score[0] > new_score:
+            old_score[0] = new_score
 
 class ActiveCriticLearner(nn.Module):
     def __init__(self,
@@ -17,83 +31,128 @@ class ActiveCriticLearner(nn.Module):
         super().__init__()
         self.network_args = network_args_obj
         self.env = env
-
         self.policy = ac_policy
-
-        self.total_steps = 0
-        self.max_success_rate = 0
         self.extractor = network_args_obj.extractor
-
         self.logname = network_args_obj.logname
 
+        self.scores = ACLScores()
+
         if network_args_obj.tboard:
+            gpus = tf.config.list_physical_devices('GPU')
+            if gpus:
+                try:
+                    # Currently, memory growth needs to be the same across GPUs
+                    for gpu in gpus:
+                        tf.config.experimental.set_memory_growth(gpu, True)
+                        logical_gpus = tf.config.list_logical_devices('GPU')
+                        print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+                except RuntimeError as e:
+                    # Memory growth must be set before GPUs have been initialized
+                    print(e)
             self.tboard = TBoardGraphs(
                 self.logname, data_path=network_args_obj.data_path)
+        self.global_step = 0
 
-        self.imitation_phase = not network_args_obj.imitation_phase
+        self.train_data = DatasetAC()
+        self.train_data.onyl_positiv = False
 
-        self.train_data = DatasetAC(device=network_args_obj.device)
-
-        self.train_loader = None
-        self.val_loader = None
-
-    def setDatasets(self, train_data: DatasetAC, batch_size=32):
+    def setDatasets(self, train_data: DatasetAC):
+        self.train_data = train_data
         if len(train_data) > 0:
-            self.train_data = train_data
             self.train_loader = DataLoader(
-                dataset=train_data, batch_size=batch_size, shuffle=True)
+                dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
+
+    def add_data(self, actions:th.Tensor, observations:th.Tensor, rewards:th.Tensor):
+        acts, obsv, rews = make_part_obs_data(actions=actions, observations=observations, rewards=rewards)
+        self.train_data.add_data(obsv=obsv, actions=acts, reward=rews)
+        self.train_loader = DataLoader(
+                dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
+
+
+    def actor_step(self, data, loss_actor):
+        obsv, actions, reward = data
+        actor_input = self.policy.get_actor_input(obs=obsv, actions=actions, rew=reward)
+        debug_dict = self.policy.actor.optimizer_step(inputs=actor_input, label=actions)
+        if loss_actor is None:
+            loss_actor = debug_dict['Loss '].unsqueeze(0)
+        else:
+            loss_actor = th.cat((loss_actor, debug_dict['Loss '].unsqueeze(0)), dim=0)
+        return loss_actor
+
+    def critic_step(self, data, loss_critic):
+        obsv, actions, reward = data
+        critic_inpt = self.policy.get_critic_input(acts=actions, obs_seq=obsv)
+        debug_dict = self.policy.critic.optimizer_step(inputs=critic_inpt, label=reward)
+        if loss_critic is None:
+            loss_critic = debug_dict['Loss '].unsqueeze(0)
+        else:
+            loss_critic = th.cat((loss_critic, debug_dict['Loss '].unsqueeze(0)), dim=0)
+        return loss_critic
+
+    def add_training_data(self):
+        actions, observations, rewards, expected_rewards = sample_new_episode(
+            policy=self.policy,
+            env=self.env,
+            episodes=1)
+        self.add_data(
+            actions=actions,
+            observations=observations,
+            rewards=rewards
+        )
+
 
     def train(self, epochs):
-        self.expert_examples_len = len(self.train_data)
-        print(f'inital num examples: {self.expert_examples_len}')
-        model_step = 0
         for epoch in range(epochs):
-            self.policy.eval()
-            if self.add_data:
-                self.sample_new_episode(episodes=1, add_data=True)
-            self.policy.train()
-            while model_step < self.network_args.n_steps:
-                model_step += len(self.train_data)
-                self.policy.train()
+            if not self.network_args.imitation_phase:
+                self.add_training_data()
 
-                if not self.init_train:
-                    self.train_data.onyl_positiv = False
-                    for data in self.train_loader:
-                        debug_dict = self.policy.critic.optimizer_step(data)
-                        self.write_tboard_scalar(
-                            debug_dict=debug_dict, train=True)
-                        self.global_step += 1
+            self.policy.train()                
+            loss_actor = None
+            loss_critic = None
+            for data in self.train_loader:
+                loss_actor = self.actor_step(data, loss_actor)                
+                loss_critic = self.critic_step(data, loss_critic)                
+                self.global_step += 1
 
-                if self.train_data.success.sum() > 0:
-                    self.train_data.onyl_positiv = True
-                    for data in self.train_loader:
-                        debug_dict = self.policy.actor.optimizer_step(data)
-                        self.write_tboard_scalar(
-                            debug_dict=debug_dict, train=True)
-                        self.global_step += 1
+            mean_actor = loss_actor.mean()
+            mean_critic = loss_critic.mean()
+            
+            self.scores.update_min_score(self.scores.mean_critic, mean_critic)
+            self.scores.update_min_score(self.scores.mean_actor, mean_actor)
+            
+            debug_dict = {
+                'Loss Actor': mean_actor,
+                'Loss Critic': mean_critic
+            }
+            self.write_tboard_scalar(debug_dict=debug_dict, train=True)
 
-            model_step = 0
-            self.num_vals += 1
-            complete = (self.num_vals % self.network_args.complete_modulo == 0)
-            print(f'logname: {self.logname}')
-            self.runValidation(complete=complete)
+    def update_min_scores(self, name, score):
+        if name in self.scores:
+            if self.scores[name] > score:
+                self.scores[name] = score
+        else:
+            self.scores[name] = score
 
-    def sample_new_episode(self, episodes=1, add_data=True):
-        self.policy.eval()
-        self.policy.reset_state()
-        transitions = sample_expert_transitions(
-            self.policy, self.env, episodes)
-        expected_rewards = torch.tensor(*self.policy.scores)
-        datas = parse_sampled_transitions(
-            transitions=transitions, new_epoch=self.network_args.new_epoch, extractor=self.extractor)
-        device_data = []
-        for data in datas:
-            device_data.append(data.to(self.network_args.device))
-        actions, observations, rewards = device_data
-        if add_data:
-            self.add_data_to_loader(inpt_obs_opt=observations, trajectories_opt=actions,
-                                    success_opt=rewards, ftrjs_opt=actions, episodes=episodes)
-        return actions, observations, rewards, expected_rewards
+    def update_max_scores(self, name, score):
+        if name in self.scores:
+            if self.scores[name] < score:
+                self.scores[name] = score
+        else:
+            self.scores[name] = score
+
+
+    def write_tboard_scalar(self, debug_dict, train, step=None):
+        if step is None:
+            step = self.global_step
+        if self.network_args.tboard:
+            for para, value in debug_dict.items():
+                value = value.to('cpu')
+                if train:
+                    self.tboard.addTrainScalar(para, value, step)
+                else:
+                    self.tboard.addValidationScalar(para, value, step)
+
+
 
     def torch2tf(self, inpt):
         if inpt is not None:
@@ -224,44 +283,8 @@ class ActiveCriticLearner(nn.Module):
             self.saveNetworkToFile(
                 add=self.logname + "/last/", data_path=self.data_path)
 
-    def add_data_to_loader(self, inpt_obs_opt, trajectories_opt, success_opt, ftrjs_opt, episodes):
-        if self.add_data:
 
-            print(f'inpt_obs_opt: {inpt_obs_opt.shape}')
-            print(f'trajectories_opt: {trajectories_opt.shape}')
-            print(f'success_opt: {success_opt}')
-            print(f'ftrjs_opt: {ftrjs_opt.shape}')
-            print(f'episodes: {episodes}')
 
-            inpt_obs_opt = inpt_obs_opt.to(self.network_args.device)
-            trajectories_opt = trajectories_opt.to(self.network_args.device)
-            success_opt = success_opt.to(self.network_args.device)
-            ftrjs_opt = ftrjs_opt.to(self.network_args.device)
-
-            success_opt = success_opt.type(torch.bool)
-            self.train_data.add_data(
-                obsv=inpt_obs_opt[:episodes], actions=trajectories_opt[:episodes], success=success_opt)
-
-            self.write_tboard_scalar(
-                {'num examples': torch.tensor(len(self.train_data))}, train=False)
-            self.init_train = ~self.train_data.success.sum() == 0
-            self.train_loader = DataLoader(
-                self.train_data, batch_size=32, shuffle=True)
-            self.val_loader = DataLoader(
-                self.val_data, batch_size=32, shuffle=True)
-        print(f'num examples: {len(self.train_data)}')
-        print(f'num demonstrations: {self.train_data.success.sum()}')
-
-    def write_tboard_scalar(self, debug_dict, train, step=None):
-        if step is None:
-            step = self.global_step
-        if self.network_args.tboard:
-            for para, value in debug_dict.items():
-                value = value.to('cpu')
-                if train:
-                    self.tboard.addTrainScalar(para, value, step)
-                else:
-                    self.tboard.addValidationScalar(para, value, step)
 
     def plot_with_mask(self, label, trj, inpt, mask, name, opt_trj=None):
         if mask.sum() > 0:

@@ -3,9 +3,12 @@ import copy
 from pyclbr import Function
 from tkinter.messagebox import NO
 from typing import Dict, Optional, Tuple, Union
+from unittest import result
 
 import numpy as np
-import torch
+from scipy.fftpack import sc_diff
+from sklearn.utils import resample
+import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel
 from active_critic.utils.pytorch_utils import make_partially_observed_seq
 from stable_baselines3.common.policies import BaseModel
@@ -13,7 +16,7 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 
 class ACPOptResult:
-    def __init__(self, gen_trj: torch.Tensor, inpt_trj: torch.Tensor = None, expected_succes_before: torch.Tensor = None, expected_succes_after: torch.Tensor = None) -> None:
+    def __init__(self, gen_trj: th.Tensor, inpt_trj: th.Tensor = None, expected_succes_before: th.Tensor = None, expected_succes_after: th.Tensor = None) -> None:
         self.gen_trj = gen_trj
         self.inpt_trj = inpt_trj
         self.expected_succes_before = expected_succes_before
@@ -30,8 +33,7 @@ class ActiveCriticPolicySetup:
         self.device: Str = None
         self.inference_opt_lr: float = None
         self.optimize: bool = None
-        self.writer = None
-        self.plotter = None
+        self.batch_size: int = None
 
 
 class ActiveCriticPolicy(BaseModel):
@@ -48,29 +50,42 @@ class ActiveCriticPolicy(BaseModel):
 
         self.actor = actor
         self.critic = critic
-        self.optim_run = 0
-        self.last_update = 0
+        self.args_obj = acps
+        self.register_buffer('gl', th.ones(
+            size=[acps.batch_size, acps.epoch_len, critic.wsms.model_setup.d_output], dtype=th.float, device=acps.device))
+        self.reset()
+
+    def reset(self):
         self.last_goal = None
         self.current_step = 0
-        self.args_obj = acps
+        self.score_history = None
+
+    def reset_epoch(self, vec_obsv: th.Tensor):
+        self.current_step = 0
+        self.last_goal = vec_obsv
+        self.current_result = None
+        self.obs_seq = th.zeros(
+            size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
+        if self.score_history is None:
+            self.score_history = th.zeros(
+                size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output])
+        else:
+            self.score_history = th.cat((self.score_history, th.zeros(
+                size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output])))
 
     def predict(
         self,
-        observation: Union[torch.Tensor, Dict[str, torch.Tensor]],
+        observation: Union[th.Tensor, Dict[str, th.Tensor]],
         state: Optional[Tuple[np.ndarray, ...]] = None,
         episode_start: Optional[np.ndarray] = None,
         deterministic: bool = False,
-    ) -> torch.Tensor:
+    ) -> th.Tensor:
         vec_obsv = self.args_obj.extractor.forward(
             observation).to(self.args_obj.device).unsqueeze(1)
 
         if (self.last_goal is None) or (self.args_obj.new_epoch(self.last_goal, vec_obsv)):
-            self.current_step = 0
-            self.last_goal = vec_obsv
-            self.current_result = None
+            self.reset_epoch(vec_obsv=vec_obsv)
             action_seq = None
-            self.obs_seq = torch.zeros(
-                size=[observation.shape[0], self.args_obj.epoch_len, observation.shape[-1]], device=self.args_obj.device)
         else:
             self.current_step += 1
             action_seq = self.current_result.gen_trj
@@ -79,16 +94,33 @@ class ActiveCriticPolicy(BaseModel):
 
         self.current_result = self.forward(
             observation_seq=self.obs_seq, action_seq=action_seq, optimize=self.args_obj.optimize, current_step=self.current_step)
-        return self.current_result.gen_trj[:, self.current_step].cpu().numpy()
+        batch_size = self.current_result.expected_succes_before.shape[0]
+        if self.args_obj.optimize:
+            self.score_history[-batch_size:,
+                            self.current_step] = self.current_result.expected_succes_after[:, self.current_step]
+        else:
+            self.score_history[-batch_size:,
+                            self.current_step] = self.current_result.expected_succes_before[:, self.current_step]
 
-    def forward(self, observation_seq: torch.Tensor, action_seq: torch.Tensor, optimize: bool, current_step: int):
-        actions = self.actor.forward(observation_seq)
+        return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
+
+    def forward(self, observation_seq: th.Tensor, action_seq: th.Tensor, optimize: bool, current_step: int):
+        # In inference, we want the maximum eventual reward.
+        actor_input = self.get_actor_input(
+            obs=observation_seq, actions=action_seq, rew=self.gl[:observation_seq.shape[0]])
+        actions = self.actor.forward(actor_input)
+        actions = th.ones_like(actions) * 0.5
+
         if action_seq is not None:
             actions = self.proj_actions(
                 action_seq, actions, current_step)
-        expected_success = self.get_critic_score(
+
+        critic_input = self.get_critic_input(
             acts=actions, obs_seq=observation_seq)
-        expected_success = expected_success
+
+        expected_success = self.critic.forward(
+            inputs=critic_input)  # batch_size, seq_len, 1
+
         if not optimize:
             result = ACPOptResult(
                 gen_trj=actions, expected_succes_before=expected_success.detach())
@@ -103,18 +135,18 @@ class ActiveCriticPolicy(BaseModel):
                 expected_succes_before=expected_success,
                 expected_succes_after=expected_success_opt)
 
-    def optimize_act_sequence(self, actions: torch.Tensor, observations: torch.Tensor, current_step: int):
-        optimized_actions = torch.clone(actions.detach())
+    def optimize_act_sequence(self, actions: th.Tensor, observations: th.Tensor, current_step: int):
+        optimized_actions = th.clone(actions.detach())
         optimized_actions.requires_grad_(True)
-        optimizer = torch.optim.Adam(
+        optimizer = th.optim.Adam(
             [optimized_actions], lr=self.args_obj.inference_opt_lr)
-        expected_success = torch.zeros(
-            size=[actions.shape[0], self.critic.wsms.model_setup.seq_len, self.critic.wsms.model_setup.d_output], dtype=torch.float, device=actions.device)
-        goal_label = torch.ones_like(expected_success)
+        expected_success = th.zeros(
+            size=[actions.shape[0], self.critic.wsms.model_setup.seq_len, self.critic.wsms.model_setup.d_output], dtype=th.float, device=actions.device)
+        goal_label = self.gl[:actions.shape[0]]
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()
-        while (not torch.all(expected_success[:,-1] >= self.args_obj.optimisation_threshold)) and (step <= self.args_obj.opt_steps):
+        while (not th.all(expected_success[:, -1] >= self.args_obj.optimisation_threshold)) and (step <= self.args_obj.opt_steps):
 
             optimized_actions, expected_success = self.inference_opt_step(
                 org_actions=actions,
@@ -127,9 +159,9 @@ class ActiveCriticPolicy(BaseModel):
 
         return optimized_actions, expected_success
 
-    def inference_opt_step(self, org_actions: torch.Tensor, opt_actions: torch.Tensor, obs_seq: torch.Tensor, optimizer: torch.optim.Optimizer, goal_label: torch.Tensor, current_step: int):
-        critic_result = self.get_critic_score(
-            acts=opt_actions, obs_seq=obs_seq)
+    def inference_opt_step(self, org_actions: th.Tensor, opt_actions: th.Tensor, obs_seq: th.Tensor, optimizer: th.optim.Optimizer, goal_label: th.Tensor, current_step: int):
+        critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
+        critic_result = self.critic.forward(inputs=critic_inpt)
         critic_loss = self.critic.loss_fct(
             result=critic_result, label=goal_label)
 
@@ -141,14 +173,18 @@ class ActiveCriticPolicy(BaseModel):
             org_actions=org_actions, new_actions=opt_actions, current_step=current_step)
         return actions, critic_result
 
-    def get_critic_score(self, acts, obs_seq):
+    def get_critic_input(self, acts, obs_seq):
         critic_input = make_partially_observed_seq(
             obs=obs_seq, acts=acts, seq_len=self.args_obj.epoch_len, act_space=self.action_space)
+        return critic_input
 
-        critic_result = self.critic.forward(inputs=critic_input) #batch_size, seq_len, 1
-        return critic_result
+    def get_actor_input(self, obs: th.Tensor, actions: th.Tensor, rew: th.Tensor):
+        last_reward = rew[:, -1:].repeat([1, obs.shape[1], 1])
 
-    def proj_actions(self, org_actions: torch.Tensor, new_actions: torch.Tensor, current_step: int):
-        with torch.no_grad():
+        actor_inpt = th.cat((obs, last_reward), dim=-1)
+        return actor_inpt
+
+    def proj_actions(self, org_actions: th.Tensor, new_actions: th.Tensor, current_step: int):
+        with th.no_grad():
             new_actions[:, :current_step] = org_actions[:, :current_step]
         return new_actions

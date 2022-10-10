@@ -1,14 +1,15 @@
 import unittest
 
 import torch as th
+import numpy as np
 
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 from active_critic.utils.test_utils import (make_acps, make_obs_act_space,
-                                    make_wsm_setup)
+                                            make_wsm_setup)
 from active_critic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
-                             new_epoch_pap,
-                             new_epoch_reach)
+                                           new_epoch_pap,
+                                           new_epoch_reach)
 
 
 class TestPolicy(unittest.TestCase):
@@ -35,7 +36,6 @@ class TestPolicy(unittest.TestCase):
     def setup_ac_reach(self):
         seq_len = 50
         env, gt_policy = make_dummy_vec_env('reach', seq_len=seq_len)
-        d_result = 1
         d_output = env.action_space.shape[0]
         wsm_actor_setup = make_wsm_setup(
             seq_len=seq_len, d_output=d_output)
@@ -72,7 +72,8 @@ class TestPolicy(unittest.TestCase):
         org_obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
                                   device=acps.device, dtype=th.float, requires_grad=False)
         optimizer = th.optim.Adam([opt_actions], lr=1e-1)
-        goal_label = th.ones([batch_size, acps.epoch_len, 1], device=acps.device, dtype=th.float)
+        goal_label = th.ones([batch_size, acps.epoch_len, 1],
+                             device=acps.device, dtype=th.float)
 
         actions, critic_result = ac.inference_opt_step(
             org_actions=org_actions, opt_actions=opt_actions, obs_seq=obs_seq, optimizer=optimizer,
@@ -89,7 +90,7 @@ class TestPolicy(unittest.TestCase):
             self.assertFalse(th.equal(
                 opt_actions[:, current_step:], org_actions[:, current_step:]), 'opt actions did not change')
             self.assertTrue(
-                th.all(critic_result.mean(dim=[1,2]) > last_critic_result.mean(dim=[1,2])), 'optimisation does not work.')
+                th.all(critic_result.mean(dim=[1, 2]) > last_critic_result.mean(dim=[1, 2])), 'optimisation does not work.')
             last_critic_result = th.clone(critic_result.detach())
 
     def test_seq_optimizer(self):
@@ -113,10 +114,10 @@ class TestPolicy(unittest.TestCase):
             org_actions[:, :current_step], actions[:, :current_step]), 'org_actions were overwritten')
 
         self.assertFalse(th.equal(actions[:, current_step:], org_actions[:,
-                                                             current_step:]),
+                                                                         current_step:]),
                          'seq optimisation did not change the actions')
         self.assertTrue(th.all(
-            expected_success[:,-1] >= ac.args_obj.optimisation_threshold), 'optimisation does not work.')
+            expected_success[:, -1] >= ac.args_obj.optimisation_threshold), 'optimisation does not work.')
         self.assertTrue(th.equal(obs_seq, org_obs_seq),
                         'Observations were changed.')
 
@@ -132,17 +133,79 @@ class TestPolicy(unittest.TestCase):
             all_taken_actions.append(action)
             obsv, rew, dones, info = env.step(action)
             all_observations.append(obsv)
-            self.assertTrue(len(th.nonzero(ac.obs_seq[:, ac.current_step + 1:])) == 0, 'unobserved seq is not 0')
+            self.assertTrue(len(th.nonzero(
+                ac.obs_seq[:, ac.current_step + 1:])) == 0, 'unobserved seq is not 0')
             if new_epoch_reach(last_obsv, th.tensor(obsv)):
-                self.assertTrue(ac.current_step == ac.args_obj.epoch_len - 1, 'Steps are counted wrong')
+                self.assertTrue(
+                    ac.current_step == ac.args_obj.epoch_len - 1, 'Steps are counted wrong')
                 ata = th.tensor(all_taken_actions).transpose(0, 1)
                 self.assertTrue(th.equal(ata.to('cuda'), ac.current_result.gen_trj),
                                 'Actual action sequence differs from saved action sequence. Maybe problem with backprop?')
                 aob = th.tensor(all_observations).transpose(0, 1)[:, :50]
-                self.assertTrue(th.equal(aob.to('cuda'), ac.obs_seq), 'Observation sequence was overridden')
+                self.assertTrue(th.equal(aob.to('cuda'), ac.obs_seq),
+                                'Observation sequence was overridden')
 
                 self.assertTrue(ac.current_result.expected_succes_before.mean() < ac.current_result.expected_succes_after.mean(),
                                 'In inference optimisation went wrong.')
+
+    def test_score_history(self):
+        th.manual_seed(0)
+        ac, acps, env = self.setup_ac_reach()
+        obsv = env.reset()
+        all_taken_actions = []
+        all_observations = [obsv]
+        all_scores = []
+        ac.reset()
+        epsiodes = 2
+        for i in range(epsiodes*ac.args_obj.epoch_len):
+            action = ac.predict(obsv)
+            all_taken_actions.append(action)
+            obsv, rew, dones, info = env.step(action)
+            all_observations.append(obsv)
+            all_scores.append(ac.current_result.expected_succes_after)
+            assert len(th.nonzero(ac.obs_seq[:, ac.current_step+1:])) == 0
+            if (i+1) % 5 == 0:
+                all_taken_actions = []
+                all_observations = [obsv]
+
+        all_scores_th = th.tensor(np.array([s.detach().cpu().numpy() for s in all_scores]).reshape(
+            [epsiodes, ac.args_obj.epoch_len, ac.args_obj.epoch_len, 1]))
+        for i in range(epsiodes):
+            for j in range(all_scores_th.shape[1]):
+                assert th.equal(
+                    all_scores_th[i, j, j], ac.score_history[i, j]), 'score history of ac is corrupted.'
+
+        for i in range(epsiodes*ac.args_obj.epoch_len):
+            action = ac.predict(obsv)
+            all_taken_actions.append(action)
+            obsv, rew, dones, info = env.step(action)
+            all_observations.append(obsv)
+            all_scores.append(ac.current_result.expected_succes_after)
+            assert len(th.nonzero(ac.obs_seq[:, ac.current_step+1:])) == 0
+            if (i+1) % 5 == 0:
+                all_taken_actions = []
+                all_observations = [obsv]
+
+        self.assertTrue(
+            ac.score_history.shape[0] == 2*epsiodes, 'Scores are not properly appended.')
+
+        all_taken_actions = []
+        all_observations = [obsv]
+        all_scores = []
+        ac.reset()
+        epsiodes = 2
+        for i in range(epsiodes*ac.args_obj.epoch_len):
+            action = ac.predict(obsv)
+            all_taken_actions.append(action)
+            obsv, rew, dones, info = env.step(action)
+            all_observations.append(obsv)
+            all_scores.append(ac.current_result.expected_succes_after)
+            assert len(th.nonzero(ac.obs_seq[:, ac.current_step+1:])) == 0
+            if (i+1) % 5 == 0:
+                all_taken_actions = []
+                all_observations = [obsv]
+        self.assertTrue(
+            ac.score_history.shape[0] == 2, 'Epochs reset did not work.')
 
 
 if __name__ == '__main__':

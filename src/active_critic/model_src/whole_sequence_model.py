@@ -1,4 +1,4 @@
-from abc import ABC, abstractclassmethod, abstractmethod
+from abc import ABC, abstractstaticmethod
 import typing
 import torch as th
 import torch.nn as nn
@@ -36,17 +36,15 @@ class WholeSequenceModel(nn.Module, ABC):
                 self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
         return result
 
-    def optimizer_step(self, data: typing.Tuple[th.Tensor, th.Tensor, th.Tensor], prefix='') -> typing.Dict:
-        inputs, label, success = data
-        assert th.all(success), 'wrong trajectories input to Actor Model'
-        results = self.forward(inputs=inputs)
-        loss = self.loss_fct(result=results, label=label)
+    def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, prefix='') -> typing.Dict:
+        result = self.forward(inputs=inputs)
+        loss = self.loss_fct(result=result, label=label)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
         debug_dict = {
-            'Trajectory Loss ' + prefix: loss.detach()
+            'Loss ' + prefix: loss.detach()
         }
 
         return debug_dict
