@@ -71,7 +71,7 @@ class ActiveCriticLearner(nn.Module):
                 self.logname, data_path=network_args_obj.data_path)
         self.global_step = 0
 
-        self.train_data = DatasetAC()
+        self.train_data = DatasetAC(device=self.network_args.device)
         self.train_data.onyl_positiv = False
 
     def setDatasets(self, train_data: DatasetAC):
@@ -120,8 +120,11 @@ class ActiveCriticLearner(nn.Module):
 
 
     def train(self, epochs):
+        next_val = self.network_args.val_every
+        next_add = 0
         for epoch in range(epochs):
-            if not self.network_args.imitation_phase:
+            if (not self.network_args.imitation_phase) and (self.global_step >= next_add):
+                next_add += self.network_args.add_data_every
                 self.add_training_data()
 
             self.policy.train()                
@@ -130,7 +133,6 @@ class ActiveCriticLearner(nn.Module):
             for data in self.train_loader:
                 loss_actor = self.actor_step(data, loss_actor)                
                 loss_critic = self.critic_step(data, loss_critic)                
-                self.global_step += 1
 
             mean_actor = loss_actor.mean()
             mean_critic = loss_critic.mean()
@@ -142,8 +144,11 @@ class ActiveCriticLearner(nn.Module):
                 'Loss Actor': mean_actor,
                 'Loss Critic': mean_critic
             }
+            self.global_step += len(self.train_data)
             self.write_tboard_scalar(debug_dict=debug_dict, train=True)
-            if (epoch+1)%self.network_args.val_every == 0:
+
+            if self.global_step >= next_val:
+                next_val += self.network_args.val_every
                 if self.network_args.tboard:
                     self.run_validation() 
 
@@ -164,15 +169,12 @@ class ActiveCriticLearner(nn.Module):
             policy=self.policy,
             env=self.env,
             episodes=self.network_args.validation_episodes)
-
-        self.createGraphsMW(d_in=1, d_out=actions, result=actions, toy=False,
+        self.createGraphsMW(d_in=1, d_out=actions[0], result=actions[0], toy=False,
                                 inpt=observations[:,0], name='Trajectory', window=0)
-
         last_reward = rewards[:,-1]
         best_model = self.scores.update_max_score(self.scores.mean_reward, last_reward.mean())
         if best_model:
             self.saveNetworkToFile(add='best_validation', data_path=self.network_args.data_path)
-
         last_expected_rewards_before = expected_rewards_before[:, -1]
         last_expected_reward_after = expected_rewards_after[:, -1]
         self.analyze_critic_scores(last_reward, last_expected_rewards_before, '')
@@ -227,6 +229,8 @@ class ActiveCriticLearner(nn.Module):
         debug_dict['true negative' + add] = tn
         debug_dict['false negative' + add] = fn
         debug_dict['critic success' + add] = (expected_success == success).type(th.float).mean()
+        debug_dict['critic expected reward' + add] = expected_reward.mean()
+        debug_dict['critic reward' + add] = reward.mean()
         debug_dict['critic expected success' + add] = expected_success.type(th.float).mean()
         debug_dict['critic L2 error reward' + add] = calcMSE(reward, expected_reward)
 

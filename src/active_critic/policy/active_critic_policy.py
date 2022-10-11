@@ -107,10 +107,10 @@ class ActiveCriticPolicy(BaseModel):
         batch_size = self.current_result.expected_succes_before.shape[0]
         if self.args_obj.optimize:
             self.score_history_after[-batch_size:,
-                            self.current_step] = self.current_result.expected_succes_after[:, self.current_step]
+                            self.current_step] = self.current_result.expected_succes_after[:, self.current_step].detach()
 
         self.score_history_before[-batch_size:,
-                        self.current_step] = self.current_result.expected_succes_before[:, self.current_step]
+                        self.current_step] = self.current_result.expected_succes_before[:, self.current_step].detach()
 
         return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
 
@@ -119,7 +119,6 @@ class ActiveCriticPolicy(BaseModel):
         actor_input = self.get_actor_input(
             obs=observation_seq, actions=action_seq, rew=self.gl[:observation_seq.shape[0]])
         actions = self.actor.forward(actor_input)
-        actions = th.ones_like(actions) * 0.5
 
         if action_seq is not None:
             actions = self.proj_actions(

@@ -14,3 +14,4 @@ class ActiveCriticLearnerArgs:
         self.batch_size:int = None
         self.validation_episodes:int = None
         self.val_every:int= None
+        self.add_data_every:int = None
