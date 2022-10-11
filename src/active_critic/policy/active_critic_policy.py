@@ -13,7 +13,8 @@ from active_critic.model_src.whole_sequence_model import WholeSequenceModel
 from active_critic.utils.pytorch_utils import make_partially_observed_seq
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-
+import os
+import pickle
 
 class ACPOptResult:
     def __init__(self, gen_trj: th.Tensor, inpt_trj: th.Tensor = None, expected_succes_before: th.Tensor = None, expected_succes_after: th.Tensor = None) -> None:
@@ -197,3 +198,15 @@ class ActiveCriticPolicy(BaseModel):
         with th.no_grad():
             new_actions[:, :current_step] = org_actions[:, :current_step]
         return new_actions
+
+    def save_policy(self, add, data_path):
+
+        path_to_file = os.path.join(data_path, "Data/Model/", add)
+        if not os.path.exists(path_to_file):
+            os.makedirs(path_to_file)
+
+        th.save(self.state_dict(), path_to_file + "/policy_network")
+        th.save(self.actor.optimizer.state_dict(), path_to_file + "/optimizer_actor")
+        th.save(self.critic.optimizer.state_dict(), path_to_file + "/optimizer_critic")
+        with open(path_to_file + '/policy_args.pkl', 'wb') as f:
+            pickle.dump(self.args_obj, f)

@@ -2,6 +2,7 @@ from email import policy
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel
 from cv2 import MSER
 from gym.envs.mujoco import MujocoEnv
+from h11 import Data
 from matplotlib.pyplot import polar
 from sklearn.utils import resample
 import torch.nn as nn
@@ -14,15 +15,30 @@ from torch.utils.data.dataloader import DataLoader
 from active_critic.utils.gym_utils import sample_new_episode
 from active_critic.utils.pytorch_utils import make_part_obs_data, calcMSE
 import tensorflow as tf
+import os
+import pickle
+import sys
 
 class ACLScores:
     def __init__(self) -> None:
         self.mean_actor = [float('inf')]
         self.mean_critic = [float('inf')]
+        self.mean_reward = [0]
+
 
     def update_min_score(self, old_score, new_score):
-        if old_score[0] > new_score:
+        new_min = old_score[0] > new_score
+        if new_min:
             old_score[0] = new_score
+        return new_min
+
+
+    def update_max_score(self, old_score, new_score):
+        new_max = old_score[0] < new_score
+        if old_score[0] < new_score:
+            old_score[0] = new_score
+        return new_max
+
 
 class ActiveCriticLearner(nn.Module):
     def __init__(self,
@@ -128,7 +144,8 @@ class ActiveCriticLearner(nn.Module):
             }
             self.write_tboard_scalar(debug_dict=debug_dict, train=True)
             if (epoch+1)%self.network_args.val_every == 0:
-                self.run_validation() 
+                if self.network_args.tboard:
+                    self.run_validation() 
 
 
     def write_tboard_scalar(self, debug_dict, train, step=None):
@@ -148,7 +165,14 @@ class ActiveCriticLearner(nn.Module):
             env=self.env,
             episodes=self.network_args.validation_episodes)
 
+        self.createGraphsMW(d_in=1, d_out=actions, result=actions, toy=False,
+                                inpt=observations[:,0], name='Trajectory', window=0)
+
         last_reward = rewards[:,-1]
+        best_model = self.scores.update_max_score(self.scores.mean_reward, last_reward.mean())
+        if best_model:
+            self.saveNetworkToFile(add='best_validation', data_path=self.network_args.data_path)
+
         last_expected_rewards_before = expected_rewards_before[:, -1]
         last_expected_reward_after = expected_rewards_after[:, -1]
         self.analyze_critic_scores(last_reward, last_expected_rewards_before, '')
@@ -208,87 +232,6 @@ class ActiveCriticLearner(nn.Module):
 
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
-    def runValidation(self, complete=False):
-        self.policy.eval()
-        if complete:
-            num_envs = self.network_args.eval_epochs
-            print("Running full validation...")
-
-        else:
-            num_envs = self.network_args.quick_eval_epochs
-
-        self.policy.return_mode = 0
-
-        actions, observations, success, expected_rewards = self.sample_new_episode(
-            episodes=num_envs, add_data=False)
-        data_gen = (actions, observations, success.type(torch.bool))
-        mean_success = success.mean()
-        fail = ~success.type(torch.bool)
-        print(f'mean success before: {mean_success}')
-        debug_dict = {'success rate generated': mean_success}
-        self.write_tboard_scalar(debug_dict=debug_dict, train=False)
-
-        self.analyze_critic_scores(success, expected_rewards)
-
-        if self.add_data:
-            self.policy.return_mode = 1
-            actions_opt, observations_opt, success_opt, expected_rewards_opt = self.sample_new_episode(
-                episodes=num_envs, add_data=False)
-            self.analyze_critic_scores(success_opt, expected_rewards_opt)
-
-        fail_opt = ~success_opt.type(torch.bool)
-
-        self.write_tboard_scalar(
-            {'num optimisation steps': torch.tensor(self.policy.max_steps)}, train=False)
-
-        mean_success_opt = (success_opt.type(torch.float)).mean()
-        print(f'mean success after: {mean_success_opt}')
-        debug_dict = {}
-        debug_dict['success rate optimized'] = mean_success_opt
-        debug_dict['improved success rate'] = mean_success_opt - \
-            mean_success
-        if mean_success_opt - mean_success > self.best_improved_success:
-            self.best_improved_success = mean_success_opt - mean_success
-            self.saveNetworkToFile(
-                add=self.logname + "/best_improved/", data_path=self.data_path)
-
-        num_improved = (success_opt * fail).type(torch.float).mean()
-        num_deproved = (success * fail_opt).type(torch.float).mean()
-        debug_dict['rel number improved'] = num_improved
-        debug_dict['rel number failed'] = num_deproved
-
-        self.write_tboard_scalar(
-            debug_dict=debug_dict, train=not complete, step=self.global_step)
-
-        if self.use_tboard:
-            success = success.type(torch.bool)
-            success_opt = success_opt.type(torch.bool)
-            self.plot_with_mask(
-                label=actions, trj=actions, inpt=observations, mask=success, name='success')
-
-            fail = ~success
-            fail_opt = ~success_opt
-            self.plot_with_mask(label=actions, trj=actions,
-                                inpt=observations, mask=fail, name='fail')
-
-            fail_to_success = success_opt & fail
-            self.plot_with_mask(label=actions, trj=actions, inpt=observations,
-                                mask=fail_to_success, name='fail to success', opt_trj=actions_opt)
-
-            success_to_fail = success & fail_opt
-            self.plot_with_mask(label=actions, trj=actions, inpt=observations,
-                                mask=success_to_fail, name='success to fail', opt_trj=actions_opt)
-
-            fail_to_fail = fail & fail_opt
-            self.plot_with_mask(label=actions, trj=actions, inpt=observations,
-                                mask=fail_to_fail, name='fail to fail', opt_trj=actions_opt)
-
-        if self.use_tboard:
-            self.saveNetworkToFile(
-                add=self.logname + "/last/", data_path=self.data_path)
-
-
-
 
     def plot_with_mask(self, label, trj, inpt, mask, name, opt_trj=None):
         if mask.sum() > 0:
@@ -313,50 +256,52 @@ class ActiveCriticLearner(nn.Module):
             print("")
         sys.stdout.flush()
 
+
     def createGraphsMW(self, d_in, d_out, result, save=False, name_plot='', epoch=0, toy=True, inpt=None, name='Trajectory', opt_trj=None, window=0):
         target_trj = d_out
         gen_trj = result
 
-        path_to_plots = self.data_path + "/plots/" + \
+        path_to_plots = self.network_args.data_path + "/plots/" + \
             str(self.logname) + '/' + str(epoch) + '/'
 
         tol_neg = None
         tol_pos = None
-        self.tboard.plotDMPTrajectory(target_trj, gen_trj, torch.zeros_like(gen_trj),
+        self.tboard.plotDMPTrajectory(target_trj, gen_trj, th.zeros_like(gen_trj),
                                       None, None, None, stepid=self.global_step, save=save, name_plot=name_plot, path=path_to_plots,
                                       tol_neg=tol_neg, tol_pos=tol_pos, inpt=inpt, name=name, opt_gen_trj=opt_trj, window=window)
 
+
     def saveNetworkToFile(self, add, data_path):
-        import os
-        import pickle
 
-        path_to_file = os.path.join(data_path, "Data/Model/", add)
-        if not path.exists(path_to_file):
-            makedirs(path_to_file)
+        path_to_file = os.path.join(data_path, add)
+        if not os.path.exists(path_to_file):
+            os.makedirs(path_to_file)
 
-        torch.save(self.state_dict(), path_to_file + "policy_network")
-        torch.save(self.tailor_modules[0].model.state_dict(
-        ), path_to_file + "tailor_network")
-        torch.save(self.optimizer.state_dict(), path_to_file + "optimizer")
-        torch.save(self.tailor_modules[0].meta_optimizer.state_dict(
-        ), path_to_file + "tailor_optimizer")
-        torch.save(torch.tensor(self.global_step),
-                   path_to_file + "global_step")
+        print(path_to_file)
 
-        with open(path_to_file + 'model_setup.pkl', 'wb') as f:
-            pickle.dump(self.network_args, f)
+        th.save(self.state_dict(), path_to_file + "/policy_network")
+        th.save(self.policy.actor.optimizer.state_dict(), path_to_file + "/optimizer_actor")
+        th.save(self.policy.critic.optimizer.state_dict(), path_to_file + "/optimizer_critic")
+        th.save(th.tensor(self.global_step),
+                   path_to_file + "/global_step")
+        with open(path_to_file + '/scores.pkl', 'wb') as f:
+            pickle.dump(self.scores, f)
 
-        torch.save(self.train_loader, path_to_file+'train')
+        th.save(self.train_data, path_to_file+'/train')
 
     def loadNetworkFromFile(self, path, device='cuda'):
-        self.load_state_dict(torch.load(
+        optimize = self.policy.args_obj.optimize
+        self.policy.args_obj.optimize = False
+        sample_new_episode(
+            policy=self.policy,
+            env=self.env,
+            episodes=1)
+        self.load_state_dict(th.load(
             path + "policy_network", map_location=device))
-        self.tailor_modules[0].model.load_state_dict(
-            torch.load(path + "tailor_network", map_location=device))
-        self.optimizer.load_state_dict(torch.load(path + "optimizer"))
-        self.tailor_modules[0].meta_optimizer.load_state_dict(
-            torch.load(path + "tailor_optimizer", map_location=device))
-
-        self.global_step = int(torch.load(path+'global_step'))
-
-        self.train_loader = torch.load(path+'train')
+        self.policy.actor.optimizer.load_state_dict(th.load(path + "/optimizer_actor"))
+        self.policy.critic.optimizer.load_state_dict(th.load(path + "/optimizer_critic"))
+        self.global_step = int(th.load(path+'/global_step'))
+        self.setDatasets(train_data=th.load(path+'/train', map_location=device))
+        with open(path + '/scores.pkl', 'rb') as f:
+            self.scores = pickle.load(f)
+        self.policy.args_obj.optimize = optimize

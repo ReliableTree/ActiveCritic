@@ -105,7 +105,7 @@ class TBoardGraphs():
 
         if inpt is not None:
             ax[-1,-1].clear()
-            ax[-1,-1].plot(range(inpt.shape[-1]), tf_inpt,   alpha=1.0, color='forestgreen')     
+            ax[-1,-1].plot(range(inpt.shape[-1]), tf_inpt[sp],   alpha=1.0, color='forestgreen')     
         
         if tf_phase is not None:
             ax[2,2].clear()

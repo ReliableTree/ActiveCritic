@@ -152,6 +152,41 @@ class TestUtils(unittest.TestCase):
             length += len(obsv)
         self.assertTrue(acl.policy.args_obj.epoch_len == length)
 
+    def test_save_and_load(self):
+        seq_len = 5
+        epsiodes = 2
+        device = 'cuda'
+        env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
+        transitions = sample_expert_transitions(policy=expert.predict, env=env, episodes=epsiodes)
+        exp_actions, exp_observations, exp_rewards = parse_sampled_transitions(transitions=transitions, new_epoch=new_epoch_reach, extractor=DummyExtractor(), device=device)
+        part_acts, part_obsv, part_rews = make_part_obs_data(actions=exp_actions, observations=exp_observations, rewards=exp_rewards)
+        imitation_data = DatasetAC(device='cuda')
+        imitation_data.onyl_positiv = False
+        imitation_data.add_data(obsv=part_obsv, actions=part_acts, reward=part_rews)
+        th.manual_seed(0)
+        acl, env, expert, seq_len, epsiodes, device = self.make_acl()
+        acl.setDatasets(train_data=imitation_data)
+        self.assertTrue(len(acl.train_data) == seq_len*epsiodes, 'set dataset failed')
+
+        acl.train(epochs=400)
+        acl.run_validation()
+        scores_before = acl.scores
+
+        th.manual_seed(0)
+        acl, env, expert, seq_len, epsiodes, device = self.make_acl()
+        acl.setDatasets(train_data=imitation_data)
+        acl.train(epochs=200)
+        acl.saveNetworkToFile(data_path='/home/hendrik/Documents/master_project/LokalData/TransformerImitationLearning/', add='best')
+        acl, env, expert, seq_len, epsiodes, device = self.make_acl()
+        acl.loadNetworkFromFile(path='/home/hendrik/Documents/master_project/LokalData/TransformerImitationLearning/best/')
+        acl.train(epochs=200)
+        acl.run_validation()
+
+        self.assertTrue(len(acl.train_data) == seq_len*epsiodes, 'Load dataset failed.')
+
+        self.assertTrue(th.allclose(acl.scores.mean_actor[0], scores_before.mean_actor[0]), 'Network did not converge as predicted after load from file.')
+        self.assertTrue(th.allclose(acl.scores.mean_critic[0], scores_before.mean_critic[0]))
+
 
 
 if __name__ == '__main__':
