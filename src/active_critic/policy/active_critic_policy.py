@@ -1,13 +1,7 @@
-from ast import Str
-import copy
 from pyclbr import Function
-from tkinter.messagebox import NO
 from typing import Dict, Optional, Tuple, Union
-from unittest import result
 
 import numpy as np
-from scipy.fftpack import sc_diff
-from sklearn.utils import resample
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel
 from active_critic.utils.pytorch_utils import make_partially_observed_seq
@@ -31,7 +25,7 @@ class ActiveCriticPolicySetup:
         self.optimisation_threshold: float = None
         self.epoch_len: int = None
         self.opt_steps: int = None
-        self.device: Str = None
+        self.device: str = None
         self.inference_opt_lr: float = None
         self.optimize: bool = None
         self.batch_size: int = None

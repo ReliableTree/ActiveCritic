@@ -130,10 +130,7 @@ class TestUtils(unittest.TestCase):
         actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
             policy=ac,
             env=env,
-            new_epoch=new_epoch_reach,
-            extractor=DummyExtractor(),
-            episodes=epsiodes,
-            device='cuda')
+            episodes=epsiodes)
             
         exp_act_shp = [epsiodes, seq_len, env.action_space.shape[0]]
         self.assertTrue( list(actions.shape) == exp_act_shp)
@@ -141,7 +138,7 @@ class TestUtils(unittest.TestCase):
         exp_obs_shp = [epsiodes, seq_len, env.observation_space.shape[0]]
         self.assertTrue( list(observations.shape) == exp_obs_shp)
 
-        exp_rew_shp = [epsiodes, seq_len]
+        exp_rew_shp = [epsiodes, seq_len, 1]
         self.assertTrue( list(rewards.shape) == exp_rew_shp)
 
         exp_exp_rew_shp = [epsiodes, seq_len, ac.critic.wsms.model_setup.d_output]

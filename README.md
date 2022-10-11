@@ -1,21 +1,13 @@
 ## Prerequisites 
-ActiveCritic requires mujoco. Follow the instructions here: https://github.com/openai/mujoco-py .
+ActiveCritic requires mujoco version 2.1. Follow the instructions here: https://github.com/openai/mujoco-py .
 
-Install metaworld in the root folder of AC. 
-Follow the instructions from https://github.com/rlworkgroup/metaworld:
-in the root folder, open a terminal and input:
-
-git clone https://github.com/rlworkgroup/metaworld.git
-cd metaworld
+Install active critic from the root folder of the project with:
 pip install -e .
 .
 
-Install stable baselines 3 from https://stable-baselines3.readthedocs.io/en/master/guide/install.html 
-with 
-pip install stable-baselines3
-.
+Install metaworld. 
+Follow the instructions from https://github.com/rlworkgroup/metaworld:
+in the root folder, open a terminal and input:
 
-Install stable baselines 3 imiation from https://stable-baselines3.readthedocs.io/en/master/guide/imitation.html
-with
-pip install imitation
-.
+pip install git+https://github.com/rlworkgroup/metaworld.git@master#egg=metaworld .
+You might need to add some path variables, which will be promted, when you try to run metaworld for the first time.

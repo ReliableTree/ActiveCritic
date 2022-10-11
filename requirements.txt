@@ -1,5 +1,0 @@
-numpy
-pytorch
-tensorflow
-hashids
-matplotlib

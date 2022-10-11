@@ -3,4 +3,5 @@ setup.py
 src/active_critic.egg-info/PKG-INFO
 src/active_critic.egg-info/SOURCES.txt
 src/active_critic.egg-info/dependency_links.txt
+src/active_critic.egg-info/requires.txt
 src/active_critic.egg-info/top_level.txt
