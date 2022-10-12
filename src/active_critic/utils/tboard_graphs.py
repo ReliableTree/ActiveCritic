@@ -10,7 +10,6 @@ class TBoardGraphs():
             self.__hashids           = Hashids()
             #self.logdir              = "Data/TBoardLog/" + logname + "/"
             self.logdir              = os.path.join(data_path, "gboard/" + logname + "/")
-            print(f'log dir: {self.logdir + "train/"}')
             self.__tboard_train      = tf.summary.create_file_writer(self.logdir + "train/")
             self.__tboard_validation = tf.summary.create_file_writer(self.logdir + "validate/")
             #self.voice               = Voice(path=data_path)
@@ -31,6 +30,7 @@ class TBoardGraphs():
     
     def addTrainScalar(self, name, value, stepid):
         with self.__tboard_train.as_default():
+
             tfvalue = self.torch2tf(value)
             tf.summary.scalar(name, tfvalue, step=stepid)
             self.__tboard_train.flush()

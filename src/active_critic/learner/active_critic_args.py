@@ -15,3 +15,5 @@ class ActiveCriticLearnerArgs:
         self.validation_episodes:int = None
         self.val_every:int= None
         self.add_data_every:int = None
+        self.actor_threshold:float = None
+        self.critic_threshold:float = None

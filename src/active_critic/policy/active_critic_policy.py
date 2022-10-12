@@ -1,5 +1,6 @@
 from pyclbr import Function
 from typing import Dict, Optional, Tuple, Union
+from matplotlib.pyplot import hist
 
 import numpy as np
 import torch as th
@@ -30,6 +31,28 @@ class ActiveCriticPolicySetup:
         self.optimize: bool = None
         self.batch_size: int = None
 
+class ActiveCriticPolicyHistory:
+    def __init__(self) -> None:
+        self.reset()
+
+
+    def reset(self):
+        self.gen_scores = []
+        self.opt_scores = []
+        self.gen_trj = []
+
+
+    def new_epoch(self, history:list([th.Tensor]), size:list([int, int, int]), device:str):
+        new_field = th.zeros(size=size, device=device)
+        if len(history) == 0:
+            history.append(new_field)
+        else:
+            history[0] = th.cat((history[0], new_field))
+
+
+    def add_value(self, history:list([th.Tensor]), value:th.Tensor, current_step:int):
+        history[0][-value.shape[0]:, current_step] = value
+
 
 class ActiveCriticPolicy(BaseModel):
     def __init__(
@@ -48,34 +71,29 @@ class ActiveCriticPolicy(BaseModel):
         self.args_obj = acps
         self.register_buffer('gl', th.ones(
             size=[acps.batch_size, acps.epoch_len, critic.wsms.model_setup.d_output], dtype=th.float, device=acps.device))
+        self.history = ActiveCriticPolicyHistory()
         self.reset()
 
     def reset(self):
         self.last_goal = None
         self.current_step = 0
-        self.score_history_after = None
-        self.score_history_before = None
+        self.history.reset()
 
     def reset_epoch(self, vec_obsv: th.Tensor):
         self.current_step = 0
         self.last_goal = vec_obsv
         self.current_result = None
+
+        scores_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output]
+        self.history.new_epoch(self.history.gen_scores, size=scores_size, device=self.args_obj.device)
+        self.history.new_epoch(self.history.opt_scores, size=scores_size, device=self.args_obj.device)
+
+        trj_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.action_space.shape[0]]
+        self.history.new_epoch(self.history.gen_trj, size=trj_size, device=self.args_obj.device)
+        
         self.obs_seq = th.zeros(
             size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
             
-        if self.score_history_after is None:
-            self.score_history_after = th.zeros(
-                size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output], device=self.args_obj.device)
-        else:
-            self.score_history_after = th.cat((self.score_history_after, th.zeros(
-                size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output], device=self.args_obj.device)))
-
-        if self.score_history_before is None:
-            self.score_history_before = th.zeros(
-                size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output], device=self.args_obj.device)
-        else:
-            self.score_history_before = th.cat((self.score_history_before, th.zeros(
-                size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output], device=self.args_obj.device)))
 
     def predict(
         self,
@@ -98,13 +116,10 @@ class ActiveCriticPolicy(BaseModel):
 
         self.current_result = self.forward(
             observation_seq=self.obs_seq, action_seq=action_seq, optimize=self.args_obj.optimize, current_step=self.current_step)
-        batch_size = self.current_result.expected_succes_before.shape[0]
-        if self.args_obj.optimize:
-            self.score_history_after[-batch_size:,
-                            self.current_step] = self.current_result.expected_succes_after[:, self.current_step].detach()
 
-        self.score_history_before[-batch_size:,
-                        self.current_step] = self.current_result.expected_succes_before[:, self.current_step].detach()
+        if self.args_obj.optimize:
+            self.history.add_value(self.history.opt_scores, value=self.current_result.expected_succes_after[:, self.current_step].detach(), current_step=self.current_step)
+        self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, self.current_step].detach(), current_step=self.current_step)
 
         return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
 
@@ -117,6 +132,8 @@ class ActiveCriticPolicy(BaseModel):
         if action_seq is not None:
             actions = self.proj_actions(
                 action_seq, actions, current_step)
+
+        self.history.add_value(self.history.gen_trj, actions[:, self.current_step].detach(), current_step=self.current_step)
 
         critic_input = self.get_critic_input(
             acts=actions, obs_seq=observation_seq)
@@ -141,8 +158,8 @@ class ActiveCriticPolicy(BaseModel):
     def optimize_act_sequence(self, actions: th.Tensor, observations: th.Tensor, current_step: int):
         optimized_actions = th.clone(actions.detach())
         optimized_actions.requires_grad_(True)
-        optimizer = th.optim.Adam(
-            [optimized_actions], lr=self.args_obj.inference_opt_lr)
+        optimizer = th.optim.AdamW(
+            [optimized_actions], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         expected_success = th.zeros(
             size=[actions.shape[0], self.critic.wsms.model_setup.seq_len, self.critic.wsms.model_setup.d_output], dtype=th.float, device=actions.device)
         goal_label = self.gl[:actions.shape[0]]

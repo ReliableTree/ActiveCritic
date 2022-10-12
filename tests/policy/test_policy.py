@@ -11,6 +11,7 @@ from active_critic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
                                            new_epoch_pap,
                                            new_epoch_reach)
 
+from active_critic.utils.gym_utils import make_policy_dict, new_epoch_reach, make_dummy_vec_env, sample_expert_transitions, parse_sampled_transitions
 
 class TestPolicy(unittest.TestCase):
 
@@ -47,7 +48,8 @@ class TestPolicy(unittest.TestCase):
         critic = WholeSequenceModel(wsm_critic_setup)
         ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
                                 actor=actor, critic=critic, acps=acps)
-        return ac, acps, env
+        return ac, acps, env, gt_policy
+
 
     def test_policy_output_shape(self):
         ac, acps, d_output, obs_dim, batch_size = self.setup_ac()
@@ -123,7 +125,7 @@ class TestPolicy(unittest.TestCase):
 
     def test_prediction(self):
         th.manual_seed(0)
-        ac, acps, env = self.setup_ac_reach()
+        ac, acps, env, _ = self.setup_ac_reach()
         obsv = env.reset()
         last_obsv = th.tensor(obsv)
         all_taken_actions = []
@@ -150,7 +152,7 @@ class TestPolicy(unittest.TestCase):
 
     def test_score_history(self):
         th.manual_seed(0)
-        ac, acps, env = self.setup_ac_reach()
+        ac, acps, env, _ = self.setup_ac_reach()
         obsv = env.reset()
         all_taken_actions = []
         all_observations = [obsv]
@@ -158,6 +160,7 @@ class TestPolicy(unittest.TestCase):
         all_scores_before = []
         ac.reset()
         epsiodes = 2
+
         for i in range(epsiodes*ac.args_obj.epoch_len):
             action = ac.predict(obsv)
             all_taken_actions.append(action)
@@ -165,25 +168,39 @@ class TestPolicy(unittest.TestCase):
             all_observations.append(obsv)
             all_scores_after.append(ac.current_result.expected_succes_after)
             all_scores_before.append(ac.current_result.expected_succes_before)
-            assert len(th.nonzero(ac.obs_seq[:, ac.current_step+1:])) == 0
+            self.assertTrue(len(th.nonzero(ac.obs_seq[:, ac.current_step+1:])) == 0, 'Unobserved observations are set in ac.obs_seq.')
             if (i+1) % 5 == 0:
-                all_taken_actions = []
                 all_observations = [obsv]
 
         all_scores_after_th = th.tensor(np.array([s.detach().cpu().numpy() for s in all_scores_after]).reshape(
             [epsiodes, ac.args_obj.epoch_len, ac.args_obj.epoch_len, 1]), device=ac.args_obj.device)
         all_scores_before_th = th.tensor(np.array([s.detach().cpu().numpy() for s in all_scores_before]).reshape(
             [epsiodes, ac.args_obj.epoch_len, ac.args_obj.epoch_len, 1]), device=ac.args_obj.device)
+
+        ac, acps, env, _ = self.setup_ac_reach()
+        ac.args_obj.optimize = False
+        obsv = env.reset()
+        all_taken_actions = []
+        all_observations = [obsv]
+        all_scores_after = []
+        all_scores_before = []
+        ac.reset()
+        epsiodes = 2
+
+        for i in range(epsiodes*ac.args_obj.epoch_len):
+            action = ac.predict(obsv)
+            all_taken_actions.append(action)
+            obsv, rew, dones, info = env.step(action)
+
+
+        all_actions_th = th.tensor(np.array(all_taken_actions).reshape(
+            [epsiodes, ac.args_obj.epoch_len, 4]), device=ac.args_obj.device)
         
         for i in range(epsiodes):
             for j in range(all_scores_after_th.shape[1]):
-                assert th.equal(
-                    all_scores_after_th[i, j, j], ac.score_history_after[i, j]), 'scores after history of ac is corrupted.'
-
-        for i in range(epsiodes):
-            for j in range(all_scores_before_th.shape[1]):
-                assert th.equal(
-                    all_scores_before_th[i, j, j], ac.score_history_before[i, j]), 'scores before history of ac is corrupted.'
+                self.assertTrue(th.equal(
+                    all_actions_th[i, j], ac.history.gen_trj[0][i, j]), 'Trajectory history of ac is corrupted.')
+                
 
         for i in range(epsiodes*ac.args_obj.epoch_len):
             action = ac.predict(obsv)
@@ -197,9 +214,9 @@ class TestPolicy(unittest.TestCase):
                 all_observations = [obsv]
 
         self.assertTrue(
-            ac.score_history_after.shape[0] == 2*epsiodes, 'Scores after are not properly appended.')
+            ac.history.opt_scores[0].shape[0] == 2*epsiodes, 'Scores after are not properly appended.')
         self.assertTrue(
-            ac.score_history_before.shape[0] == 2*epsiodes, 'Scores before are not properly appended.')
+            ac.history.gen_scores[0].shape[0] == 2*epsiodes, 'Scores before are not properly appended.')
 
         all_taken_actions = []
         all_observations = [obsv]
@@ -217,8 +234,12 @@ class TestPolicy(unittest.TestCase):
                 all_taken_actions = []
                 all_observations = [obsv]
         self.assertTrue(
-            ac.score_history_after.shape[0] == 2, 'Epochs reset did not work.')
+            ac.history.opt_scores[0].shape[0] == 2, 'Epochs reset did not work.')
+        self.assertTrue(
+            ac.history.gen_scores[0].shape[0] == 2, 'Epochs reset did not work.')
 
 
 if __name__ == '__main__':
-    unittest.main()
+    #unittest.main()
+    to = TestPolicy()
+    to.test_score_history()

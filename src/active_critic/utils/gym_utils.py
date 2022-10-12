@@ -7,7 +7,7 @@ from metaworld.policies import *
 from gym.wrappers import TimeLimit
 from imitation.data.wrappers import RolloutInfoWrapper
 from stable_baselines3.common.vec_env import DummyVecEnv
-from imitation.data import rollout
+from active_critic.utils.rollout import rollout, make_sample_until, flatten_trajectories
 from stable_baselines3.common.type_aliases import GymEnv
 from gym import Env
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -108,14 +108,14 @@ def sample_expert_transitions(policy, env, episodes):
     expert = policy
 
     print(f"Sampling expert transitions. {episodes}")
-    rollouts = rollout.rollout(
+    rollouts = rollout(
         expert,
         env,
-        rollout.make_sample_until(min_timesteps=None, min_episodes=episodes),
+        make_sample_until(min_timesteps=None, min_episodes=episodes),
         unwrap=True,
         exclude_infos=False
     )
-    return rollout.flatten_trajectories(rollouts)
+    return flatten_trajectories(rollouts)
 
 
 class ImitationLearningWrapper:
@@ -130,13 +130,13 @@ class ImitationLearningWrapper:
             actions.append(self.policy.get_action(obs))
         return actions
 
-def sample_new_episode(policy:ActiveCriticPolicy, env:Env, episodes:int=1):
+def sample_new_episode(policy:ActiveCriticPolicy, env:Env, episodes:int=1, return_gen_trj = False):
         policy.eval()
         policy.reset()
         transitions = sample_expert_transitions(
             policy.predict, env, episodes)
-        expected_rewards_after = policy.score_history_after
-        expected_rewards_before = policy.score_history_before
+        expected_rewards_after = policy.history.opt_scores[0]
+        expected_rewards_before = policy.history.gen_scores[0]
         datas = parse_sampled_transitions(
             transitions=transitions, new_epoch=policy.args_obj.new_epoch, extractor=policy.args_obj.extractor)
         device_data = []
@@ -144,4 +144,7 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, episodes:int=1):
             device_data.append(data.to(policy.args_obj.device))
         actions, observations, rewards = device_data
         rewards = rewards.unsqueeze(-1)
-        return actions, observations, rewards, expected_rewards_before, expected_rewards_after
+        if return_gen_trj:
+            return actions, policy.history.gen_trj[0], observations, rewards, expected_rewards_before, expected_rewards_after
+        else:
+            return actions, observations, rewards, expected_rewards_before, expected_rewards_after

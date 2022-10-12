@@ -124,23 +124,26 @@ class ActiveCriticLearner(nn.Module):
             self.policy.train()                
             loss_actor = None
             loss_critic = None
-            for data in self.train_loader:
-                loss_actor = self.actor_step(data, loss_actor)                
-                loss_critic = self.critic_step(data, loss_critic)                
+            mean_actor = float('inf')
+            mean_critic = float('inf')
 
-            mean_actor = loss_actor.mean()
-            mean_critic = loss_critic.mean()
-            
-            self.scores.update_min_score(self.scores.mean_critic, mean_critic)
-            self.scores.update_min_score(self.scores.mean_actor, mean_actor)
-            
-            debug_dict = {
-                'Loss Actor': mean_actor,
-                'Loss Critic': mean_critic
-            }
-            self.global_step += len(self.train_data)
-            self.write_tboard_scalar(debug_dict=debug_dict, train=True)
+            while (mean_actor > self.network_args.actor_threshold) or (mean_critic > self.network_args.critic_threshold):
+                for data in self.train_loader:
+                    loss_actor = self.actor_step(data, loss_actor)                
+                    loss_critic = self.critic_step(data, loss_critic)                
 
+                mean_actor = loss_actor.mean()
+                mean_critic = loss_critic.mean()
+                
+                self.scores.update_min_score(self.scores.mean_critic, mean_critic)
+                self.scores.update_min_score(self.scores.mean_actor, mean_actor)
+                
+                debug_dict = {
+                    'Loss Actor': mean_actor,
+                    'Loss Critic': mean_critic
+                }
+                self.write_tboard_scalar(debug_dict=debug_dict, train=True)
+            self.global_step += 1
             if self.global_step >= next_val:
                 next_val += self.network_args.val_every
                 if self.network_args.tboard:
@@ -163,8 +166,9 @@ class ActiveCriticLearner(nn.Module):
             policy=self.policy,
             env=self.env,
             episodes=self.network_args.validation_episodes)
+        opt_trj = self.policy.history.gen_trj[0][0]
         self.createGraphsMW(d_in=1, d_out=actions[0], result=actions[0], toy=False,
-                                inpt=observations[:,0], name='Trajectory', window=0)
+                                inpt=observations[:,0], name='Trajectory', window=0, opt_trj=opt_trj)
         last_reward = rewards[:,-1]
         best_model = self.scores.update_max_score(self.scores.mean_reward, last_reward.mean())
         if best_model:

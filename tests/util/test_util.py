@@ -114,6 +114,7 @@ class TestUtils(unittest.TestCase):
             self.assertTrue( th.equal(acts[i], actions[org_index]))
 
     def test_sample_new_episode(self):
+        th.manual_seed(0)
         device = 'cpu'
         acla = ActiveCriticLearnerArgs()
         acla.data_path = '/home/hendrik/Documents/master_project/LokalData/TransformerImitationLearning/'
@@ -144,6 +145,17 @@ class TestUtils(unittest.TestCase):
         exp_exp_rew_shp = [epsiodes, seq_len, ac.critic.wsms.model_setup.d_output]
         self.assertTrue( list(expected_rewards_before.shape) == exp_exp_rew_shp)
 
+        ac.args_obj.optimize = False
+        for i in range(4): #rng is not save
+            actions, gen_act, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
+                policy=ac,
+                env=env,
+                episodes=epsiodes,
+                return_gen_trj=True)
+            self.assertTrue(th.equal(actions, gen_act), 'Gen Actions output wrong.')
+
 
 if __name__ == '__main__':
     unittest.main()
+    #to = TestUtils()
+    #to.test_sample_new_episode()

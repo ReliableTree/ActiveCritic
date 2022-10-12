@@ -9,14 +9,16 @@ from active_critic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
                                            parse_sampled_transitions,
                                            sample_expert_transitions,
                                            sample_new_episode)
-from active_critic.utils.pytorch_utils import make_part_obs_data
+from active_critic.utils.pytorch_utils import make_part_obs_data, calcMSE
 from active_critic.utils.test_utils import setup_ac_reach
 from gym import Env
+import numpy as np
+from torch.utils.data.dataloader import DataLoader
 
 th.manual_seed(0)
 
 
-class TestUtils(unittest.TestCase):
+class TestLerner(unittest.TestCase):
     def make_acl(self):
         device = 'cuda'
         acla = ActiveCriticLearnerArgs()
@@ -25,9 +27,9 @@ class TestUtils(unittest.TestCase):
         acla.extractor = DummyExtractor()
         acla.imitation_phase = True
         acla.logname = 'test_acl'
-        acla.tboard = False
+        acla.tboard = True
         acla.batch_size = 32
-        acla.val_every = 10000
+        acla.val_every = 100000
         acla.validation_episodes = 5
         seq_len = 5
         epsiodes = 2
@@ -35,6 +37,7 @@ class TestUtils(unittest.TestCase):
         acl = ActiveCriticLearner(ac_policy=ac, env=env, network_args_obj=acla)
         env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
         return acl, env, expert, seq_len, epsiodes, device
+
 
     def test_make_part_seq_with_td(self):
         acl, env, expert, seq_len, epsiodes, device = self.make_acl()
@@ -71,6 +74,8 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(list(expected_rewards_after.shape) == [1, seq_len, 1])
 
     def test_convergence(self):
+        th.manual_seed(0)
+        np.random.seed(0)
         acl, env, expert, seq_len, epsiodes, device = self.make_acl()
         transitions = sample_expert_transitions(
             policy=expert.predict, env=env, episodes=epsiodes)
@@ -118,10 +123,52 @@ class TestUtils(unittest.TestCase):
                         2*epsiodes * seq_len, seq_len, 1])
 
         acl.setDatasets(train_data=imitation_data)
+        
+        actions_L2_b = []
+        rew_L2_b = []
+        acl.policy.args_obj.optimize = False
+        for data in acl.train_loader:
+            dobsv, dact, drews = data
+            for epoch in range(dobsv.shape[0]):
+                predicted_actions = []
+                acl.policy.reset()
+                if th.count_nonzero(dobsv[epoch][:,-3:]) == th.numel(dobsv[epoch][:,-3:]):
+                    for step in range(dobsv.shape[1]):
+                        action = acl.policy.predict(observation=dobsv[epoch, step].unsqueeze(0))
+                        predicted_actions.append(action)
+                    th_action = th.tensor(np.array(predicted_actions))
+                    actions_L2_b.append(calcMSE(th_action, dact[epoch].to('cpu')))
+                    rew_L2_b.append(calcMSE(acl.policy.history.gen_scores[0], drews[epoch]))
+
+        L2_actions_mean_b = th.tensor([*actions_L2_b]).mean()
+        L2_critic_mean_b = th.tensor([*rew_L2_b]).mean()
+                
 
         acl.train(epochs=1000)
         self.assertTrue(acl.scores.mean_actor[0] < 1e-3)
         self.assertTrue(acl.scores.mean_critic[0] < 1e-3)
+        
+        actions_L2 = []
+        rew_L2 = []
+        acl.policy.args_obj.optimize = False
+        for data in acl.train_loader:
+            dobsv, dact, drews = data
+            for epoch in range(dobsv.shape[0]):
+                predicted_actions = []
+                acl.policy.reset()
+                if th.count_nonzero(dobsv[epoch][:,-3:]) == th.numel(dobsv[epoch][:,-3:]):
+                    for step in range(dobsv.shape[1]):
+                        action = acl.policy.predict(observation=dobsv[epoch, step].unsqueeze(0))
+                        predicted_actions.append(action)
+                    th_action = th.tensor(np.array(predicted_actions))
+                    actions_L2.append(calcMSE(th_action, dact[epoch].to('cpu')))
+                    rew_L2.append(calcMSE(acl.policy.history.gen_scores[0], drews[epoch]))
+
+        L2_actions_mean = th.tensor([*actions_L2]).mean()
+        L2_critic_mean = th.tensor([*rew_L2]).mean()
+
+        self.assertTrue(L2_actions_mean < 0.1 * L2_actions_mean_b, 'The prediction did not converge.')
+        self.assertTrue(L2_critic_mean < 0.1 * L2_critic_mean_b, 'The prediction did not converge.')
 
         lenght_before = 0
         for data in acl.train_loader:
@@ -188,6 +235,7 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(th.allclose(acl.scores.mean_critic[0], scores_before.mean_critic[0]))
 
 
-
 if __name__ == '__main__':
     unittest.main()
+    #to = TestLerner()
+    #to.test_convergence()
