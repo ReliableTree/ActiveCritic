@@ -31,6 +31,10 @@ class TestLerner(unittest.TestCase):
         acla.batch_size = 32
         acla.val_every = 100000
         acla.validation_episodes = 5
+        acla.training_epsiodes = 1
+        acla.num_cpu = 5
+        acla.actor_threshold = 0.5
+        acla.critic_threshold = 0.5
         seq_len = 5
         epsiodes = 2
         ac, acps, env = setup_ac_reach(seq_len=seq_len)

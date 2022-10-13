@@ -13,7 +13,9 @@ class ActiveCriticLearnerArgs:
         self.device:str = None
         self.batch_size:int = None
         self.validation_episodes:int = None
+        self.training_epsiodes:int = None
         self.val_every:int= None
         self.add_data_every:int = None
         self.actor_threshold:float = None
         self.critic_threshold:float = None
+        self.num_cpu:int = None

@@ -6,11 +6,10 @@ from metaworld.envs import \
 from metaworld.policies import *
 from gym.wrappers import TimeLimit
 from imitation.data.wrappers import RolloutInfoWrapper
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from active_critic.utils.rollout import rollout, make_sample_until, flatten_trajectories
 from stable_baselines3.common.type_aliases import GymEnv
 from gym import Env
-from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 
 class DummyExtractor:
@@ -67,6 +66,21 @@ def make_dummy_vec_env(name, seq_len):
         policy=policy_dict[env_tag][0], env=dv1)
     return dv1, vec_expert
 
+def make_vec_env(env_id, num_cpu, seq_len):
+    policy_dict = make_policy_dict()
+    def make_env(env_id, rank, seed=0):
+        def _init():
+            max_episode_steps = seq_len
+            env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_id][1]]()
+            env._freeze_rand_vec = False
+            timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
+            riw = RolloutInfoWrapper(timelimit)
+            return riw
+        return _init
+    env = SubprocVecEnv([make_env(env_id, i) for i in range(num_cpu)])
+    vec_expert = ImitationLearningWrapper(
+        policy=policy_dict[env_id][0], env=env)
+    return env, vec_expert
 
 def parse_sampled_transitions(transitions, new_epoch, extractor, device='cuda'):
     observations = []
@@ -141,10 +155,11 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, episodes:int=1, retur
             transitions=transitions, new_epoch=policy.args_obj.new_epoch, extractor=policy.args_obj.extractor)
         device_data = []
         for data in datas:
-            device_data.append(data.to(policy.args_obj.device))
+            device_data.append(data[:episodes].to(policy.args_obj.device))
         actions, observations, rewards = device_data
         rewards = rewards.unsqueeze(-1)
+
         if return_gen_trj:
-            return actions, policy.history.gen_trj[0], observations, rewards, expected_rewards_before, expected_rewards_after
+            return actions, policy.history.gen_trj[0][:episodes], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]
         else:
-            return actions, observations, rewards, expected_rewards_before, expected_rewards_after
+            return actions, observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]

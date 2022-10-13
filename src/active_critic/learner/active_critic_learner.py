@@ -105,7 +105,7 @@ class ActiveCriticLearner(nn.Module):
         actions, observations, rewards, _, _ = sample_new_episode(
             policy=self.policy,
             env=self.env,
-            episodes=1)
+            episodes=self.network_args.training_epsiodes)
         self.add_data(
             actions=actions,
             observations=observations,
@@ -162,13 +162,14 @@ class ActiveCriticLearner(nn.Module):
                     self.tboard.addValidationScalar(para, value, step)
 
     def run_validation(self):
-        actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
+        opt_actions, gen_actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
             policy=self.policy,
             env=self.env,
-            episodes=self.network_args.validation_episodes)
-        opt_trj = self.policy.history.gen_trj[0][0]
-        self.createGraphsMW(d_in=1, d_out=actions[0], result=actions[0], toy=False,
-                                inpt=observations[:,0], name='Trajectory', window=0, opt_trj=opt_trj)
+            episodes=self.network_args.validation_episodes,
+            return_gen_trj=True)
+
+        self.createGraphsMW(d_in=1, d_out=gen_actions[0], result=gen_actions[0], toy=False,
+                                inpt=observations[:,0], name='Trajectory', window=0, opt_trj=opt_actions[0])
         last_reward = rewards[:,-1]
         best_model = self.scores.update_max_score(self.scores.mean_reward, last_reward.mean())
         if best_model:
@@ -193,11 +194,13 @@ class ActiveCriticLearner(nn.Module):
         else:
             return None
 
+
     def tf2torch(self, inpt):
         if inpt is not None:
             return th.tensor(inpt.numpy(), device=self.device)
         else:
             return None
+
 
     def analyze_critic_scores(self, reward:th.Tensor, expected_reward:th.Tensor, add:str):
         success = reward == 1
