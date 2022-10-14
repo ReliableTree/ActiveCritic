@@ -142,9 +142,9 @@ class ActiveCriticLearner(nn.Module):
                     'Loss Critic': mean_critic
                 }
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True)
-                self.global_step += 1
+                self.global_step += len(self.train_data)
             if self.global_step >= next_val:
-                next_val += self.network_args.val_every
+                next_val = self.global_step + self.network_args.val_every
                 if self.network_args.tboard:
                     self.run_validation() 
 
@@ -186,7 +186,7 @@ class ActiveCriticLearner(nn.Module):
         debug_dict = {
             'Success Rate' : success.mean(),
             'Reward': last_reward.mean(),
-            'Training Epochs' : len(self.train_data)
+            'Training Epochs' : th.tensor(int(len(self.train_data)/self.policy.args_obj.epoch_len))
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
