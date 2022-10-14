@@ -74,9 +74,9 @@ def make_obs_act_space(obs_dim, action_dim):
         np.array(action_low), np.array(action_high), (action_dim,), float)
     return observation_space, action_space
 
-def make_acps(seq_len, extractor, new_epoch, batch_size = 32):
+def make_acps(seq_len, extractor, new_epoch, batch_size = 32, device='cuda'):
     acps = ActiveCriticPolicySetup()
-    acps.device='cuda'
+    acps.device=device
     acps.epoch_len=seq_len
     acps.extractor=extractor
     acps.new_epoch=new_epoch
@@ -84,19 +84,19 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 32):
     acps.optimisation_threshold=0.5
     acps.inference_opt_lr = 1e-1
     acps.optimize = True
-    acps.batch_size = 32
+    acps.batch_size = batch_size
     return acps
 
-def setup_ac_reach(seq_len = 5):
+def setup_ac_reach(seq_len = 5, device='cuda'):
     seq_len = seq_len
     env, gt_policy = make_dummy_vec_env('reach', seq_len=seq_len)
     d_output = env.action_space.shape[0]
     wsm_actor_setup = make_wsm_setup(
-        seq_len=seq_len, d_output=d_output)
+        seq_len=seq_len, d_output=d_output, device=device)
     wsm_critic_setup = make_wsm_setup(
-        seq_len=seq_len, d_output=1)
+        seq_len=seq_len, d_output=1, device=device)
     acps = make_acps(
-        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach)
+        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
     actor = WholeSequenceModel(wsm_actor_setup)
     critic = WholeSequenceModel(wsm_critic_setup)
     ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,

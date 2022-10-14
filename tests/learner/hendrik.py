@@ -13,6 +13,7 @@ from active_critic.model_src.whole_sequence_model import (
 from active_critic.model_src.transformer import (
     ModelSetup, generate_square_subsequent_mask)
 from active_critic.policy.active_critic_policy import ActiveCriticPolicySetup, ActiveCriticPolicy
+import argparse
 
 
 from gym import Env
@@ -38,9 +39,9 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     return wsm
 
 
-def make_acps(seq_len, extractor, new_epoch, batch_size=32):
+def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps = ActiveCriticPolicySetup()
-    acps.device = 'cuda'
+    acps.device = device
     acps.epoch_len = seq_len
     acps.extractor = extractor
     acps.new_epoch = new_epoch
@@ -52,16 +53,16 @@ def make_acps(seq_len, extractor, new_epoch, batch_size=32):
     return acps
 
 
-def setup_ac_reach(seq_len, num_cpu):
+def setup_ac_reach(seq_len, num_cpu, device):
     seq_len = seq_len
     env, expert = make_vec_env('reach', num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
     wsm_actor_setup = make_wsm_setup(
-        seq_len=seq_len, d_output=d_output)
+        seq_len=seq_len, d_output=d_output, device=device)
     wsm_critic_setup = make_wsm_setup(
-        seq_len=seq_len, d_output=1)
+        seq_len=seq_len, d_output=1, device=device)
     acps = make_acps(
-        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach)
+        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
     actor = WholeSequenceModel(wsm_actor_setup)
     critic = WholeSequenceModel(wsm_critic_setup)
     ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
@@ -69,8 +70,8 @@ def setup_ac_reach(seq_len, num_cpu):
     return ac, acps, env, expert
 
 
-def make_acl():
-    device = 'cuda'
+def make_acl(device):
+    device = device
     acla = ActiveCriticLearnerArgs()
     acla.data_path = '/data/bing/hendrik/'
     acla.device = device
@@ -89,11 +90,16 @@ def make_acl():
 
     seq_len = 100
     epsiodes = 30
-    ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.training_epsiodes, acla.num_cpu))
+    ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.training_epsiodes, acla.num_cpu), device=device)
     eval_env, expert = make_vec_env('reach', num_cpu=acla.num_cpu, seq_len=seq_len)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
     return acl, env, expert, seq_len, epsiodes, device
 
 if __name__ == '__main__':
-    acl, env, expert, seq_len, epsiodes, device = make_acl()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('device', type=str,
+                    help='Choose free GPU')
+    args = parser.parse_args()
+    print(args.device)
+    acl, env, expert, seq_len, epsiodes, device = make_acl(device=args.device)
     acl.train(epochs=10000)

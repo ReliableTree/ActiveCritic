@@ -104,7 +104,6 @@ class ActiveCriticPolicy(BaseModel):
     ) -> th.Tensor:
         vec_obsv = self.args_obj.extractor.forward(
             observation).to(self.args_obj.device).unsqueeze(1)
-
         if (self.last_goal is None) or (self.args_obj.new_epoch(self.last_goal, vec_obsv)):
             self.reset_epoch(vec_obsv=vec_obsv)
             action_seq = None
