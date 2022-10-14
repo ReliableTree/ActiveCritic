@@ -161,7 +161,7 @@ class ActiveCriticLearner(nn.Module):
                     self.tboard.addValidationScalar(para, value, step)
 
     def run_validation(self):
-        h = time.time()
+        h = time.perf_counter()
         opt_actions, gen_actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
             policy=self.policy,
             env=self.eval_env,
