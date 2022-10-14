@@ -32,13 +32,13 @@ class TestLerner(unittest.TestCase):
         acla.val_every = 100000
         acla.validation_episodes = 5
         acla.training_epsiodes = 1
-        acla.num_cpu = 5
+        acla.num_cpu = 1
         acla.actor_threshold = 0.5
         acla.critic_threshold = 0.5
         seq_len = 5
         epsiodes = 2
         ac, acps, env = setup_ac_reach(seq_len=seq_len)
-        acl = ActiveCriticLearner(ac_policy=ac, env=env, network_args_obj=acla)
+        acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=env, network_args_obj=acla)
         env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
         return acl, env, expert, seq_len, epsiodes, device
 

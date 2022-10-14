@@ -1,17 +1,20 @@
-from gym.envs.mujoco import MujocoEnv
-import torch.nn as nn
-import torch as th
-from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
-from active_critic.policy.active_critic_policy import ActiveCriticPolicy
-from active_critic.utils.tboard_graphs import TBoardGraphs
-from active_critic.utils.dataset import DatasetAC
-from torch.utils.data.dataloader import DataLoader
-from active_critic.utils.gym_utils import sample_new_episode
-from active_critic.utils.pytorch_utils import make_part_obs_data, calcMSE
-import tensorflow as tf
+from distutils.log import debug
 import os
 import pickle
 import sys
+
+import tensorflow as tf
+import torch as th
+import torch.nn as nn
+from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
+from active_critic.policy.active_critic_policy import ActiveCriticPolicy
+from active_critic.utils.dataset import DatasetAC
+from active_critic.utils.gym_utils import sample_new_episode
+from active_critic.utils.pytorch_utils import calcMSE, make_part_obs_data
+from active_critic.utils.tboard_graphs import TBoardGraphs
+from gym.envs.mujoco import MujocoEnv
+from torch.utils.data.dataloader import DataLoader
+import time
 
 class ACLScores:
     def __init__(self) -> None:
@@ -38,11 +41,13 @@ class ActiveCriticLearner(nn.Module):
     def __init__(self,
                  ac_policy:ActiveCriticPolicy,
                  env: MujocoEnv,
+                 eval_env: MujocoEnv,
                  network_args_obj: ActiveCriticLearnerArgs = None
                  ):
         super().__init__()
         self.network_args = network_args_obj
         self.env = env
+        self.eval_env = eval_env
         self.policy = ac_policy
         self.extractor = network_args_obj.extractor
         self.logname = network_args_obj.logname
@@ -102,10 +107,15 @@ class ActiveCriticLearner(nn.Module):
         return loss_critic
 
     def add_training_data(self):
+        h = time.perf_counter()
         actions, observations, rewards, _, _ = sample_new_episode(
             policy=self.policy,
             env=self.env,
             episodes=self.network_args.training_epsiodes)
+        debug_dict = {
+            'Training epoch time' : th.tensor(time.perf_counter() - h)
+        }
+        self.write_tboard_scalar(debug_dict=debug_dict, train=True)
         self.add_data(
             actions=actions,
             observations=observations,
@@ -143,7 +153,7 @@ class ActiveCriticLearner(nn.Module):
                     'Loss Critic': mean_critic
                 }
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True)
-            self.global_step += 1
+                self.global_step += 1
             if self.global_step >= next_val:
                 next_val += self.network_args.val_every
                 if self.network_args.tboard:
@@ -162,12 +172,16 @@ class ActiveCriticLearner(nn.Module):
                     self.tboard.addValidationScalar(para, value, step)
 
     def run_validation(self):
+        h = time.time()
         opt_actions, gen_actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
             policy=self.policy,
-            env=self.env,
+            env=self.eval_env,
             episodes=self.network_args.validation_episodes,
             return_gen_trj=True)
-
+        debug_dict = {
+            'Validation epoch time': th.tensor(time.perf_counter() - h)
+        }
+        self.write_tboard_scalar(debug_dict=debug_dict, train=False)
         self.createGraphsMW(d_in=1, d_out=gen_actions[0], result=gen_actions[0], toy=False,
                                 inpt=observations[:,0], name='Trajectory', window=0, opt_trj=opt_actions[0])
         last_reward = rewards[:,-1]

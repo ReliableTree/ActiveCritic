@@ -118,7 +118,11 @@ class ActiveCriticPolicy(BaseModel):
             observation_seq=self.obs_seq, action_seq=action_seq, optimize=self.args_obj.optimize, current_step=self.current_step)
 
         if self.args_obj.optimize:
-            self.history.add_value(self.history.opt_scores, value=self.current_result.expected_succes_after[:, self.current_step].detach(), current_step=self.current_step)
+            self.history.add_value(
+                history=self.history.opt_scores, 
+                value=self.current_result.expected_succes_after[:, self.current_step].detach(), 
+                current_step=self.current_step,
+            )
         self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, self.current_step].detach(), current_step=self.current_step)
 
         return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()

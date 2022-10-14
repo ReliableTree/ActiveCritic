@@ -10,7 +10,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from active_critic.utils.rollout import rollout, make_sample_until, flatten_trajectories
 from stable_baselines3.common.type_aliases import GymEnv
 from gym import Env
-
+import time
 
 class DummyExtractor:
     def __init__(self):
@@ -120,7 +120,6 @@ def parse_sampled_transitions(transitions, new_epoch, extractor, device='cuda'):
 def sample_expert_transitions(policy, env, episodes):
 
     expert = policy
-
     print(f"Sampling expert transitions. {episodes}")
     rollouts = rollout(
         expert,

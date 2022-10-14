@@ -1,11 +1,8 @@
-import unittest
 import torch as th
 from active_critic.learner.active_critic_learner import ActiveCriticLearner, ACLScores
 from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
-from active_critic.utils.gym_utils import make_dummy_vec_env, make_policy_dict, parse_sampled_transitions, sample_expert_transitions \
-    ,DummyExtractor, new_epoch_reach, sample_new_episode, make_policy_dict, TimeLimit, RolloutInfoWrapper, ImitationLearningWrapper, \
-        make_vec_env
+from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env, parse_sampled_transitions, sample_expert_transitions, DummyExtractor, new_epoch_reach, sample_new_episode
 from active_critic.utils.pytorch_utils import make_part_obs_data, count_parameters
 from active_critic.utils.dataset import DatasetAC
 from stable_baselines3.common.policies import BasePolicy
@@ -16,10 +13,11 @@ from active_critic.model_src.whole_sequence_model import (
 from active_critic.model_src.transformer import (
     ModelSetup, generate_square_subsequent_mask)
 from active_critic.policy.active_critic_policy import ActiveCriticPolicySetup, ActiveCriticPolicy
-from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
-import numpy as np
+
+
 from gym import Env
+th.manual_seed(0)
+
 
 def make_wsm_setup(seq_len, d_output, device='cuda'):
     wsm = WholeSequenceModelSetup()
@@ -74,40 +72,28 @@ def setup_ac_reach(seq_len, num_cpu):
 def make_acl():
     device = 'cuda'
     acla = ActiveCriticLearnerArgs()
-    acla.data_path = '/home/hendrik/Documents/master_project/LokalData/TransformerImitationLearning/'
+    acla.data_path = '/data/bing/hendrik/'
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'reach_org_test'
+    acla.logname = 'reach'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 10
     acla.add_data_every = 1
     acla.validation_episodes = 10
-    acla.training_epsiodes = 4
+    acla.training_epsiodes = 1
     acla.actor_threshold = 5e-2
     acla.critic_threshold = 5e-2
-    acla.num_cpu = 5
-    seq_len = 10
-    ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=acla.num_cpu)
-    acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=env, network_args_obj=acla)
-    return acl, env, expert, seq_len, device
+    acla.num_cpu = 8
 
-class TestVec(unittest.TestCase):
-    def test_vec_env(self):
-        acl, env, expert, seq_len, device = make_acl()
-        self.assertTrue(len(acl.train_data) == 0)
-        acl.add_training_data()
-        self.assertTrue(len(acl.train_data) == acl.network_args.training_epsiodes * seq_len)
-        opt_actions, gen_actions, observations, rewards, expected_rewards_before, expected_rewards_after = \
-            sample_new_episode(acl.policy, env, episodes=acl.network_args.validation_episodes, return_gen_trj=True)
-        self.assertTrue(list(opt_actions.shape) == [acl.network_args.validation_episodes, seq_len, env.action_space.shape[0]])
-        self.assertTrue(list(gen_actions.shape) == [acl.network_args.validation_episodes, seq_len, env.action_space.shape[0]])
-        self.assertTrue(list(observations.shape) == [acl.network_args.validation_episodes, seq_len, env.observation_space.shape[0]])
-        self.assertTrue(list(rewards.shape) == [acl.network_args.validation_episodes, seq_len, 1])
-        self.assertTrue(list(expected_rewards_before.shape) == [acl.network_args.validation_episodes, seq_len, acl.policy.critic.model.model_setup.d_output])
-        self.assertTrue(list(expected_rewards_after.shape) == [acl.network_args.validation_episodes, seq_len, acl.policy.critic.model.model_setup.d_output])
-        self.assertTrue(th.all(expected_rewards_after.mean(dim=[1,2]) > expected_rewards_before.mean(dim=[1,2])))
+    seq_len = 100
+    epsiodes = 30
+    ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.training_epsiodes, acla.num_cpu))
+    eval_env, expert = make_vec_env('reach', num_cpu=acla.num_cpu, seq_len=seq_len)
+    acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
+    return acl, env, expert, seq_len, epsiodes, device
 
 if __name__ == '__main__':
-    unittest.main()
+    acl, env, expert, seq_len, epsiodes, device = make_acl()
+    acl.train(epochs=10000)
