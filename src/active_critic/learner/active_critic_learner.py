@@ -185,7 +185,8 @@ class ActiveCriticLearner(nn.Module):
         success = success.type(th.float)
         debug_dict = {
             'Success Rate' : success.mean(),
-            'Reward': last_reward.mean()
+            'Reward': last_reward.mean(),
+            'Training Epochs' : len(self.train_data)
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
