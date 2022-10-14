@@ -126,7 +126,7 @@ class TestUtils(unittest.TestCase):
         epsiodes = 2
         seq_len = 5
         ac, acps, env = setup_ac_reach()
-        acl = ActiveCriticLearner(ac_policy=ac, env=env, network_args_obj=acla)
+        acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=env, network_args_obj=acla)
         env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
         actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
             policy=ac,
