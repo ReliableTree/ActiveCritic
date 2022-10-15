@@ -15,7 +15,7 @@ setup(
     "numpy>=1.15",
     "torch>=1.4.0",
     "mujoco-py<2.2,>=2.1",
-    "tensorflow-cpu>=2.1",
+    "tensorflow-cpu",
     "hashids",
     "stable-baselines3",
     "prettytable",

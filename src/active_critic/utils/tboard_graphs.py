@@ -6,7 +6,7 @@ import os
 
 class TBoardGraphs():
     def __init__(self, logname= None, data_path = None):
-
+        tf.autograph.set_verbosity(0)
         if logname is not None:
             self.__hashids           = Hashids()
             #self.logdir              = "Data/TBoardLog/" + logname + "/"
