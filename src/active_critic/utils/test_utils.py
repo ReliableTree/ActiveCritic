@@ -88,6 +88,7 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 32, device='cuda'):
     acps.batch_size = batch_size
     acps.stop_opt = False
     acps.opt_end = False
+    acps.optimize_last = False
     return acps
 
 def setup_ac_reach(seq_len = 5, device='cuda'):
