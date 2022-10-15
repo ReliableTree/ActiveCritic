@@ -6,7 +6,7 @@ import torch as th
 from metaworld.envs import \
     ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
 from active_critic.utils.gym_utils import make_policy_dict, new_epoch_reach, make_dummy_vec_env, sample_expert_transitions, parse_sampled_transitions
-from active_critic.utils.pytorch_utils import make_partially_observed_seq, make_part_obs_data
+from active_critic.utils.pytorch_utils import make_partially_observed_seq, make_part_obs_data, make_inf_seq
 from gym.wrappers import TimeLimit
 from imitation.data.wrappers import RolloutInfoWrapper
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -153,6 +153,34 @@ class TestUtils(unittest.TestCase):
                 episodes=epsiodes,
                 return_gen_trj=True)
             self.assertTrue(th.equal(actions, gen_act), 'Gen Actions output wrong.')
+
+    def test_make_inf_seq(self):
+        obs_len = 6
+        batch_size = 2
+        dim = 1
+        seq_len = 3
+        inp_seq = th.arange(obs_len).reshape([1,obs_len,1]).repeat([batch_size,1,dim])
+
+        inf_seq = make_inf_seq(inp_seq,seq_len)
+        self.assertTrue(list(inf_seq.shape) == [batch_size*(obs_len-seq_len+int(seq_len/2)+1), seq_len, dim])
+
+        obs_len = 7
+        batch_size = 2
+        dim = 1
+        seq_len = 3
+        inp_seq = th.arange(obs_len).reshape([1,obs_len,1]).repeat([batch_size,1,dim])
+
+        inf_seq = make_inf_seq(inp_seq, seq_len)
+        self.assertTrue(list(inf_seq.shape) == [batch_size*(obs_len-seq_len+int(seq_len/2)+1), seq_len, dim])
+
+        obs_len = 7
+        batch_size = 2
+        dim = 1
+        seq_len = 4
+        inp_seq = th.arange(obs_len).reshape([1,obs_len,1]).repeat([batch_size,1,dim])
+
+        inf_seq = make_inf_seq(inp_seq, seq_len)
+        self.assertTrue(list(inf_seq.shape) == [batch_size*(obs_len-seq_len+int(seq_len/2)+1), seq_len, dim])
 
 
 if __name__ == '__main__':

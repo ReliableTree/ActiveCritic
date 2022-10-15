@@ -1,6 +1,5 @@
 from pyclbr import Function
 from typing import Dict, Optional, Tuple, Union
-from matplotlib.pyplot import hist
 
 import numpy as np
 import torch as th
@@ -30,6 +29,9 @@ class ActiveCriticPolicySetup:
         self.inference_opt_lr: float = None
         self.optimize: bool = None
         self.batch_size: int = None
+        self.stop_opt: bool = None
+        self.opt_end: bool = None
+
 
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
@@ -114,19 +116,30 @@ class ActiveCriticPolicy(BaseModel):
         self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
 
         self.current_result = self.forward(
-            observation_seq=self.obs_seq, action_seq=action_seq, optimize=self.args_obj.optimize, current_step=self.current_step)
+            observation_seq=self.obs_seq, action_seq=action_seq, 
+            optimize=self.args_obj.optimize, 
+            current_step=self.current_step,
+            stop_opt=self.args_obj.stop_opt,
+            opt_end=self.args_obj.opt_end
+            )
 
         if self.args_obj.optimize:
             self.history.add_value(
                 history=self.history.opt_scores, 
                 value=self.current_result.expected_succes_after[:, self.current_step].detach(), 
-                current_step=self.current_step,
+                current_step=self.current_step
             )
         self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, self.current_step].detach(), current_step=self.current_step)
 
         return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
 
-    def forward(self, observation_seq: th.Tensor, action_seq: th.Tensor, optimize: bool, current_step: int):
+    def forward(self, 
+            observation_seq: th.Tensor, 
+            action_seq: th.Tensor, 
+            optimize: bool, 
+            current_step: int,
+            stop_opt: bool,
+            opt_end: bool):
         # In inference, we want the maximum eventual reward.
         actor_input = self.get_actor_input(
             obs=observation_seq, actions=action_seq, rew=self.gl[:observation_seq.shape[0]])
@@ -151,43 +164,72 @@ class ActiveCriticPolicy(BaseModel):
 
         else:
             actions, expected_success_opt = self.optimize_act_sequence(
-                actions=actions, observations=observation_seq, current_step=current_step)
+                actions=actions, 
+                observations=observation_seq, 
+                current_step=current_step,
+                stop_opt=stop_opt,
+                opt_end=opt_end)
 
             return ACPOptResult(
                 gen_trj=actions.detach(),
                 expected_succes_before=expected_success,
                 expected_succes_after=expected_success_opt)
 
-    def optimize_act_sequence(self, actions: th.Tensor, observations: th.Tensor, current_step: int):
+    def optimize_act_sequence(self, 
+            actions: th.Tensor, 
+            observations: th.Tensor, 
+            current_step: int, 
+            stop_opt:bool, 
+            opt_end:bool):
         optimized_actions = th.clone(actions.detach())
+        final_actions = th.clone(optimized_actions)
         optimized_actions.requires_grad_(True)
         optimizer = th.optim.AdamW(
             [optimized_actions], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         expected_success = th.zeros(
             size=[actions.shape[0], self.critic.wsms.model_setup.seq_len, self.critic.wsms.model_setup.d_output], dtype=th.float, device=actions.device)
+        final_exp_success = th.clone(expected_success)
         goal_label = self.gl[:actions.shape[0]]
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()
-        while (not th.all(expected_success[:, -1] >= self.args_obj.optimisation_threshold)) and (step <= self.args_obj.opt_steps):
 
+        while (not th.all(final_exp_success[:, -1] >= self.args_obj.optimisation_threshold)) and (step <= self.args_obj.opt_steps):
+            mask = (final_exp_success[:, -1] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success = self.inference_opt_step(
                 org_actions=actions,
                 opt_actions=optimized_actions,
                 obs_seq=observations,
                 optimizer=optimizer,
                 goal_label=goal_label,
-                current_step=current_step)
+                current_step=current_step,
+                opt_end=opt_end)
             step += 1
+            if stop_opt:
+                final_actions[mask] = optimized_actions[mask]
+                final_exp_success[mask] = expected_success[mask]
+            else:
+                final_actions = optimized_actions
+                final_exp_success = expected_success
 
-        return optimized_actions, expected_success
+        return final_actions, final_exp_success
 
-    def inference_opt_step(self, org_actions: th.Tensor, opt_actions: th.Tensor, obs_seq: th.Tensor, optimizer: th.optim.Optimizer, goal_label: th.Tensor, current_step: int):
+    def inference_opt_step(self, 
+            org_actions: th.Tensor, 
+            opt_actions: th.Tensor, 
+            obs_seq: th.Tensor, 
+            optimizer: th.optim.Optimizer, 
+            goal_label: th.Tensor, 
+            current_step: int, 
+            opt_end:bool= False):
         critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
-        critic_loss = self.critic.loss_fct(
-            result=critic_result, label=goal_label)
-
+        if opt_end:
+            critic_loss = self.critic.loss_fct(
+                result=critic_result[:,current_step:], label=goal_label[:,current_step:])
+        else:
+            critic_loss = self.critic.loss_fct(
+                result=critic_result, label=goal_label)
         optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()

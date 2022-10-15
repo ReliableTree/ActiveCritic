@@ -111,7 +111,7 @@ class TestPolicy(unittest.TestCase):
                                   device=acps.device, dtype=th.float, requires_grad=False)
 
         actions, expected_success = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step)
+            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=False, opt_end=False)
         self.assertTrue(th.equal(
             org_actions[:, :current_step], actions[:, :current_step]), 'org_actions were overwritten')
 
@@ -208,7 +208,7 @@ class TestPolicy(unittest.TestCase):
             obsv, rew, dones, info = env.step(action)
             all_observations.append(obsv)
             all_scores_after.append(ac.current_result.expected_succes_after)
-            assert len(th.nonzero(ac.obs_seq[:, ac.current_step+1:])) == 0
+            self.assertTrue(len(th.nonzero(ac.obs_seq[:, ac.current_step+1:])) == 0)
             if (i+1) % 5 == 0:
                 all_taken_actions = []
                 all_observations = [obsv]
@@ -229,7 +229,7 @@ class TestPolicy(unittest.TestCase):
             obsv, rew, dones, info = env.step(action)
             all_observations.append(obsv)
             all_scores_after.append(ac.current_result.expected_succes_after)
-            assert len(th.nonzero(ac.obs_seq[:, ac.current_step+1:])) == 0
+            self.assertTrue(len(th.nonzero(ac.obs_seq[:, ac.current_step+1:])) == 0)
             if (i+1) % 5 == 0:
                 all_taken_actions = []
                 all_observations = [obsv]
@@ -238,8 +238,66 @@ class TestPolicy(unittest.TestCase):
         self.assertTrue(
             ac.history.gen_scores[0].shape[0] == 2, 'Epochs reset did not work.')
 
+    def test_early_stopping(self):
+        th.manual_seed(1)
+        current_step = 1
+
+        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
+        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
+                                device=acps.device, dtype=th.float, requires_grad=True)
+        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
+                                device=acps.device, dtype=th.float, requires_grad=False)
+        obs_seq[0] *= 2
+        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
+        critic_scores = ac.critic.forward(critic_input)
+        actions, expected_success_nonstop = ac.optimize_act_sequence(
+            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=False, opt_end=False)
+
+        th.manual_seed(1)
+        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
+        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
+                                device=acps.device, dtype=th.float, requires_grad=True)
+        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
+                                device=acps.device, dtype=th.float, requires_grad=False)
+        obs_seq[0] *= 2
+        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
+        critic_scores = ac.critic.forward(critic_input)
+        actions, expected_success = ac.optimize_act_sequence(
+            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=True, opt_end=False)
+
+        self.assertTrue((expected_success[:,-1] < expected_success_nonstop[:,-1]).sum() > 0)
+        self.assertTrue((expected_success[:,-1] < expected_success_nonstop[:,-1]).sum() < len(expected_success))
+
+    def test_opt_end(self):
+        th.manual_seed(1)
+        current_step = 1
+
+        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
+        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
+                                device=acps.device, dtype=th.float, requires_grad=True)
+        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
+                                device=acps.device, dtype=th.float, requires_grad=False)
+        obs_seq[0] *= 2
+        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
+        critic_scores = ac.critic.forward(critic_input)
+        actions, expected_success_nonstop = ac.optimize_act_sequence(
+            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=False, opt_end=False)
+
+        th.manual_seed(1)
+        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
+        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
+                                device=acps.device, dtype=th.float, requires_grad=True)
+        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
+                                device=acps.device, dtype=th.float, requires_grad=False)
+        obs_seq[0] *= 2
+        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
+        critic_scores = ac.critic.forward(critic_input)
+        actions, expected_success = ac.optimize_act_sequence(
+            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=False, opt_end=True)
+
+        self.assertTrue((max(expected_success[:,-1]) > max(expected_success_nonstop[:,-1])))
 
 if __name__ == '__main__':
-    #unittest.main()
-    to = TestPolicy()
-    to.test_score_history()
+    unittest.main()
+    #to = TestPolicy()
+    #to.test_score_history()

@@ -79,3 +79,11 @@ def make_part_obs_data(actions:th.Tensor, observations:th.Tensor, rewards:th.Ten
     rews = rewards.repeat([1, rewards.shape[1], 1]).reshape([-1, actions.shape[1], 1])
     obsv = apply_triu(observations, diagonal=0).reshape([-1, observations.shape[-2], observations.shape[-1]])
     return acts, obsv, rews
+
+def make_inf_seq(obs:th.Tensor, seq_len:th.Tensor):
+    start_seq = th.zeros([obs.shape[0], int(seq_len/2), obs.shape[-1]], device= obs.device)
+    whole_seq = th.cat((start_seq, obs), dim=1)
+    result = whole_seq[:,0:seq_len]
+    for i in range(len(obs[0]) - seq_len + int(seq_len/2)):
+        result = th.cat((result, whole_seq[:,i+1:seq_len+i+1]), dim=0)
+    return result

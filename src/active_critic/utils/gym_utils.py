@@ -10,7 +10,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from active_critic.utils.rollout import rollout, make_sample_until, flatten_trajectories
 from stable_baselines3.common.type_aliases import GymEnv
 from gym import Env
-import time
+import gym
 
 class DummyExtractor:
     def __init__(self):
@@ -52,6 +52,14 @@ def new_epoch_pap(current_obs, check_obsvs):
 def new_epoch_reach(current_obs, check_obsvs):
     return new_epoch_pap(current_obs, check_obsvs)
 
+class reset_counter(gym.Wrapper):
+    def __init__(self, env: Env) -> None:
+        super().__init__(env)
+        self.reset_count = 0
+
+    def reset(self):
+        self.reset_count+=1
+        return super().reset()
 
 def make_dummy_vec_env(name, seq_len):
     policy_dict = make_policy_dict()
@@ -60,7 +68,8 @@ def make_dummy_vec_env(name, seq_len):
     max_episode_steps = seq_len
     env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
     env._freeze_rand_vec = False
-    timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
+    reset_env = reset_counter(env=env)
+    timelimit = TimeLimit(env=reset_env, max_episode_steps=max_episode_steps)
     dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(timelimit)])
     vec_expert = ImitationLearningWrapper(
         policy=policy_dict[env_tag][0], env=dv1)

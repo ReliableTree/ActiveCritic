@@ -1,3 +1,4 @@
+from math import fabs
 import gym
 import numpy as np
 import torch as th
@@ -85,6 +86,8 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 32, device='cuda'):
     acps.inference_opt_lr = 1e-1
     acps.optimize = True
     acps.batch_size = batch_size
+    acps.stop_opt = False
+    acps.opt_end = False
     return acps
 
 def setup_ac_reach(seq_len = 5, device='cuda'):

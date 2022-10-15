@@ -171,8 +171,13 @@ class ActiveCriticLearner(nn.Module):
             'Validation epoch time': th.tensor(time.perf_counter() - h)
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
+
         self.createGraphsMW(d_in=1, d_out=gen_actions[0], result=gen_actions[0], toy=False,
                                 inpt=observations[:,0], name='Trajectory', window=0, opt_trj=opt_actions[0])
+        self.createGraphsMW(d_in=1, d_out=self.policy.history.gen_scores[0][0], result=self.policy.history.opt_scores[0][0], toy=False,
+                                inpt=observations[:,0], name='Scores', window=0)       
+        
+        
         last_reward = rewards[:,-1]
         best_model = self.scores.update_max_score(self.scores.mean_reward, last_reward.mean())
         if best_model:
