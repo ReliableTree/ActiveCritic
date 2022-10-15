@@ -59,7 +59,7 @@ class ActiveCriticLearner(nn.Module):
                 self.logname, data_path=network_args_obj.data_path)
         self.global_step = 0
 
-        self.train_data = DatasetAC(device=self.network_args.device)
+        self.train_data = DatasetAC(device='cpu')
         self.train_data.onyl_positiv = False
 
     def setDatasets(self, train_data: DatasetAC):
@@ -70,7 +70,7 @@ class ActiveCriticLearner(nn.Module):
 
     def add_data(self, actions:th.Tensor, observations:th.Tensor, rewards:th.Tensor):
         acts, obsv, rews = make_part_obs_data(actions=actions, observations=observations, rewards=rewards)
-        self.train_data.add_data(obsv=obsv, actions=acts, reward=rews)
+        self.train_data.add_data(obsv=obsv.to('cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
         self.train_loader = DataLoader(
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
@@ -128,8 +128,11 @@ class ActiveCriticLearner(nn.Module):
 
             while (mean_actor > self.network_args.actor_threshold) or (mean_critic > self.network_args.critic_threshold):
                 for data in self.train_loader:
-                    loss_actor = self.actor_step(data, loss_actor)                
-                    loss_critic = self.critic_step(data, loss_critic)                
+                    device_data = []
+                    for dat in data:
+                        device_data.append(dat.to(self.network_args.device))
+                    loss_actor = self.actor_step(device_data, loss_actor)                
+                    loss_critic = self.critic_step(device_data, loss_critic)                
 
                 mean_actor = loss_actor.mean()
                 mean_critic = loss_critic.mean()
@@ -143,8 +146,8 @@ class ActiveCriticLearner(nn.Module):
                 }
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True)
                 self.global_step += len(self.train_data)
-            if self.global_step >= next_val:
-                next_val = self.global_step + self.network_args.val_every
+            if epoch >= next_val:
+                next_val = epoch + self.network_args.val_every
                 if self.network_args.tboard:
                     self.run_validation() 
 
@@ -155,7 +158,7 @@ class ActiveCriticLearner(nn.Module):
 
         if self.network_args.tboard:
             for para, value in debug_dict.items():
-                value = value.to('cpu')
+                value = value.detach().to('cpu')
                 if train:
                     self.tboard.addTrainScalar(para, value, step)
                 else:
