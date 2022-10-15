@@ -31,6 +31,8 @@ class ActiveCriticPolicySetup:
         self.batch_size: int = None
         self.stop_opt: bool = None
         self.opt_end: bool = None
+        self.clip:bool = True
+        self.optimize_last: bool = False
 
 
 class ActiveCriticPolicyHistory:
@@ -74,6 +76,8 @@ class ActiveCriticPolicy(BaseModel):
         self.register_buffer('gl', th.ones(
             size=[acps.batch_size, acps.epoch_len, critic.wsms.model_setup.d_output], dtype=th.float, device=acps.device))
         self.history = ActiveCriticPolicyHistory()
+        self.clip_min = th.tensor(self.action_space.low, device=acps.device)
+        self.clip_max = th.tensor(self.action_space.high, device=acps.device)
         self.reset()
 
     def reset(self):
@@ -145,6 +149,9 @@ class ActiveCriticPolicy(BaseModel):
             obs=observation_seq, actions=action_seq, rew=self.gl[:observation_seq.shape[0]])
         actions = self.actor.forward(actor_input)
 
+        if self.args_obj.clip:
+            actions = th.clamp(actions, min=self.clip_min, max=self.clip_max)
+
         if action_seq is not None:
             actions = self.proj_actions(
                 action_seq, actions, current_step)
@@ -205,6 +212,7 @@ class ActiveCriticPolicy(BaseModel):
                 current_step=current_step,
                 opt_end=opt_end)
             step += 1
+
             if stop_opt:
                 final_actions[mask] = optimized_actions[mask]
                 final_exp_success[mask] = expected_success[mask]
@@ -212,6 +220,9 @@ class ActiveCriticPolicy(BaseModel):
                 final_actions = optimized_actions
                 final_exp_success = expected_success
 
+        if self.args_obj.clip:
+            with th.no_grad():
+                th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
         return final_actions, final_exp_success
 
     def inference_opt_step(self, 
@@ -252,6 +263,8 @@ class ActiveCriticPolicy(BaseModel):
     def proj_actions(self, org_actions: th.Tensor, new_actions: th.Tensor, current_step: int):
         with th.no_grad():
             new_actions[:, :current_step] = org_actions[:, :current_step]
+            if self.args_obj.clip:
+                th.clamp(new_actions, min=self.clip_min, max=self.clip_max, out=new_actions)
         return new_actions
 
     def save_policy(self, add, data_path):

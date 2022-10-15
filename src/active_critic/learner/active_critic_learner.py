@@ -152,6 +152,7 @@ class ActiveCriticLearner(nn.Module):
     def write_tboard_scalar(self, debug_dict, train, step=None):
         if step is None:
             step = self.global_step
+
         if self.network_args.tboard:
             for para, value in debug_dict.items():
                 value = value.to('cpu')
@@ -174,8 +175,13 @@ class ActiveCriticLearner(nn.Module):
 
         self.createGraphsMW(d_in=1, d_out=gen_actions[0], result=gen_actions[0], toy=False,
                                 inpt=observations[:,0], name='Trajectory', window=0, opt_trj=opt_actions[0])
+
         self.createGraphsMW(d_in=1, d_out=self.policy.history.gen_scores[0][0], result=self.policy.history.opt_scores[0][0], toy=False,
-                                inpt=observations[:,0], name='Scores', window=0)       
+                                inpt=observations[:,0], name='Reward Generated', window=0)
+
+        self.createGraphsMW(d_in=1, d_out=rewards[0], result=self.policy.history.opt_scores[0][0], toy=False,
+                                inpt=observations[:,0], name='Reward GT', window=0)
+
         
         
         last_reward = rewards[:,-1]
