@@ -85,7 +85,7 @@ def make_acl(device):
     acla.logname = 'reach_success_stop_lr'
     acla.tboard = True
     acla.batch_size = 32
-    acla.val_every = 20
+    acla.val_every = 10
     acla.add_data_every = 1
     acla.validation_episodes = 64
     acla.training_epsiodes = 1
