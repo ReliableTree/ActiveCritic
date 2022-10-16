@@ -82,16 +82,16 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'analyze_normal'
+    acla.logname = 'analyze_2_opt'
     acla.tboard = True
     acla.batch_size = 32
-    acla.val_every = 20
-    acla.add_data_every = 20
-    acla.validation_episodes = 24
+    acla.val_every = 1
+    acla.add_data_every = 1
+    acla.validation_episodes = 2
     acla.training_epsiodes = 1
     acla.actor_threshold = 5e-2
     acla.critic_threshold = 5e-2
-    acla.num_cpu = 8
+    acla.num_cpu = 2
 
     seq_len = 100
     epsiodes = 30

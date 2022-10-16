@@ -119,7 +119,6 @@ def parse_sampled_transitions(transitions, new_epoch, extractor, device='cuda'):
     observations.append(epch_observations)
     actions.append(epch_actions)
     rewards.append(epch_rewards)
-
     actions = th.tensor(np.array(actions), dtype=th.float, device=device)
     observations = th.tensor(np.array(observations), dtype=th.float, device=device)
     rewards = th.tensor(np.array(rewards), dtype=th.float, device=device)
@@ -152,7 +151,7 @@ class ImitationLearningWrapper:
             actions.append(self.policy.get_action(obs))
         return actions
 
-def sample_new_episode(policy:ActiveCriticPolicy, env:Env, episodes:int=1, return_gen_trj = False):
+def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:int=1, return_gen_trj = False):
         policy.eval()
         policy.reset()
         transitions = sample_expert_transitions(
@@ -160,7 +159,7 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, episodes:int=1, retur
         expected_rewards_after = policy.history.opt_scores[0]
         expected_rewards_before = policy.history.gen_scores[0]
         datas = parse_sampled_transitions(
-            transitions=transitions, new_epoch=policy.args_obj.new_epoch, extractor=policy.args_obj.extractor)
+            transitions=transitions, new_epoch=policy.args_obj.new_epoch, extractor=policy.args_obj.extractor, device=device)
         device_data = []
         for data in datas:
             device_data.append(data[:episodes].to(policy.args_obj.device))
