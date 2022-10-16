@@ -103,8 +103,8 @@ def make_acl(device):
 
 def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
-    acl.run_validation()
-    #acl.train(epochs=100000)
+    #acl.run_validation()
+    acl.train(epochs=100000)
 
 if __name__ == '__main__':
     run_experiment_analyze(device='cuda')
