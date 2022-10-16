@@ -176,7 +176,7 @@ class ActiveCriticLearner(nn.Module):
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
-        for i in range(min(opt_actions.shape[0]), 3):
+        for i in range(min(opt_actions.shape[0], 3)):
             self.createGraphsMW(d_in=1, d_out=gen_actions[i], result=gen_actions[i], toy=False,
                                     inpt=observations[i,0], name='Trajectory' + str(i), window=0, opt_trj=opt_actions[0])
 
