@@ -201,7 +201,6 @@ class ActiveCriticPolicy(BaseModel):
             critic_inpt = self.get_critic_input(acts=actions, obs_seq=observations)
             critic_result = self.critic.forward(inputs=critic_inpt)
             lr = self.args_obj.inference_opt_lr * th.max(th.abs(critic_result[:,-1]-1))
-            print(f'lr:{lr}')
         optimizer = th.optim.AdamW(
             [optimized_actions], lr=lr, weight_decay=0)
         expected_success = th.zeros(
