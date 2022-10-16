@@ -75,23 +75,42 @@ def make_dummy_vec_env(name, seq_len):
         policy=policy_dict[env_tag][0], env=dv1)
     return dv1, vec_expert
 
+class ResetCounterWrapper(gym.Wrapper):
+    def __init__(self, env: Env) -> None:
+        super().__init__(env)
+        self.reset_count = 0
+
+    def reset(self):
+        self.reset_count+=1
+        return super().reset()
+
+    def step(self, action):
+        
+        obsv, rew, done, info = super().step(action)
+        if info['success']:
+            done = True
+        return obsv, rew, done, info
+
 def make_vec_env(env_id, num_cpu, seq_len):
     policy_dict = make_policy_dict()
+
     def make_env(env_id, rank, seed=0):
         def _init():
             max_episode_steps = seq_len
             env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_id][1]]()
             env._freeze_rand_vec = False
-            timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
+            rce = ResetCounterWrapper(env)
+            timelimit = TimeLimit(env=rce, max_episode_steps=max_episode_steps)
             riw = RolloutInfoWrapper(timelimit)
             return riw
         return _init
+        
     env = SubprocVecEnv([make_env(env_id, i) for i in range(num_cpu)])
     vec_expert = ImitationLearningWrapper(
         policy=policy_dict[env_id][0], env=env)
     return env, vec_expert
 
-def parse_sampled_transitions(transitions, new_epoch, extractor, device='cuda'):
+def parse_sampled_transitions(transitions, new_epoch, extractor, seq_len, device='cuda'):
     observations = []
     actions = []
     rewards = []
@@ -114,21 +133,35 @@ def parse_sampled_transitions(transitions, new_epoch, extractor, device='cuda'):
 
         epch_observations.append(current_obs.numpy())
         epch_actions.append(transitions[i]['acts'])
-        epch_rewards.append(transitions[i]['infos']['in_place_reward'])
+        epch_rewards.append([transitions[i]['infos']['in_place_reward']])
 
     observations.append(epch_observations)
     actions.append(epch_actions)
     rewards.append(epch_rewards)
-    actions = th.tensor(np.array(actions), dtype=th.float, device=device)
-    observations = th.tensor(np.array(observations), dtype=th.float, device=device)
-    rewards = th.tensor(np.array(rewards), dtype=th.float, device=device)
+
+    
+
+    actions = th.tensor(fill_arrays(np.array(actions), seq_len = seq_len), dtype=th.float, device=device)
+    observations = th.tensor(fill_arrays(np.array(observations), seq_len = seq_len), dtype=th.float, device=device)
+    rewards = th.tensor(fill_arrays(np.array(rewards), seq_len = seq_len), dtype=th.float, device=device)
     return actions, observations, rewards
 
+def fill_arrays(inpt, seq_len):
+    d = []
+    for epoch in inpt:
+        np_epoch = np.array(epoch)
+        if np_epoch.shape[0] < seq_len:
+            fill = np.zeros([seq_len-np_epoch.shape[0], np_epoch.shape[-1]])
+            nv = np.append(epoch, fill, axis=0)
+            d.append(nv)
+        else:
+            d.append(epoch)
+    return np.array(d)
 
 def sample_expert_transitions(policy, env, episodes):
 
     expert = policy
-    print(f"Sampling expert transitions. {episodes}")
+    print(f"Sampling transitions. {episodes}")
     rollouts = rollout(
         expert,
         env,
@@ -154,17 +187,18 @@ class ImitationLearningWrapper:
 def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:int=1, return_gen_trj = False):
         policy.eval()
         policy.reset()
+        seq_len = policy.args_obj.epoch_len
         transitions = sample_expert_transitions(
             policy.predict, env, episodes)
         expected_rewards_after = policy.history.opt_scores[0]
         expected_rewards_before = policy.history.gen_scores[0]
         datas = parse_sampled_transitions(
-            transitions=transitions, new_epoch=policy.args_obj.new_epoch, extractor=policy.args_obj.extractor, device=device)
+            transitions=transitions, new_epoch=policy.args_obj.new_epoch, seq_len=seq_len, extractor=policy.args_obj.extractor, device=device)
         device_data = []
         for data in datas:
             device_data.append(data[:episodes].to(policy.args_obj.device))
         actions, observations, rewards = device_data
-        rewards = rewards.unsqueeze(-1)
+        rewards = rewards
 
         if return_gen_trj:
             return actions, policy.history.gen_trj[0][:episodes], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]

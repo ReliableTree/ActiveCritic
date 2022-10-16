@@ -1,6 +1,0 @@
-README.md
-setup.py
-active_critic.egg-info/PKG-INFO
-active_critic.egg-info/SOURCES.txt
-active_critic.egg-info/dependency_links.txt
-active_critic.egg-info/top_level.txt

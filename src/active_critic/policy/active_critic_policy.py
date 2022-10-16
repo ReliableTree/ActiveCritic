@@ -2,7 +2,6 @@ from pyclbr import Function
 from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
-from pandas import to_datetime
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel
 from active_critic.utils.pytorch_utils import make_partially_observed_seq
@@ -193,16 +192,11 @@ class ActiveCriticPolicy(BaseModel):
             stop_opt:bool, 
             opt_end:bool,
             opt_last:bool):
-
         optimized_actions = th.clone(actions.detach())
         final_actions = th.clone(optimized_actions)
         optimized_actions.requires_grad_(True)
-        with th.no_grad():
-            critic_inpt = self.get_critic_input(acts=actions, obs_seq=observations)
-            critic_result = self.critic.forward(inputs=critic_inpt)
-            lr = self.args_obj.inference_opt_lr * th.max(th.abs(critic_result[:,-1]-1))
         optimizer = th.optim.AdamW(
-            [optimized_actions], lr=lr, weight_decay=0)
+            [optimized_actions], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         expected_success = th.zeros(
             size=[actions.shape[0], self.critic.wsms.model_setup.seq_len, self.critic.wsms.model_setup.d_output], dtype=th.float, device=actions.device)
         final_exp_success = th.clone(expected_success)
@@ -245,12 +239,8 @@ class ActiveCriticPolicy(BaseModel):
             current_step: int, 
             opt_end:bool= False,
             opt_last:bool= False):
-        if current_step > 0:
-            return opt_actions, self.critic_result
-            
         critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
-        self.critic_result = critic_result
         if opt_end:
             critic_loss = self.critic.loss_fct(
                 result=critic_result[:,current_step:], label=goal_label[:,current_step:])

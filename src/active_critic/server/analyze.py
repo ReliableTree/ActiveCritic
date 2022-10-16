@@ -82,7 +82,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'analyze_var_lr'
+    acla.logname = 'reach_success_stop'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 20

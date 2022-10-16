@@ -191,7 +191,7 @@ class ActiveCriticLearner(nn.Module):
 
         
         
-        last_reward = rewards[:,-1]
+        last_reward, _ = rewards.max(dim=1)
         best_model = self.scores.update_max_score(self.scores.mean_reward, last_reward.mean())
         if best_model:
             self.saveNetworkToFile(add='best_validation', data_path=self.network_args.data_path)
@@ -208,6 +208,7 @@ class ActiveCriticLearner(nn.Module):
         }
         print(f'Success Rate: {success.mean()}')
         print(f'Reward: {last_reward.mean()}')
+        print(f'training samples: {int(len(self.train_data / self.policy.args_obj.epoch_len))}')
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
         self.policy.actor.init_model()
         self.policy.critic.init_model()

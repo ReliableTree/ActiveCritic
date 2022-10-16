@@ -86,12 +86,12 @@ class TestUtils(unittest.TestCase):
         name = 'reach'
         env, exp = make_dummy_vec_env(name=name, seq_len=seq_len)
         transitions = sample_expert_transitions(policy=exp.predict, env=env, episodes=episodes)
-        actions, observations, rewards = parse_sampled_transitions(transitions=transitions, new_epoch=new_epoch_reach, extractor=DummyExtractor())
+        actions, observations, rewards = parse_sampled_transitions(transitions=transitions, new_epoch=new_epoch_reach, seq_len=seq_len, extractor=DummyExtractor())
         
         
         self.assertTrue( list(actions.shape) == [episodes, seq_len, env.action_space.shape[0]])
         self.assertTrue(list(observations.shape) == [episodes, seq_len, env.observation_space.shape[0]])
-        self.assertTrue(list(rewards.shape) == [episodes, seq_len])
+        self.assertTrue(list(rewards.shape) == [episodes, seq_len,1])
         self.assertTrue(th.all(rewards[:,-1] == 1))
 
     def test_part_observ_seq(self):
@@ -99,9 +99,10 @@ class TestUtils(unittest.TestCase):
         seq_len = 5
         env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
         transitions = sample_expert_transitions(policy=expert.predict, env=env, episodes=epsiodes)
-        actions, observations, rewards = parse_sampled_transitions(transitions=transitions, new_epoch=new_epoch_reach, extractor=DummyExtractor())
+        actions, observations, rewards = parse_sampled_transitions(transitions=transitions, new_epoch=new_epoch_reach, extractor=DummyExtractor(), seq_len=seq_len)
         acts, obsv, rews = make_part_obs_data(actions=actions, observations=observations, rewards=rewards)
-        
+        print(f'acts.shape: {acts.shape}')
+        print([epsiodes*seq_len, seq_len, env.action_space.shape[0]])
         self.assertTrue( list(acts.shape) == [epsiodes*seq_len, seq_len, env.action_space.shape[0]])
         self.assertTrue( list(obsv.shape) == [epsiodes*seq_len, seq_len, env.observation_space.shape[0]])
         self.assertTrue( list(rews.shape) == [epsiodes*seq_len, seq_len, 1])
@@ -131,6 +132,7 @@ class TestUtils(unittest.TestCase):
         actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
             policy=ac,
             env=env,
+            device=device,
             episodes=epsiodes)
             
         exp_act_shp = [epsiodes, seq_len, env.action_space.shape[0]]
@@ -151,6 +153,7 @@ class TestUtils(unittest.TestCase):
                 policy=ac,
                 env=env,
                 episodes=epsiodes,
+                device=device,
                 return_gen_trj=True)
             self.assertTrue(th.equal(actions, gen_act), 'Gen Actions output wrong.')
 
