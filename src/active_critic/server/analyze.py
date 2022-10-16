@@ -96,7 +96,7 @@ def make_acl(device):
     seq_len = 100
     epsiodes = 30
     ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.training_epsiodes, acla.num_cpu), device=device)
-    eval_env, expert = make_vec_env('reach', num_cpu=acla.num_cpu, seq_len=seq_len)
+    eval_env, expert = make_vec_env('reach', num_cpu=min(acla.num_cpu, acla.training_epsiodes), seq_len=seq_len)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
     return acl, env, expert, seq_len, epsiodes, device
 
