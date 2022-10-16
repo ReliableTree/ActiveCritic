@@ -206,6 +206,8 @@ class ActiveCriticLearner(nn.Module):
             'Reward': last_reward.mean(),
             'Training Epochs' : th.tensor(int(len(self.train_data)/self.policy.args_obj.epoch_len))
         }
+        print(f'Success Rate: {success.mean()}')
+        print(f'Reward: {last_reward.mean()}')
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
 
