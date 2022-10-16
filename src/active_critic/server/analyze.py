@@ -48,7 +48,7 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.new_epoch = new_epoch
     acps.opt_steps = 20
     acps.optimisation_threshold = 1
-    acps.inference_opt_lr = 1e-1
+    acps.inference_opt_lr = 5
     acps.optimize = True
     acps.batch_size = 32
     acps.stop_opt = True
@@ -82,7 +82,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'analyze_opt_20'
+    acla.logname = 'analyze_var_lr'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 20
