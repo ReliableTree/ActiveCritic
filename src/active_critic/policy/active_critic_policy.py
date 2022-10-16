@@ -240,8 +240,12 @@ class ActiveCriticPolicy(BaseModel):
             current_step: int, 
             opt_end:bool= False,
             opt_last:bool= False):
+        if current_step > 0:
+            return opt_actions, self.critic_result
+            
         critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
+        self.critic_result = critic_result
         if opt_end:
             critic_loss = self.critic.loss_fct(
                 result=critic_result[:,current_step:], label=goal_label[:,current_step:])

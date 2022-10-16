@@ -46,8 +46,8 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.epoch_len = seq_len
     acps.extractor = extractor
     acps.new_epoch = new_epoch
-    acps.opt_steps = 2
-    acps.optimisation_threshold = 0.95
+    acps.opt_steps = 20
+    acps.optimisation_threshold = 1
     acps.inference_opt_lr = 1e-1
     acps.optimize = True
     acps.batch_size = 32
@@ -82,7 +82,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'analyze_2_opt'
+    acla.logname = 'analyze_opt_20'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 20
@@ -91,7 +91,7 @@ def make_acl(device):
     acla.training_epsiodes = 1
     acla.actor_threshold = 5e-2
     acla.critic_threshold = 5e-2
-    acla.num_cpu = 16
+    acla.num_cpu = 32
 
     seq_len = 100
     epsiodes = 30
@@ -103,8 +103,8 @@ def make_acl(device):
 
 def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
-    #acl.run_validation()
-    acl.train(epochs=100000)
+    acl.run_validation()
+    #acl.train(epochs=100000)
 
 if __name__ == '__main__':
     run_experiment_analyze(device='cuda')
