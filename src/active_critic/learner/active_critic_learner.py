@@ -102,7 +102,7 @@ class ActiveCriticLearner(nn.Module):
             env=self.env,
             device=self.network_args.device,
             episodes=self.network_args.training_epsiodes)
-            
+
         debug_dict = {
             'Training epoch time' : th.tensor(time.perf_counter() - h)
         }
@@ -171,6 +171,7 @@ class ActiveCriticLearner(nn.Module):
         opt_actions, gen_actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
             policy=self.policy,
             env=self.eval_env,
+            device=self.network_args.device,
             episodes=self.network_args.validation_episodes,
             return_gen_trj=True)
         debug_dict = {

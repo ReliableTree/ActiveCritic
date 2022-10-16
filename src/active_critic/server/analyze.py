@@ -85,13 +85,13 @@ def make_acl(device):
     acla.logname = 'analyze_2_opt'
     acla.tboard = True
     acla.batch_size = 32
-    acla.val_every = 1
+    acla.val_every = 20
     acla.add_data_every = 1
-    acla.validation_episodes = 2
+    acla.validation_episodes = 32
     acla.training_epsiodes = 1
     acla.actor_threshold = 5e-2
     acla.critic_threshold = 5e-2
-    acla.num_cpu = 2
+    acla.num_cpu = 16
 
     seq_len = 100
     epsiodes = 30
@@ -104,7 +104,7 @@ def make_acl(device):
 def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
     #acl.run_validation()
-    acl.train(epochs=10000)
+    acl.train(epochs=100000)
 
 if __name__ == '__main__':
     run_experiment_analyze(device='cuda')
