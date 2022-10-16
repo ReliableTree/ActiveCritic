@@ -209,6 +209,8 @@ class ActiveCriticLearner(nn.Module):
         print(f'Success Rate: {success.mean()}')
         print(f'Reward: {last_reward.mean()}')
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
+        self.policy.actor.init_model()
+        self.policy.critic.init_model()
 
 
 
