@@ -176,14 +176,15 @@ class ActiveCriticLearner(nn.Module):
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
-        self.createGraphsMW(d_in=1, d_out=gen_actions[0], result=gen_actions[0], toy=False,
-                                inpt=observations[:,0], name='Trajectory', window=0, opt_trj=opt_actions[0])
+        for i in range(min(opt_actions.shape[0]), 3):
+            self.createGraphsMW(d_in=1, d_out=gen_actions[i], result=gen_actions[i], toy=False,
+                                    inpt=observations[i,0], name='Trajectory' + str(i), window=0, opt_trj=opt_actions[0])
 
-        self.createGraphsMW(d_in=1, d_out=self.policy.history.gen_scores[0][0], result=self.policy.history.opt_scores[0][0], toy=False,
-                                inpt=observations[:,0], name='Reward Generated', window=0)
+            self.createGraphsMW(d_in=1, d_out=self.policy.history.gen_scores[0][i], result=self.policy.history.opt_scores[0][i], toy=False,
+                                    inpt=observations[i,0], name='Reward Generated' + str(i), window=0)
 
-        self.createGraphsMW(d_in=1, d_out=rewards[0], result=self.policy.history.opt_scores[0][0], toy=False,
-                                inpt=observations[:,0], name='Reward GT', window=0)
+            self.createGraphsMW(d_in=1, d_out=rewards[i], result=self.policy.history.opt_scores[0][i], toy=False,
+                                    inpt=observations[i,0], name='Reward GT' + str(i), window=0)
 
         
         

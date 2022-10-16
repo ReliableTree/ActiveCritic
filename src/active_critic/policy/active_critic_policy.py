@@ -192,6 +192,7 @@ class ActiveCriticPolicy(BaseModel):
             stop_opt:bool, 
             opt_end:bool,
             opt_last:bool):
+
         optimized_actions = th.clone(actions.detach())
         final_actions = th.clone(optimized_actions)
         optimized_actions.requires_grad_(True)
