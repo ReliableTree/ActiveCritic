@@ -72,7 +72,7 @@ class ActiveCriticPolicy(BaseModel):
         self.critic = critic
         self.args_obj = acps
         self.register_buffer('gl', th.ones(
-            size=[acps.batch_size, acps.epoch_len, critic.wsms.model_setup.d_output], dtype=th.float, device=acps.device))
+            size=[1000, acps.epoch_len, critic.wsms.model_setup.d_output], dtype=th.float, device=acps.device))
         self.history = ActiveCriticPolicyHistory()
         self.clip_min = th.tensor(self.action_space.low, device=acps.device)
         self.clip_max = th.tensor(self.action_space.high, device=acps.device)
