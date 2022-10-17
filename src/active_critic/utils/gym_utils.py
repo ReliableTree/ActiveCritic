@@ -80,7 +80,7 @@ def make_dummy_vec_env(name, seq_len):
     max_episode_steps = seq_len
     env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
     env._freeze_rand_vec = False
-    reset_env = reset_counter(env=env)
+    reset_env = ResetCounterWrapper(env=env)
     timelimit = TimeLimit(env=reset_env, max_episode_steps=max_episode_steps)
     dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(timelimit)])
     vec_expert = ImitationLearningWrapper(
@@ -101,6 +101,8 @@ class ResetCounterWrapper(gym.Wrapper):
         obsv, rew, done, info = super().step(action)
         if info['success']:
             done = True
+        else:
+            rew = rew - 5
         return obsv, rew, done, info
 
 def make_vec_env(env_id, num_cpu, seq_len):
