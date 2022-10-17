@@ -48,12 +48,10 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.new_epoch = new_epoch
     acps.opt_steps = 20
     acps.optimisation_threshold = 1
-    acps.inference_opt_lr = 1e-1
+    acps.inference_opt_lr = 5e-3
     acps.optimize = True
     acps.batch_size = 32
     acps.stop_opt = True
-    acps.opt_end = True
-    acps.optimize_last = False
     acps.clip = True
     return acps
 
@@ -82,16 +80,16 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'reach_success_stop_lr'
+    acla.logname = 'reach_success_end_opt_rew_mask_best_reward_actor_input'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 10
     acla.add_data_every = 1
-    acla.validation_episodes = 64
+    acla.validation_episodes = 10
     acla.training_epsiodes = 1
     acla.actor_threshold = 5e-2
     acla.critic_threshold = 5e-2
-    acla.num_cpu = 32
+    acla.num_cpu = 10
 
     seq_len = 100
     epsiodes = 30

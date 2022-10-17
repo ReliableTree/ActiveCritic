@@ -1,4 +1,4 @@
-from active_critic.model_src.whole_sequence_model import WholeSequenceModel
+from active_critic.model_src.whole_sequence_model import WholeSequenceModel, OptimizeMaximumCritic
 from active_critic.model_src.transformer import ModelSetup, TransformerModel
 import torch as th
 from active_critic.utils.test_utils import make_mask_data, make_seq_encoding_data, make_critic_data, make_wsm_setup
@@ -49,6 +49,41 @@ class TestWholeSequenceModel(unittest.TestCase):
             res = wsa.optimizer_step(inputs=inpt_seq, label=outpt_seq)
         self.assertTrue(res['Loss '] < 1e-2,
                         'Did not converge after reinit.')
+
+    def test_loss_fct(self):
+        th.manual_seed(0)
+
+        seq_len = 6
+        ntoken = 3
+        d_output = 2
+        batch_size = 2
+        d_intput = 3
+
+
+        input = th.ones([batch_size, seq_len, 1],
+                        dtype=th.float, device='cuda')
+        input[0,0] = 3
+        input[1,1] = 2
+        org_input = th.clone(input)
+        input.requires_grad = True
+
+        goal = th.ones([batch_size, seq_len, 1],
+                dtype=th.float, device='cuda')
+
+        opt = th.optim.SGD([input], lr=1e-1)
+
+        wsa_setup = make_wsm_setup(seq_len=seq_len, d_output=d_output)
+        omc = OptimizeMaximumCritic(wsms=wsa_setup)
+        loss = omc.loss_fct(result=input, label=goal)
+
+        self.assertTrue((loss - 2.5).sum() == 0)
+        loss.backward()
+        opt.step()
+        self.assertTrue(th.equal(input[0,1:], org_input[0,1:]))
+        self.assertTrue(th.equal(input[1,0], org_input[1,0]))
+        self.assertTrue(th.equal(input[1,2:], org_input[1,2:]))
+        self.assertTrue(input[0,0] < org_input[0,0])
+        self.assertTrue(input[1,1] < org_input[1,1])
 
 
 if __name__ == '__main__':

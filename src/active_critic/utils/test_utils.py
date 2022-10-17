@@ -8,7 +8,7 @@ from active_critic.model_src.transformer import (ModelSetup, generate_square_sub
 from active_critic.model_src.whole_sequence_model import (WholeSequenceModelSetup, WholeSequenceModel)
 from active_critic.policy.active_critic_policy import ActiveCriticPolicySetup, ActiveCriticPolicy
 from active_critic.utils.gym_utils import (DummyExtractor, new_epoch_reach)
-from active_critic.utils.gym_utils import make_dummy_vec_env
+from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env
 
 
 def make_seq_encoding_data(batch_size, seq_len, ntoken, d_out, device = 'cuda'):
@@ -106,3 +106,19 @@ def setup_ac_reach(seq_len = 5, device='cuda'):
     ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
                             actor=actor, critic=critic, acps=acps)
     return ac, acps, env
+
+def setup_ac_reach_op(seq_len, device):
+    seq_len = seq_len
+    env, expert = make_vec_env('reach',seq_len=seq_len, num_cpu=1)
+    d_output = env.action_space.shape[0]
+    wsm_actor_setup = make_wsm_setup(
+        seq_len=seq_len, d_output=d_output, device=device)
+    wsm_critic_setup = make_wsm_setup(
+        seq_len=seq_len, d_output=1, device=device)
+    acps = make_acps(
+        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
+    actor = WholeSequenceModel(wsm_actor_setup)
+    critic = OptimizeEndCritic(wsm_critic_setup)
+    ac = ACPOptEnd(observation_space=env.observation_space, action_space=env.action_space,
+                            actor=actor, critic=critic, acps=acps)
+    return ac, acps, env, expert

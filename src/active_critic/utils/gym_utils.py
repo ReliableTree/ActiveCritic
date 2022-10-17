@@ -61,6 +61,18 @@ class reset_counter(gym.Wrapper):
         self.reset_count+=1
         return super().reset()
 
+class ImitationLearningWrapper:
+    def __init__(self, policy, env: GymEnv):
+        self.observation_space = env.observation_space
+        self.action_space = env.action_space
+        self.policy = policy
+
+    def predict(self, obsv, deterministic=None):
+        actions = []
+        for obs in obsv:
+            actions.append(self.policy.get_action(obs))
+        return actions
+
 def make_dummy_vec_env(name, seq_len):
     policy_dict = make_policy_dict()
 
@@ -110,7 +122,7 @@ def make_vec_env(env_id, num_cpu, seq_len):
         policy=policy_dict[env_id][0], env=env)
     return env, vec_expert
 
-def parse_sampled_transitions(transitions, new_epoch, extractor, seq_len, device='cuda'):
+def parse_sampled_transitions_legacy(transitions, new_epoch, extractor, seq_len, device='cuda'):
     observations = []
     actions = []
     rewards = []
@@ -123,9 +135,9 @@ def parse_sampled_transitions(transitions, new_epoch, extractor, seq_len, device
 
         if new_epoch(current_obs, check_obsvs):
             check_obsvs = current_obs
-            rewards.append(epch_rewards)
-            observations.append(epch_observations)
-            actions.append(epch_actions)
+            rewards.append(np.array(epch_rewards))
+            observations.append(np.array(epch_observations))
+            actions.append(np.array(epch_actions))
 
             epch_actions = []
             epch_observations = []
@@ -135,23 +147,51 @@ def parse_sampled_transitions(transitions, new_epoch, extractor, seq_len, device
         epch_actions.append(transitions[i]['acts'])
         epch_rewards.append([transitions[i]['infos']['in_place_reward']])
 
-    observations.append(epch_observations)
-    actions.append(epch_actions)
-    rewards.append(epch_rewards)
+    observations.append(np.array(epch_observations))
+    actions.append(np.array(epch_actions))
+    rewards.append(np.array(epch_rewards))
 
     
+    actions = th.tensor(fill_arrays(actions, seq_len = seq_len), dtype=th.float, device=device)
+    observations = th.tensor(fill_arrays(observations, seq_len = seq_len), dtype=th.float, device=device)
+    rewards = th.tensor(fill_arrays(rewards, seq_len = seq_len), dtype=th.float, device=device)
+    return actions, observations, rewards
 
-    actions = th.tensor(fill_arrays(np.array(actions), seq_len = seq_len), dtype=th.float, device=device)
-    observations = th.tensor(fill_arrays(np.array(observations), seq_len = seq_len), dtype=th.float, device=device)
-    rewards = th.tensor(fill_arrays(np.array(rewards), seq_len = seq_len), dtype=th.float, device=device)
+def parse_sampled_transitions(transitions, extractor, seq_len, device='cuda'):
+    observations = []
+    actions = []
+    rewards = []
+    epch_actions = []
+    epch_observations = []
+    epch_rewards = []
+    check_obsvs = extractor.forward(transitions[0]['obs'])
+    for i in range(len(transitions)):
+        current_obs = extractor.forward(features=transitions[i]['obs'])
+
+        epch_observations.append(current_obs.numpy())
+        epch_actions.append(transitions[i]['acts'])
+        epch_rewards.append([transitions[i]['infos']['unscaled_reward']/10])
+
+        if transitions[i]['dones']:
+            rewards.append(np.array(epch_rewards))
+            observations.append(np.array(epch_observations))
+            actions.append(np.array(epch_actions))
+
+            epch_actions = []
+            epch_observations = []
+            epch_rewards = []
+
+
+    actions = th.tensor(fill_arrays(actions, seq_len = seq_len), dtype=th.float, device=device)
+    observations = th.tensor(fill_arrays(observations, seq_len = seq_len), dtype=th.float, device=device)
+    rewards = th.tensor(fill_arrays(rewards, seq_len = seq_len), dtype=th.float, device=device)
     return actions, observations, rewards
 
 def fill_arrays(inpt, seq_len):
     d = []
     for epoch in inpt:
-        np_epoch = np.array(epoch)
-        if np_epoch.shape[0] < seq_len:
-            fill = np.zeros([seq_len-np_epoch.shape[0], np_epoch.shape[-1]])
+        if epoch.shape[0] < seq_len:
+            fill = -np.ones([seq_len-epoch.shape[0], epoch.shape[-1]])
             nv = np.append(epoch, fill, axis=0)
             d.append(nv)
         else:
@@ -172,18 +212,6 @@ def sample_expert_transitions(policy, env, episodes):
     return flatten_trajectories(rollouts)
 
 
-class ImitationLearningWrapper:
-    def __init__(self, policy, env: GymEnv):
-        self.observation_space = env.observation_space
-        self.action_space = env.action_space
-        self.policy = policy
-
-    def predict(self, obsv, deterministic=None):
-        actions = []
-        for obs in obsv:
-            actions.append(self.policy.get_action(obs))
-        return actions
-
 def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:int=1, return_gen_trj = False):
         policy.eval()
         policy.reset()
@@ -193,7 +221,7 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:
         expected_rewards_after = policy.history.opt_scores[0]
         expected_rewards_before = policy.history.gen_scores[0]
         datas = parse_sampled_transitions(
-            transitions=transitions, new_epoch=policy.args_obj.new_epoch, seq_len=seq_len, extractor=policy.args_obj.extractor, device=device)
+            transitions=transitions, seq_len=seq_len, extractor=policy.args_obj.extractor, device=device)
         device_data = []
         for data in datas:
             device_data.append(data[:episodes].to(policy.args_obj.device))

@@ -2,7 +2,7 @@ import unittest
 
 import torch as th
 from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
-from active_critic.learner.active_critic_learner import ActiveCriticLearner, ACLScores
+from active_critic.learner.active_critic_learner import ActiveCriticLearner, ACLScores, ACLOnlyPositive
 from active_critic.utils.dataset import DatasetAC
 from active_critic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
                                            new_epoch_reach,
@@ -10,7 +10,7 @@ from active_critic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
                                            sample_expert_transitions,
                                            sample_new_episode)
 from active_critic.utils.pytorch_utils import make_part_obs_data, calcMSE
-from active_critic.utils.test_utils import setup_ac_reach
+from active_critic.utils.test_utils import setup_ac_reach, setup_ac_reach_op
 from gym import Env
 import numpy as np
 from torch.utils.data.dataloader import DataLoader
@@ -42,13 +42,36 @@ class TestLerner(unittest.TestCase):
         env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
         return acl, env, expert, seq_len, epsiodes, device
 
+    def make_acl_op(self):
+        device = 'cuda'
+        acla = ActiveCriticLearnerArgs()
+        acla.data_path = '/home/hendrik/Documents/master_project/LokalData/TransformerImitationLearning/'
+        acla.device = device
+        acla.extractor = DummyExtractor()
+        acla.imitation_phase = True
+        acla.logname = 'test_acl'
+        acla.tboard = True
+        acla.batch_size = 32
+        acla.val_every = 100000
+        acla.validation_episodes = 5
+        acla.training_epsiodes = 1
+        acla.num_cpu = 1
+        acla.actor_threshold = 0.5
+        acla.critic_threshold = 0.5
+        seq_len = 5
+        epsiodes = 2
+        ac, acps, env = setup_ac_reach_op(seq_len=seq_len, device=device)
+        aclop = ACLOnlyPositive(ac_policy=ac, env=env, eval_env=env, network_args_obj=acla)
+        env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
+        return aclop, env, expert, seq_len, epsiodes, device
+
 
     def test_make_part_seq_with_td(self):
         acl, env, expert, seq_len, epsiodes, device = self.make_acl()
         transitions = sample_expert_transitions(
             policy=expert.predict, env=env, episodes=epsiodes)
         exp_actions, exp_observations, exp_rewards = parse_sampled_transitions(
-            transitions=transitions, new_epoch=new_epoch_reach, extractor=DummyExtractor(), device=device)
+            transitions=transitions, extractor=DummyExtractor(), device=device, seq_len=seq_len)
 
         part_acts, part_obsv, part_rews = make_part_obs_data(
             actions=exp_actions, observations=exp_observations, rewards=exp_rewards)
@@ -69,6 +92,7 @@ class TestLerner(unittest.TestCase):
             policy=acl.policy,
             env=env,
             episodes=1,
+            device=device
         )
         self.assertTrue(list(actions.shape) == [
                         1, seq_len, env.action_space.shape[0]])
@@ -84,7 +108,7 @@ class TestLerner(unittest.TestCase):
         transitions = sample_expert_transitions(
             policy=expert.predict, env=env, episodes=epsiodes)
         exp_actions, exp_observations, exp_rewards = parse_sampled_transitions(
-            transitions=transitions, new_epoch=new_epoch_reach, extractor=DummyExtractor(), device=device)
+            transitions=transitions, extractor=DummyExtractor(), device=device, seq_len=seq_len)
         part_acts, part_obsv, part_rews = make_part_obs_data(
             actions=exp_actions, observations=exp_observations, rewards=exp_rewards)
 
@@ -209,7 +233,7 @@ class TestLerner(unittest.TestCase):
         device = 'cuda'
         env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
         transitions = sample_expert_transitions(policy=expert.predict, env=env, episodes=epsiodes)
-        exp_actions, exp_observations, exp_rewards = parse_sampled_transitions(transitions=transitions, new_epoch=new_epoch_reach, extractor=DummyExtractor(), device=device)
+        exp_actions, exp_observations, exp_rewards = parse_sampled_transitions(transitions=transitions, extractor=DummyExtractor(), device=device, seq_len=seq_len)
         part_acts, part_obsv, part_rews = make_part_obs_data(actions=exp_actions, observations=exp_observations, rewards=exp_rewards)
         imitation_data = DatasetAC(device='cuda')
         imitation_data.onyl_positiv = False
@@ -237,6 +261,14 @@ class TestLerner(unittest.TestCase):
 
         self.assertTrue(th.allclose(acl.scores.mean_actor[0], scores_before.mean_actor[0]), 'Network did not converge as predicted after load from file.')
         self.assertTrue(th.allclose(acl.scores.mean_critic[0], scores_before.mean_critic[0]))
+
+    def test_only_positive(self):
+        aclop, env, expert, seq_len, epsiodes, device = self.make_acl_op()
+        expert_transitions = sample_expert_transitions(expert.predict, env, 3)
+        actions, observations, rewards = parse_sampled_transitions(expert_transitions, DummyExtractor(), seq_len, 'cuda')
+        aclop.add_data(actions, observations, rewards)
+        
+
 
 
 if __name__ == '__main__':

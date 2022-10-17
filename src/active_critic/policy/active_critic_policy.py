@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel
-from active_critic.utils.pytorch_utils import make_partially_observed_seq
+from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -30,8 +30,6 @@ class ActiveCriticPolicySetup:
         self.optimize: bool = None
         self.batch_size: int = None
         self.stop_opt: bool = None
-        self.opt_end: bool = None
-        self.optimize_last: bool = False
         self.clip:bool = True
 
 
@@ -123,9 +121,7 @@ class ActiveCriticPolicy(BaseModel):
             observation_seq=self.obs_seq, action_seq=action_seq, 
             optimize=self.args_obj.optimize, 
             current_step=self.current_step,
-            stop_opt=self.args_obj.stop_opt,
-            opt_end=self.args_obj.opt_end,
-            opt_last=self.args_obj.optimize_last
+            stop_opt=self.args_obj.stop_opt
             )
 
         if self.args_obj.optimize:
@@ -143,9 +139,8 @@ class ActiveCriticPolicy(BaseModel):
             action_seq: th.Tensor, 
             optimize: bool, 
             current_step: int,
-            stop_opt: bool,
-            opt_end: bool,
-            opt_last: bool):
+            stop_opt: bool
+            ):
         # In inference, we want the maximum eventual reward.
         actor_input = self.get_actor_input(
             obs=observation_seq, actions=action_seq, rew=self.gl[:observation_seq.shape[0]])
@@ -176,9 +171,8 @@ class ActiveCriticPolicy(BaseModel):
                 actions=actions, 
                 observations=observation_seq, 
                 current_step=current_step,
-                stop_opt=stop_opt,
-                opt_end=opt_end,
-                opt_last=opt_last)
+                stop_opt=stop_opt
+                )
 
             return ACPOptResult(
                 gen_trj=actions.detach(),
@@ -189,9 +183,8 @@ class ActiveCriticPolicy(BaseModel):
             actions: th.Tensor, 
             observations: th.Tensor, 
             current_step: int, 
-            stop_opt:bool, 
-            opt_end:bool,
-            opt_last:bool):
+            stop_opt:bool
+            ):
         optimized_actions = th.clone(actions.detach())
         final_actions = th.clone(optimized_actions)
         optimized_actions.requires_grad_(True)
@@ -205,17 +198,16 @@ class ActiveCriticPolicy(BaseModel):
         if self.critic.model is not None:
             self.critic.model.eval()
 
-        while (not th.all(final_exp_success[:, -1] >= self.args_obj.optimisation_threshold)) and (step <= self.args_obj.opt_steps):
-            mask = (final_exp_success[:, -1] < self.args_obj.optimisation_threshold).reshape(-1)
+        while (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)) and (step <= self.args_obj.opt_steps):
+            mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success = self.inference_opt_step(
                 org_actions=actions,
                 opt_actions=optimized_actions,
                 obs_seq=observations,
                 optimizer=optimizer,
                 goal_label=goal_label,
-                current_step=current_step,
-                opt_end=opt_end,
-                opt_last=opt_last)
+                current_step=current_step
+                )
             step += 1
 
             if stop_opt:
@@ -236,20 +228,14 @@ class ActiveCriticPolicy(BaseModel):
             obs_seq: th.Tensor, 
             optimizer: th.optim.Optimizer, 
             goal_label: th.Tensor, 
-            current_step: int, 
-            opt_end:bool= False,
-            opt_last:bool= False):
+            current_step: int
+            ):
         critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
-        if opt_end:
-            critic_loss = self.critic.loss_fct(
-                result=critic_result[:,current_step:], label=goal_label[:,current_step:])
-        elif opt_last:
-            critic_loss = self.critic.loss_fct(
-                result=critic_result[:,-1:], label=goal_label[:,-1:])
-        else:
-            critic_loss = self.critic.loss_fct(
-                result=critic_result, label=goal_label)
+
+        mask = get_seq_end_mask(critic_result, current_step)
+        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label, mask=mask)
+
         optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()
@@ -264,9 +250,9 @@ class ActiveCriticPolicy(BaseModel):
         return critic_input
 
     def get_actor_input(self, obs: th.Tensor, actions: th.Tensor, rew: th.Tensor):
-        last_reward = rew[:, -1:].repeat([1, obs.shape[1], 1])
-
-        actor_inpt = th.cat((obs, last_reward), dim=-1)
+        max_reward, _ = rew.max(dim=1)
+        max_reward = max_reward.unsqueeze(1).repeat([1, obs.shape[1], 1])
+        actor_inpt = th.cat((obs, max_reward), dim=-1)
         return actor_inpt
 
     def proj_actions(self, org_actions: th.Tensor, new_actions: th.Tensor, current_step: int):

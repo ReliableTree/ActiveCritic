@@ -5,7 +5,7 @@ import numpy as np
 import torch as th
 from metaworld.envs import \
     ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
-from active_critic.utils.gym_utils import make_policy_dict, new_epoch_reach, make_dummy_vec_env, sample_expert_transitions, parse_sampled_transitions
+from active_critic.utils.gym_utils import make_policy_dict, new_epoch_reach, make_dummy_vec_env, sample_expert_transitions, parse_sampled_transitions_legacy, parse_sampled_transitions, make_vec_env
 from active_critic.utils.pytorch_utils import make_partially_observed_seq, make_part_obs_data, make_inf_seq
 from gym.wrappers import TimeLimit
 from imitation.data.wrappers import RolloutInfoWrapper
@@ -86,7 +86,7 @@ class TestUtils(unittest.TestCase):
         name = 'reach'
         env, exp = make_dummy_vec_env(name=name, seq_len=seq_len)
         transitions = sample_expert_transitions(policy=exp.predict, env=env, episodes=episodes)
-        actions, observations, rewards = parse_sampled_transitions(transitions=transitions, new_epoch=new_epoch_reach, seq_len=seq_len, extractor=DummyExtractor())
+        actions, observations, rewards = parse_sampled_transitions(transitions=transitions, seq_len=seq_len, extractor=DummyExtractor())
         
         
         self.assertTrue( list(actions.shape) == [episodes, seq_len, env.action_space.shape[0]])
@@ -99,7 +99,7 @@ class TestUtils(unittest.TestCase):
         seq_len = 5
         env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
         transitions = sample_expert_transitions(policy=expert.predict, env=env, episodes=epsiodes)
-        actions, observations, rewards = parse_sampled_transitions(transitions=transitions, new_epoch=new_epoch_reach, extractor=DummyExtractor(), seq_len=seq_len)
+        actions, observations, rewards = parse_sampled_transitions(transitions=transitions, extractor=DummyExtractor(), seq_len=seq_len)
         acts, obsv, rews = make_part_obs_data(actions=actions, observations=observations, rewards=rewards)
         print(f'acts.shape: {acts.shape}')
         print([epsiodes*seq_len, seq_len, env.action_space.shape[0]])
@@ -185,8 +185,33 @@ class TestUtils(unittest.TestCase):
         inf_seq = make_inf_seq(inp_seq, seq_len)
         self.assertTrue(list(inf_seq.shape) == [batch_size*(obs_len-seq_len+int(seq_len/2)+1), seq_len, dim])
 
+    def test_parse_sampled_seq(self):
+        seq_len = 100
+        episodes = 3
+        name = 'reach'
+        env, exp = make_vec_env(env_id='reach', num_cpu=1, seq_len=100)
+        transitions = sample_expert_transitions(policy=exp.predict, env=env, episodes=episodes)
+        actions_leg, observations_leg, rewards_leg = parse_sampled_transitions_legacy(transitions=transitions, new_epoch=new_epoch_reach, seq_len=seq_len, extractor=DummyExtractor())
+        actions, observations, rewards = parse_sampled_transitions(transitions=transitions, seq_len=seq_len, extractor=DummyExtractor())
+        
+        self.assertTrue(len(transitions) < episodes*seq_len)
+
+        self.assertTrue(th.equal(actions, actions_leg))
+        self.assertTrue(th.equal(observations, observations_leg))
+        self.assertTrue(th.equal(rewards, rewards_leg))
+
+        epochs = [0]
+        for i, step in enumerate(transitions):
+            if step['dones']:
+                epochs.append(i)
+        epochs = th.tensor(epochs)
+        episodes_len = th.diff(epochs)
+
+        for i, reward in enumerate(rewards):
+            self.assertTrue(th.all(reward[int(episodes_len[i]+1):] == -1))
+
 
 if __name__ == '__main__':
-    unittest.main()
-    #to = TestUtils()
-    #to.test_sample_new_episode()
+    #unittest.main()
+    to = TestUtils()
+    to.test_parse_sampled_seq()

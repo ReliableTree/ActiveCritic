@@ -87,3 +87,11 @@ def make_inf_seq(obs:th.Tensor, seq_len:th.Tensor):
     for i in range(len(obs[0]) - seq_len + int(seq_len/2)):
         result = th.cat((result, whole_seq[:,i+1:seq_len+i+1]), dim=0)
     return result
+
+def get_seq_end_mask(inpt, current_step):
+    mask = th.zeros_like(inpt, dtype=th.bool)
+    mask[:,current_step:] = True
+    return mask
+
+def get_rew_mask(reward):
+    return (reward.squeeze()>=0)
