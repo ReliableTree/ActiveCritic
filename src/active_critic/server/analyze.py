@@ -80,7 +80,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'reach_success_end_opt_rew_mask_best_reward_actor_input'
+    acla.logname = 'optlr5e-2_optstep20'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 10

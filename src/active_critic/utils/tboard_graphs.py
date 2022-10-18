@@ -3,6 +3,7 @@ import tensorflow as tf
 import numpy as np
 from hashids import Hashids
 import os
+import torch as th
 
 class TBoardGraphs():
     def __init__(self, logname= None, data_path = None):
@@ -14,7 +15,8 @@ class TBoardGraphs():
             self.__tboard_train      = tf.summary.create_file_writer(self.logdir + "train/")
             self.__tboard_validation = tf.summary.create_file_writer(self.logdir + "validate/")
             #self.voice               = Voice(path=data_path)
-        self.fig, self.ax = plt.subplots(3,3)
+        self.fig, self.ax = plt.subplots(2,2)
+        self.legend = None
 
     def startDebugger(self):
         tf.summary.trace_on(graph=True, profiler=True)
@@ -49,10 +51,36 @@ class TBoardGraphs():
         else:
             return inpt
 
+    def plot_graph(self, trjs:list([np.array]), trj_names:list([str]), trj_colors:list([str]), plot_name:str, step:int):
+        fig, ax = self.fig, self.ax
+
+        for sp in range(4):
+            idx = sp // 2
+            idy = sp  % 2
+            ax[idx, idy].clear()
+        
+        for sp in range(trjs[0].shape[-1]):
+            idx = sp // 2
+            idy = sp  % 2
+            
+            ls = []
+
+            for trj_num in range(len(trjs)):
+                l, = ax[idx, idy].plot(range(trjs[trj_num].shape[0]), trjs[trj_num][:,sp], color=trj_colors[trj_num], label=trj_names[trj_num])
+                ls.append(l)
+
+        if self.legend is not None:
+            self.legend.remove()
+        self.legend = fig.legend(handles=ls)
+        result = np.expand_dims(self.finishFigure(fig), 0)
+        with self.__tboard_validation.as_default():
+            tf.summary.image(plot_name, data=result, step=step)
+
 
     def plotDMPTrajectory(self, y_true, y_pred, y_pred_std = None, phase= None, \
         dt= None, p_dt= None, stepid= None, name = "Trajectory", save = False, \
-            name_plot = None, path=None, tol_neg = None, tol_pos=None, inpt = None, opt_gen_trj=None, window = 0):
+            name_plot = None, path=None, tol_neg = None, tol_pos=None, inpt = None, opt_gen_trj=None, window = 0,\
+                ):
         tf_y_true = self.torch2tf(y_true)
         tf_y_pred = self.torch2tf(y_pred)
         tf_phase = self.torch2tf(phase)
@@ -84,8 +112,8 @@ class TBoardGraphs():
             neg_inpt = tf_y_true + tol_neg[None,:].cpu().numpy()
             pos_inpt = tf_y_true + tol_pos[None,:].cpu().numpy()
         for sp in range(len(tf_y_true[0])):
-            idx = sp // 3
-            idy = sp  % 3
+            idx = sp // 2
+            idy = sp  % 2
             ax[idx,idy].clear()
 
             # GT Trajectory:

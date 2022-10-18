@@ -15,6 +15,7 @@ from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask, make_part_o
 from active_critic.utils.tboard_graphs import TBoardGraphs
 from gym.envs.mujoco import MujocoEnv
 from torch.utils.data.dataloader import DataLoader
+import numpy as np
 
 
 class ACLScores:
@@ -198,15 +199,10 @@ class ActiveCriticLearner(nn.Module):
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
-        for i in range(opt_actions.shape[0]):
-            self.createGraphsMW(d_in=1, d_out=gen_actions[i], result=gen_actions[i], toy=False,
-                                inpt=observations[i, 0], name='Trajectory' + str(i), window=0, opt_trj=opt_actions[0])
-
-            self.createGraphsMW(d_in=1, d_out=self.policy.history.gen_scores[0][i], result=self.policy.history.opt_scores[0][i], toy=False,
-                                inpt=observations[i, 0], name='Reward Generated' + str(i), window=0)
-
-            self.createGraphsMW(d_in=1, d_out=rewards[i], result=self.policy.history.opt_scores[0][i], toy=False,
-                                inpt=observations[i, 0], name='Reward GT' + str(i), window=0)
+        for i in range(min(opt_actions.shape[0], 4)):
+            self.createGraphs([gen_actions[i], opt_actions[i]], ['Generated Actions ' + str(i), 'Opimized Actions '+str(i)], plot_name='Trajectories')
+            self.createGraphs([rewards[i], self.policy.history.opt_scores[0][i], self.policy.history.gen_scores[0][i]], 
+                                ['GT Reward ' + str(i), 'Expected Optimized Reward '+str(i), 'Expected Generated Reward '+str(i)], plot_name='Rewards')
 
         last_reward, _ = rewards.max(dim=1)
         best_model = self.scores.update_max_score(
@@ -233,17 +229,6 @@ class ActiveCriticLearner(nn.Module):
             f'training samples: {int(len(self.train_data) / self.policy.args_obj.epoch_len)}')
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
-    def torch2tf(self, inpt):
-        if inpt is not None:
-            return tf.convert_to_tensor(inpt.detach().cpu().numpy())
-        else:
-            return None
-
-    def tf2torch(self, inpt):
-        if inpt is not None:
-            return th.tensor(inpt.numpy(), device=self.device)
-        else:
-            return None
 
     def analyze_critic_scores(self, reward: th.Tensor, expected_reward: th.Tensor, add: str):
         success = reward == 1
@@ -292,31 +277,14 @@ class ActiveCriticLearner(nn.Module):
             self.createGraphsMW(d_in=1, d_out=label, result=trj, toy=False,
                                 inpt=inpt, name=name, opt_trj=opt_trj, window=0)
 
-    def loadingBar(self, count, total, size, addition="", end=False):
-        if total == 0:
-            percent = 0
-        else:
-            percent = float(count) / float(total)
-        full = int(percent * size)
-        fill = size - full
-        print("\r  {:5d}/{:5d} [".format(count, total) +
-              "#" * full + " " * fill + "] " + addition, end="")
-        if end:
-            print("")
-        sys.stdout.flush()
 
-    def createGraphsMW(self, d_in, d_out, result, save=False, name_plot='', epoch=0, toy=True, inpt=None, name='Trajectory', opt_trj=None, window=0):
-        target_trj = d_out
-        gen_trj = result
+    def createGraphs(self, trjs:list([th.tensor]), trj_names:list([str]), plot_name:str):
+        np_trjs = []
+        trj_colors = ['forestgreen', 'orange', 'pink']
+        for trj in trjs:
+            np_trjs.append(trj.detach().cpu().numpy())
+        self.tboard.plot_graph(trjs=np_trjs, trj_names=trj_names, trj_colors=trj_colors, plot_name=plot_name, step=self.global_step)
 
-        path_to_plots = self.network_args.data_path + "/plots/" + \
-            str(self.logname) + '/' + str(epoch) + '/'
-
-        tol_neg = None
-        tol_pos = None
-        self.tboard.plotDMPTrajectory(target_trj, gen_trj, th.zeros_like(gen_trj),
-                                      None, None, None, stepid=self.global_step, save=save, name_plot=name_plot, path=path_to_plots,
-                                      tol_neg=tol_neg, tol_pos=tol_pos, inpt=inpt, name=name, opt_gen_trj=opt_trj, window=window)
 
     def saveNetworkToFile(self, add, data_path):
 
