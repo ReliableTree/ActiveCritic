@@ -198,7 +198,7 @@ class ActiveCriticPolicy(BaseModel):
         if self.critic.model is not None:
             self.critic.model.eval()
 
-        while (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)) and (step <= self.args_obj.opt_steps):
+        while (step <= self.args_obj.opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
             mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success = self.inference_opt_step(
                 org_actions=actions,
