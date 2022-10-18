@@ -86,11 +86,11 @@ def make_acl(device):
     acla.val_every = 10
     acla.add_data_every = 1
     acla.validation_episodes = 50
-    acla.training_epsiodes = 1
+    acla.training_epsiodes = 50
     acla.actor_threshold = 5e-2
     acla.critic_threshold = 5e-2
     acla.num_cpu = 50
-    name = 'pickplace'
+    name = 'pickplace_50'
 
     seq_len = 100
     epsiodes = 30
