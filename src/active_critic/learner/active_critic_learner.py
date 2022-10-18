@@ -308,13 +308,13 @@ class ActiveCriticLearner(nn.Module):
         self.load_state_dict(th.load(
             path + "policy_network", map_location=device))
         self.policy.actor.optimizer.load_state_dict(
-            th.load(path + "/optimizer_actor"))
+            th.load(path + "/optimizer_actor", map_location=device))
         self.policy.critic.optimizer.load_state_dict(
-            th.load(path + "/optimizer_critic"))
+            th.load(path + "/optimizer_critic", map_location=device))
         self.global_step = int(th.load(path+'/global_step'))
         self.setDatasets(train_data=th.load(
             path+'/train', map_location=device))
-        with open(path + '/scores.pkl', 'rb') as f:
-            self.scores = pickle.load(f)
+        '''with open(path + '/scores.pkl', 'rb') as f:
+            self.scores = pickle.load(f, device=device)'''
         self.policy.args_obj.optimize = optimize
 

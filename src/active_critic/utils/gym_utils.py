@@ -113,8 +113,8 @@ def make_vec_env(env_id, num_cpu, seq_len):
             max_episode_steps = seq_len
             env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_id][1]]()
             env._freeze_rand_vec = False
-            #rce = ResetCounterWrapper(env)
-            timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
+            rce = ResetCounterWrapper(env)
+            timelimit = TimeLimit(env=rce, max_episode_steps=max_episode_steps)
             riw = RolloutInfoWrapper(timelimit)
             return riw
         return _init

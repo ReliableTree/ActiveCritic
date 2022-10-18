@@ -30,7 +30,9 @@ class WholeSequenceModel(nn.Module, ABC):
             self.wsms.model_setup.ntoken = inputs.size(-1)
             self.model = TransformerModel(
                 model_setup=self.wsms.model_setup).to(inputs.device)
-        result = self.model.forward(inputs)
+        result, attention = self.model.forward(inputs, return_attention=True)
+        self.attention = attention.detach()
+
         if self.optimizer is None:
             self.optimizer = self.wsms.optimizer_class(
                 self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
