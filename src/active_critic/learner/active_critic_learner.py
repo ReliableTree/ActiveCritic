@@ -201,9 +201,9 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
         for i in range(min(opt_actions.shape[0], 4)):
-            self.createGraphs([gen_actions[i], opt_actions[i]], ['Generated Actions ' + str(i), 'Opimized Actions '+str(i)], plot_name='Trajectories')
+            self.createGraphs([gen_actions[i], opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i))
             self.createGraphs([rewards[i], self.policy.history.opt_scores[0][i], self.policy.history.gen_scores[0][i]], 
-                                ['GT Reward ' + str(i), 'Expected Optimized Reward '+str(i), 'Expected Generated Reward '+str(i)], plot_name='Rewards')
+                                ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i))
 
         last_reward, _ = rewards.max(dim=1)
         best_model = self.scores.update_max_score(
