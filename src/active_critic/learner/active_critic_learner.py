@@ -177,6 +177,7 @@ class ActiveCriticLearner(nn.Module):
     def write_tboard_scalar(self, debug_dict, train, step=None):
         if step is None:
             step = self.global_step
+        step = int(len(self.train_data) / self.policy.args_obj.epoch_len)
 
         if self.network_args.tboard:
             for para, value in debug_dict.items():
@@ -210,8 +211,8 @@ class ActiveCriticLearner(nn.Module):
         if best_model:
             self.saveNetworkToFile(add='best_validation', data_path=os.path.join(
                 self.network_args.data_path, self.logname))
-        last_expected_rewards_before = expected_rewards_before[:, -1]
-        last_expected_reward_after = expected_rewards_after[:, -1]
+        last_expected_rewards_before, _ = expected_rewards_before.max(dim=1)
+        last_expected_reward_after, _ = expected_rewards_after.max(dim=1)
         self.analyze_critic_scores(
             last_reward, last_expected_rewards_before, '')
         self.analyze_critic_scores(
@@ -266,16 +267,6 @@ class ActiveCriticLearner(nn.Module):
                    add] = calcMSE(reward, expected_reward)
 
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
-
-    def plot_with_mask(self, label, trj, inpt, mask, name, opt_trj=None):
-        if mask.sum() > 0:
-            label = label[mask][0]
-            trj = trj[mask][0]
-            inpt = inpt[mask][0, 0]
-            if opt_trj is not None:
-                opt_trj = opt_trj[mask][0]
-            self.createGraphsMW(d_in=1, d_out=label, result=trj, toy=False,
-                                inpt=inpt, name=name, opt_trj=opt_trj, window=0)
 
 
     def createGraphs(self, trjs:list([th.tensor]), trj_names:list([str]), plot_name:str):
