@@ -80,7 +80,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'optlr5e-2_optstep20_nostop'
+    acla.logname = 'optlr5e-2_optstep20_full_epsiodes'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 10
