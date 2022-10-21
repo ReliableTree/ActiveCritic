@@ -25,12 +25,12 @@ class WholeSequenceModel(nn.Module, ABC):
         self.model = None
         self.optimizer = None
 
-    def forward(self, inputs: th.Tensor) -> th.Tensor:
+    def forward(self, inputs: th.Tensor, tf_mask:th.Tensor=None) -> th.Tensor:
         if (self.model is None):
             self.wsms.model_setup.ntoken = inputs.size(-1)
             self.model = TransformerModel(
                 model_setup=self.wsms.model_setup).to(inputs.device)
-        result, attention = self.model.forward(inputs, return_attention=True)
+        result, attention = self.model.forward(inputs, return_attention=True, mask=tf_mask)
         self.attention = attention.detach()
 
         if self.optimizer is None:
@@ -38,8 +38,8 @@ class WholeSequenceModel(nn.Module, ABC):
                 self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
         return result
 
-    def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, prefix='', mask:th.Tensor=None) -> typing.Dict:
-        result = self.forward(inputs=inputs)
+    def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, prefix='', mask:th.Tensor=None, tf_mask:th.Tensor=None) -> typing.Dict:
+        result = self.forward(inputs=inputs, tf_mask=tf_mask)
         if mask is not None:
             loss = self.loss_fct(result=result[mask], label=label[mask])
         else:

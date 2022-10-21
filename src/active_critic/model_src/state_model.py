@@ -1,0 +1,42 @@
+import torch as th
+import torch.nn as nn
+from active_critic.utils.pytorch_utils import calcMSE
+
+class MLPNetwork(th.nn.Module):
+    def __init__(self, arch:list[int]) -> None:
+        super().__init__()
+        self.layers = th.nn.Sequential()
+        for i in range(len(arch)-2):
+            self.layers.append(th.nn.Linear(arch[i], arch[i+1]))
+            self.layers.append(th.nn.ReLU())
+        self.layers.append(th.nn.Linear(arch[-2], arch[-1]))
+
+    def forward(self, inpt:th.Tensor) -> th.Tensor:
+
+        return self.layers.forward(inpt)
+
+class StateModel(nn.Module):
+    def __init__(self, arch, lr) -> None:
+        super().__init__()
+        self.arch = arch
+        self.lr = lr
+        self.is_init = False
+
+    def reset(self):
+        self.model = MLPNetwork(arch=self.arch)
+        self.optimizer = th.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=0)
+                
+    def forward(self, inpt):
+        if not self.is_init:
+            self.arch = [inpt.shape[-1]] + self.arch
+            self.reset()
+            self.is_init = True
+        return self.model.forward(inpt)
+
+    def optimizer_step(self, inpt, label):
+        result = self.model.forward(inpt=inpt)
+        loss = calcMSE(result, label)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        return {'Loss ':loss.detach()}

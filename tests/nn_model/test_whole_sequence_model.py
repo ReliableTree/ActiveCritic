@@ -1,5 +1,6 @@
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel, OptimizeMaximumCritic
 from active_critic.model_src.transformer import ModelSetup, TransformerModel
+from matplotlib.pyplot import close
 import torch as th
 from active_critic.utils.test_utils import make_mask_data, make_seq_encoding_data, make_critic_data, make_wsm_setup
 import unittest
@@ -85,6 +86,19 @@ class TestWholeSequenceModel(unittest.TestCase):
         self.assertTrue(input[0,0] < org_input[0,0])
         self.assertTrue(input[1,1] < org_input[1,1])
 
+    def test_tf_mask(self):
+        batch_size = 2
+        seq_len = 2
+        obs_dim = 3
+        device = 'cpu'
 
+        inpt_seq, outpt_seq, mask = make_mask_data(batch_size,seq_len,obs_dim,device=device)
+        wsms = make_wsm_setup(seq_len=seq_len, d_output=obs_dim, device=device)
+        wsm = WholeSequenceModel(wsms=wsms)
+        for i in range(1000):
+            loss_dict = wsm.optimizer_step(inpt_seq, outpt_seq, tf_mask=mask)
+        self.assertTrue(th.allclose(loss_dict['Loss '], th.tensor(0.125)))
+
+        
 if __name__ == '__main__':
     unittest.main()

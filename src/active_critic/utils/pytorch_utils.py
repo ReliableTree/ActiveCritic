@@ -58,7 +58,7 @@ def add_max_val_to_dict(dict, key, val, tm):
         dict[key] = val
 
 
-def calcMSE(a, b):
+def calcMSE(a:th.Tensor, b:th.Tensor) -> th.Tensor:
     return ((a.squeeze() - b.squeeze())**2).mean()
 
 
