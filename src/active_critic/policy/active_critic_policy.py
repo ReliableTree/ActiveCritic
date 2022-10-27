@@ -83,11 +83,14 @@ class ActiveCriticPolicy(BaseModel):
         self.reset()
 
     def reset(self):
-        self.last_goal = None
         self.current_step = 0
 
+    def make_critic_input(self, embeddings:th.Tensor, actions:th.Tensor):
+        input = th.cat((embeddings, actions), dim=-1)
+        return input
+
     def predict_step(self, embeddings:th.Tensor, actions:th.Tensor, mask:th.Tensor = None):
-        predictor_input = th.cat((embeddings, actions), dim=-1)
+        predictor_input = self.make_critic_input(embeddings=embeddings, actions=actions)
         next_embeddings = self.predicor.forward(predictor_input, tf_mask=mask)
         return next_embeddings
 
@@ -102,62 +105,36 @@ class ActiveCriticPolicy(BaseModel):
 
         return embeddings
 
-    def optimize_sequence(self, actions:th.Tensor, seq_embeddings:th.Tensor, mask:th.Tensor, goal_embeddings:th.Tensor, steps:int, detach:bool, current_step:int, reward_weight:float = 0):
+    def optimize_sequence(self, actions:th.Tensor, seq_embeddings:th.Tensor, mask:th.Tensor, goal_label:th.Tensor, steps:int, current_step:int):
         actions = actions.detach().clone()
+        org_actions = actions.detach().clone()
+
         actions.requires_grad = True
         seq_embeddings = seq_embeddings.detach().clone()
-        seq_embeddings.requires_grad = True
-        optimizer = th.optim.Adam([actions, seq_embeddings], lr=1e-2)
+        org_embeddings = seq_embeddings.detach().clone()
+        
+        optimizer = th.optim.Adam([actions], lr=1e-2)
         opt_paras = optimizer.state_dict()
         for i in range(steps):
             actions = actions.detach().clone()
             actions.requires_grad = True
-            seq_embeddings = seq_embeddings.detach().clone()
-            seq_embeddings.requires_grad = True
+            optimizer = th.optim.Adam([actions], lr=1e-2)
+            seq_embeddings = self.build_sequence(embeddings=seq_embeddings.detach()[:,:current_step], actions=actions, seq_len=actions.shape[1], mask=mask, detach=False)
+            critic_input = self.make_critic_input(embeddings=seq_embeddings, actions=actions)
 
-            last_embeddings = seq_embeddings.detach().clone()
-
-            optimizer = th.optim.Adam([actions, seq_embeddings], lr=1e-2)
-
-
-            if detach:
-                next_seq_embeddings = self.predict_step(embeddings=seq_embeddings, actions=actions, mask=mask)
-                loss_embedding = calcMSE(next_seq_embeddings[:,:-1], last_embeddings[:,1:])
-
-            else:
-                seq_embeddings = self.build_sequence(embeddings=seq_embeddings.detach()[:,:current_step], actions=actions, seq_len=actions.shape[1], mask=mask, detach=False)
-                loss_embedding = 0
-
-
+            scores = self.critic.forward(critic_input)
             optimizer.load_state_dict(opt_paras)
 
-            loss_reward = calcMSE(seq_embeddings[:,-1], goal_embeddings[:,1])
-            loss = loss_embedding + loss_reward * reward_weight
+            loss_reward = calcMSE(scores[:, current_step:], goal_label[:, current_step:])
+            loss = loss_reward
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             opt_paras = optimizer.state_dict()
-        if detach:
-            seq_embeddings = self.predict_step(embeddings=seq_embeddings, actions=actions, mask=mask)
-            loss_reward = calcMSE(seq_embeddings[:,-1], goal_embeddings[:,1])
+            with th.no_grad():
+                actions[:,:current_step] = org_actions[:,:current_step]
 
-
-        return loss_reward, loss_embedding, actions, seq_embeddings
-
-    def reset_epoch(self, vec_obsv: th.Tensor):
-        self.current_step = 0
-        self.last_goal = vec_obsv
-        self.current_result = None
-
-        scores_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output]
-        self.history.new_epoch(self.history.gen_scores, size=scores_size, device=self.args_obj.device)
-        self.history.new_epoch(self.history.opt_scores, size=scores_size, device=self.args_obj.device)
-
-        trj_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.action_space.shape[0]]
-        self.history.new_epoch(self.history.gen_trj, size=trj_size, device=self.args_obj.device)
-        
-        self.obs_seq = th.zeros(
-            size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
+        return loss_reward, actions, seq_embeddings
             
 
     def predict(
@@ -167,161 +144,12 @@ class ActiveCriticPolicy(BaseModel):
         episode_start: Optional[np.ndarray] = None,
         deterministic: bool = False,
     ) -> th.Tensor:
-        vec_obsv = self.args_obj.extractor.forward(
-            observation).to(self.args_obj.device).unsqueeze(1)
-        if (self.last_goal is None) or (self.args_obj.new_epoch(self.last_goal, vec_obsv)):
-            self.reset_epoch(vec_obsv=vec_obsv)
-            action_seq = None
-        else:
-            self.current_step += 1
-            action_seq = self.current_result.gen_trj
 
-        self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
+        embedding = self.emitter.forward(observation)
+        
 
-        self.current_result = self.forward(
-            observation_seq=self.obs_seq, action_seq=action_seq, 
-            optimize=self.args_obj.optimize, 
-            current_step=self.current_step,
-            stop_opt=self.args_obj.stop_opt
-            )
 
-        if self.args_obj.optimize:
-            self.history.add_value(
-                history=self.history.opt_scores, 
-                value=self.current_result.expected_succes_after[:, self.current_step].detach(), 
-                current_step=self.current_step
-            )
-        self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, self.current_step].detach(), current_step=self.current_step)
 
-        return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
-
-    def forward(self, 
-            observation_seq: th.Tensor, 
-            action_seq: th.Tensor, 
-            optimize: bool, 
-            current_step: int,
-            stop_opt: bool
-            ):
-        # In inference, we want the maximum eventual reward.
-        actor_input = self.get_actor_input(
-            obs=observation_seq, actions=action_seq, rew=self.gl[:observation_seq.shape[0]])
-        actions = self.actor.forward(actor_input)
-
-        if self.args_obj.clip:
-            actions = th.clamp(actions, min=self.clip_min, max=self.clip_max)
-
-        if action_seq is not None:
-            actions = self.proj_actions(
-                action_seq, actions, current_step)
-
-        self.history.add_value(self.history.gen_trj, actions[:, self.current_step].detach(), current_step=self.current_step)
-
-        critic_input = self.get_critic_input(
-            acts=actions, obs_seq=observation_seq)
-
-        expected_success = self.critic.forward(
-            inputs=critic_input)  # batch_size, seq_len, 1
-
-        if not optimize:
-            result = ACPOptResult(
-                gen_trj=actions, expected_succes_before=expected_success.detach())
-            return result
-
-        else:
-            actions, expected_success_opt = self.optimize_act_sequence(
-                actions=actions, 
-                observations=observation_seq, 
-                current_step=current_step,
-                stop_opt=stop_opt
-                )
-
-            return ACPOptResult(
-                gen_trj=actions.detach(),
-                expected_succes_before=expected_success,
-                expected_succes_after=expected_success_opt)
-
-    def optimize_act_sequence(self, 
-            actions: th.Tensor, 
-            observations: th.Tensor, 
-            current_step: int, 
-            stop_opt:bool
-            ):
-        optimized_actions = th.clone(actions.detach())
-        final_actions = th.clone(optimized_actions)
-        optimized_actions.requires_grad_(True)
-        optimizer = th.optim.AdamW(
-            [optimized_actions], lr=self.args_obj.inference_opt_lr, weight_decay=0)
-        expected_success = th.zeros(
-            size=[actions.shape[0], self.critic.wsms.model_setup.seq_len, self.critic.wsms.model_setup.d_output], dtype=th.float, device=actions.device)
-        final_exp_success = th.clone(expected_success)
-        goal_label = self.gl[:actions.shape[0]]
-        step = 0
-        if self.critic.model is not None:
-            self.critic.model.eval()
-
-        while (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)) and (step <= self.args_obj.opt_steps):
-            mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
-            optimized_actions, expected_success = self.inference_opt_step(
-                org_actions=actions,
-                opt_actions=optimized_actions,
-                obs_seq=observations,
-                optimizer=optimizer,
-                goal_label=goal_label,
-                current_step=current_step
-                )
-            step += 1
-
-            if stop_opt:
-                final_actions[mask] = optimized_actions[mask]
-                final_exp_success[mask] = expected_success[mask]
-            else:
-                final_actions = optimized_actions
-                final_exp_success = expected_success
-
-        if self.args_obj.clip:
-            with th.no_grad():
-                th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
-        return final_actions, final_exp_success
-
-    def inference_opt_step(self, 
-            org_actions: th.Tensor, 
-            opt_actions: th.Tensor, 
-            obs_seq: th.Tensor, 
-            optimizer: th.optim.Optimizer, 
-            goal_label: th.Tensor, 
-            current_step: int
-            ):
-        critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_result = self.critic.forward(inputs=critic_inpt)
-
-        mask = get_seq_end_mask(critic_result, current_step)
-        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label, mask=mask)
-
-        optimizer.zero_grad()
-        critic_loss.backward()
-        optimizer.step()
-
-        actions = self.proj_actions(
-            org_actions=org_actions, new_actions=opt_actions, current_step=current_step)
-        return actions, critic_result
-
-    def get_critic_input(self, acts, obs_seq):
-        critic_input = make_partially_observed_seq(
-            obs=obs_seq, acts=acts, seq_len=self.args_obj.epoch_len, act_space=self.action_space)
-        return critic_input
-
-    def get_actor_input(self, obs: th.Tensor, actions: th.Tensor, rew: th.Tensor):
-        max_reward, _ = rew.max(dim=1)
-        max_reward = max_reward.unsqueeze(1).repeat([1, obs.shape[1], 1])
-        actor_inpt = th.cat((obs, max_reward), dim=-1)
-        return actor_inpt
-
-    def proj_actions(self, org_actions: th.Tensor, new_actions: th.Tensor, current_step: int):
-        with th.no_grad():
-            new_actions[:, :current_step] = org_actions[:, :current_step]
-            if self.args_obj.clip:
-                th.clamp(new_actions, min=self.clip_min, max=self.clip_max, out=new_actions)
-        return new_actions
 
     def save_policy(self, add, data_path):
 
