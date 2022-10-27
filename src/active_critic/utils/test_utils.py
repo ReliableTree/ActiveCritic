@@ -4,11 +4,12 @@ import numpy as np
 import torch as th
 from metaworld.envs import \
     ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
-from active_critic.model_src.transformer import (ModelSetup, generate_square_subsequent_mask)
-from active_critic.model_src.whole_sequence_model import (WholeSequenceModelSetup, WholeSequenceModel)
+from active_critic.model_src.transformer import (ModelSetup)
+from active_critic.model_src.whole_sequence_model import (WholeSequenceModelArgs, WholeSequenceModel)
 from active_critic.policy.active_critic_policy import ActiveCriticPolicySetup, ActiveCriticPolicy
 from active_critic.utils.gym_utils import (DummyExtractor, new_epoch_reach)
 from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env
+from active_critic.utils.pytorch_utils import generate_square_subsequent_mask
 
 
 def make_seq_encoding_data(batch_size, seq_len, ntoken, d_out, device = 'cuda'):
@@ -46,7 +47,7 @@ def make_policy_obs_action(seq_len, ntoken, d_out, diff_ele, device = 'cuda'):
     return o, a
 
 def make_wsm_setup(seq_len, d_output, device='cuda'):
-    wsm = WholeSequenceModelSetup()
+    wsm = WholeSequenceModelArgs()
     wsm.model_setup = ModelSetup()
     seq_len = seq_len
     d_output = d_output
@@ -87,8 +88,6 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 32, device='cuda'):
     acps.optimize = True
     acps.batch_size = batch_size
     acps.stop_opt = False
-    acps.opt_end = False
-    acps.optimize_last = False
     return acps
 
 def setup_ac_reach(seq_len = 5, device='cuda'):

@@ -95,3 +95,18 @@ def get_seq_end_mask(inpt, current_step):
 
 def get_rew_mask(reward):
     return (reward.squeeze()>=0)
+
+
+def generate_square_subsequent_mask(sz: int) -> th.Tensor:
+    """Generates an upper-triangular matrix of -inf, with zeros on diag."""
+    return th.triu(th.ones(sz, sz) * float('-inf'), diagonal=1)
+
+
+def build_tf_horizon_mask(seq_len:int, horizon:int, device:str):
+    mask = generate_square_subsequent_mask(seq_len)
+    if horizon > 0:
+        mask[horizon:, :-horizon] += generate_square_subsequent_mask(seq_len-horizon).T
+    else:
+        mask += generate_square_subsequent_mask(seq_len).T
+    mask = mask.to(device)
+    return mask

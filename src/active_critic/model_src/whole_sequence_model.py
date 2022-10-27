@@ -6,7 +6,7 @@ from active_critic.model_src.transformer import TransformerModel, ModelSetup
 from active_critic.utils.pytorch_utils import calcMSE
 
 
-class WholeSequenceModelSetup:
+class WholeSequenceModelArgs:
     def __init__(self) -> None:
         self.model_setup: ModelSetup = None
         self.optimizer_class:th.optim.Optimizer = None
@@ -15,9 +15,9 @@ class WholeSequenceModelSetup:
         self.name:str = None
 
 class WholeSequenceModel(nn.Module, ABC):
-    def __init__(self, wsms: WholeSequenceModelSetup) -> None:
+    def __init__(self, args: WholeSequenceModelArgs) -> None:
         super().__init__()
-        self.wsms = wsms
+        self.args = args
         self.model: TransformerModel = None
         self.optimizer: th.optim.Optimizer = None
 
@@ -25,15 +25,15 @@ class WholeSequenceModel(nn.Module, ABC):
         self.model = None
         self.optimizer = None
 
-    def forward(self, inputs: th.Tensor) -> th.Tensor:
+    def forward(self, inputs: th.Tensor, tf_mask:th.Tensor=None) -> th.Tensor:
         if (self.model is None):
-            self.wsms.model_setup.ntoken = inputs.size(-1)
+            self.args.model_setup.ntoken = inputs.size(-1)
             self.model = TransformerModel(
-                model_setup=self.wsms.model_setup).to(inputs.device)
-        result = self.model.forward(inputs)
+                model_setup=self.args.model_setup).to(inputs.device)
+        result = self.model.forward(inputs, mask=tf_mask)
         if self.optimizer is None:
-            self.optimizer = self.wsms.optimizer_class(
-                self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
+            self.optimizer = self.args.optimizer_class(
+                self.model.parameters(), self.args.lr, **self.args.optimizer_kwargs)
         return result
 
     def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, prefix='', mask:th.Tensor=None) -> typing.Dict:

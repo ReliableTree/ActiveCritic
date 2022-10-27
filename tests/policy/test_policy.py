@@ -3,8 +3,9 @@ import unittest
 import torch as th
 import numpy as np
 
-from active_critic.model_src.whole_sequence_model import WholeSequenceModel, OptimizeMaximumCritic, OptimizeEndCritic
-from active_critic.policy.active_critic_policy import ActiveCriticPolicy, ACPOptEnd
+from active_critic.model_src.whole_sequence_model import WholeSequenceModel
+from active_critic.model_src.state_model import StateModel, StateModelArgs
+from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 from active_critic.utils.test_utils import (make_acps, make_obs_act_space,
                                             make_wsm_setup)
 from active_critic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
@@ -12,6 +13,7 @@ from active_critic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
                                            new_epoch_reach)
 
 from active_critic.utils.gym_utils import make_policy_dict, new_epoch_reach, make_dummy_vec_env, sample_expert_transitions, parse_sampled_transitions
+from active_critic.utils.pytorch_utils import build_tf_horizon_mask
 
 class TestPolicy(unittest.TestCase):
 
@@ -50,44 +52,54 @@ class TestPolicy(unittest.TestCase):
                                 actor=actor, critic=critic, acps=acps)
         return ac, acps, env, gt_policy
 
-    def setup_opt_end(self):
-        seq_len = 50
-        d_output = 2
+
+    def setup_opt_state(device='cpu'):
+        seq_len = 6
+        action_dim = 2
         obs_dim = 3
         batch_size = 2
-        wsm_actor_setup = make_wsm_setup(
-            seq_len=seq_len, d_output=d_output)
-        wsm_critic_setup = make_wsm_setup(
-            seq_len=seq_len, d_output=1)
+        embed_dim = 4
+        lr = 1e-3
+
+        actor_args = StateModelArgs()
+        actor_args.arch = [20, action_dim]
+        actor_args.device = device
+        actor_args.lr = lr
+        actor = StateModel(args=actor_args)
+
+        critic_args = StateModelArgs()
+        critic_args.arch = [10, 1]
+        critic_args.device = device
+        critic_args.lr = lr
+        critic = StateModel(args=critic_args)
+
+        emitter_args = StateModelArgs()
+        emitter_args.arch = [20, embed_dim]
+        emitter_args.device = device
+        emitter_args.lr = lr
+        emitter = StateModel(args=emitter_args)
+
+        predictor_args = make_wsm_setup(
+            seq_len=seq_len, d_output=embed_dim, device=device)
+        predictor_args.model_setup.d_hid = 200
+        predictor_args.model_setup.d_model = 200
+        predictor_args.model_setup.nlayers = 1
+        predictor = WholeSequenceModel(args=predictor_args)
+
+
         acps = make_acps(
-            seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_pap)
+            seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_pap, device=device)
         acps.opt_steps = 2
         obs_space, acts_space = make_obs_act_space(
-            obs_dim=obs_dim, action_dim=d_output)
-        actor = WholeSequenceModel(wsm_actor_setup)
-        critic = OptimizeEndCritic(wsms=wsm_critic_setup)
-        ac = ACPOptEnd(observation_space=obs_space, action_space=acts_space,
-                                actor=actor, critic=critic, acps=acps)
-        return ac, acps, d_output, obs_dim, batch_size
-
-    def setup_opt_max(self):
-        seq_len = 50
-        d_output = 2
-        obs_dim = 3
-        batch_size = 2
-        wsm_actor_setup = make_wsm_setup(
-            seq_len=seq_len, d_output=d_output)
-        wsm_critic_setup = make_wsm_setup(
-            seq_len=seq_len, d_output=1)
-        acps = make_acps(
-            seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_pap)
-        obs_space, acts_space = make_obs_act_space(
-            obs_dim=obs_dim, action_dim=d_output)
-        actor = WholeSequenceModel(wsm_actor_setup)
-        critic = OptimizeMaximumCritic(wsms=wsm_critic_setup)
-        ac = ActiveCriticPolicy(observation_space=obs_space, action_space=acts_space,
-                                actor=actor, critic=critic, acps=acps)
-        return ac, acps, d_output, obs_dim, batch_size
+            obs_dim=obs_dim, action_dim=action_dim)
+        ac = ActiveCriticPolicy(observation_space=obs_space, 
+                                action_space=acts_space,
+                                actor=actor,
+                                critic=critic,
+                                predictor=predictor,
+                                emitter=emitter,
+                                acps=acps)
+        return ac, acps, action_dim, obs_dim, batch_size, embed_dim, seq_len
 
 
     def test_policy_output_shape(self):
@@ -308,34 +320,6 @@ class TestPolicy(unittest.TestCase):
         self.assertTrue((expected_success[:,-1] < expected_success_nonstop[:,-1]).sum() > 0)
         self.assertTrue((expected_success[:,-1] < expected_success_nonstop[:,-1]).sum() < len(expected_success))
 
-    def test_opt_end(self):
-        th.manual_seed(1)
-        current_step = 1
-
-        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
-        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-        obs_seq[0] *= 2
-        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_scores = ac.critic.forward(critic_input)
-        actions, expected_success_nonstop = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=False, opt_end=False, opt_last=False)
-
-        th.manual_seed(1)
-        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
-        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-        obs_seq[0] *= 2
-        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_scores = ac.critic.forward(critic_input)
-        actions, expected_success = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=False, opt_end=True, opt_last=False)
-
-        self.assertTrue((max(expected_success[:,-1]) > max(expected_success_nonstop[:,-1])))
 
     def test_clip(self):
         th.manual_seed(1)
@@ -356,117 +340,48 @@ class TestPolicy(unittest.TestCase):
         self.assertTrue(th.all(maxim <= th.tensor(ac.action_space.high, device=maxim.device)))
         self.assertTrue(th.all(minim >= th.tensor(ac.action_space.low, device=maxim.device)))
 
+    def test_grad_whole_sequence_one_step(self):
+        th.manual_seed(0)
+        device = 'cuda'
+        ac, acps, action_dim, obs_dim, batch_size, embed_dim, seq_len = self.setup_opt_state(device=device)
+        horizon = 0
+        embeddings = th.ones([batch_size, 1, embed_dim], device=device)
+        actions = th.ones([batch_size, seq_len, action_dim], device=device, requires_grad=True)
+        goal_embeddings = th.ones_like(embeddings)
+        action_optim = th.optim.Adam([actions], lr=1e-1)
+        opt_paras = action_optim.state_dict()
 
-    def test_opt_end(self):
-        th.manual_seed(1)
-        current_step = 1
+        mask = build_tf_horizon_mask(seq_len=seq_len, horizon=horizon, device=device)
+        seq_embeddings = ac.build_sequence(embeddings=embeddings, actions=actions, seq_len=seq_len, mask=mask, detach=True)
+        opt_actions = actions.detach()
+        opt_actions.requires_grad = True
+        next_embedding = ac.predict_step(embeddings=seq_embeddings.detach(), actions=opt_actions, mask=mask)
+        seq_embedding = th.cat((embeddings[:,:1], next_embedding[:,:-1]), dim=1)
+        loss = ((seq_embedding - th.ones_like(seq_embedding))**2).mean()
+        loss.backward()
+        assert (opt_actions.grad != 0).sum() == opt_actions[:,:-1].numel()
 
-        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
-        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-        obs_seq[0] *= 2
-        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_scores = ac.critic.forward(critic_input)
-        actions, expected_success_end = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=False, opt_end=True, opt_last=False)
+    def test_grad_var_horizon(self):
+        th.manual_seed(0)
+        device = 'cuda'
+        ac, acps, action_dim, obs_dim, batch_size, embed_dim, seq_len = self.setup_opt_state(device=device)
+        horizon = 2
+        embeddings = th.ones([batch_size, 1, embed_dim], device=device)
+        actions = th.ones([batch_size, seq_len, action_dim], device=device, requires_grad=True)
+        goal_embeddings = th.ones_like(embeddings)
+        action_optim = th.optim.Adam([actions], lr=1e-1)
+        opt_paras = action_optim.state_dict()
 
-        th.manual_seed(1)
-        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
-        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-        obs_seq[0] *= 2
-        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_scores = ac.critic.forward(critic_input)
-        actions, expected_success = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=False, opt_end=False, opt_last=True)
-        self.assertTrue(th.all(expected_success[:,-1] > expected_success_end[:,-1]))
+        mask = build_tf_horizon_mask(seq_len=seq_len, horizon=horizon, device=device)
+        seq_embeddings = ac.build_sequence(embeddings=embeddings, actions=actions, seq_len=seq_len, mask=mask, detach=True)
+        opt_actions = actions.detach()
+        opt_actions.requires_grad = True
+        next_embedding = ac.predict_step(embeddings=seq_embeddings.detach(), actions=opt_actions, mask=mask)
+        seq_embedding = th.cat((embeddings[:,:1], next_embedding[:,:-1]), dim=1)
+        loss = ((seq_embedding[:,-1] - th.ones_like(seq_embedding[:,-1] ))**2).mean()
+        loss.backward()
+        assert (opt_actions.grad != 0).sum() == (min(seq_len-1, 1+horizon) * action_dim*batch_size)
 
-    def test_opt_max(self):
-        th.manual_seed(3)
-        current_step = 1
-
-        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
-        ac.args_obj.opt_steps = 2
-
-        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-        obs_seq[0] *= 2
-        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_scores = ac.critic.forward(critic_input)
-        self.assertTrue(th.all(critic_scores < 1))
-        actions, expected_success = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=True)
-
-        th.manual_seed(3)
-        current_step = 1
-
-        ac, acps, act_dim, obs_dim, batch_size =  self.setup_opt_max()
-        ac.args_obj.opt_steps = 2
-
-        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-        obs_seq[0] *= 2
-        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_scores = ac.critic.forward(critic_input)
-        self.assertTrue(th.all(critic_scores < 1))
-
-        actions, expected_success_max = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=True)
-
-        max_n, _ = expected_success.max(dim=1)
-        max_m, _ = expected_success_max.max(dim=1)
-        self.assertTrue(th.all(max_m > max_n))
-
-    def test_opt_end(self):
-        th.manual_seed(3)
-        current_step = 30
-
-        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
-        ac.args_obj.opt_steps = 2
-
-        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-        obs_seq[0] *= 2
-        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_scores = ac.critic.forward(critic_input)
-        self.assertTrue(th.all(critic_scores < 1))
-        actions, expected_success = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=True)
-        end_wo = expected_success[:,current_step:].mean()
-        all_wo = expected_success.mean()
-
-        th.manual_seed(3)
-        current_step = 30
-
-        ac, acps, act_dim, obs_dim, batch_size =  self.setup_opt_end()
-        ac.args_obj.opt_steps = 2
-
-        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-        obs_seq[0] *= 2
-        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_scores = ac.critic.forward(critic_input)
-        self.assertTrue(th.all(critic_scores < 1))
-        actions, expected_success = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=True)
-
-        end_w = expected_success[:,current_step:].mean()
-        all_w = expected_success.mean()
-
-        self.assertTrue(th.all(end_w > end_wo))
-        self.assertTrue(th.all(all_w < all_wo))
 
 if __name__ == '__main__':
     unittest.main()

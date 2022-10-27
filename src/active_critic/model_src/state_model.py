@@ -2,6 +2,13 @@ import torch as th
 import torch.nn as nn
 from active_critic.utils.pytorch_utils import calcMSE
 
+class StateModelArgs:
+    def __init__(self) -> None:
+        self.arch:list = None
+        self.lr:float = None
+        self.device:str = None
+
+
 class MLPNetwork(th.nn.Module):
     def __init__(self, arch:list[int]) -> None:
         super().__init__()
@@ -16,19 +23,18 @@ class MLPNetwork(th.nn.Module):
         return self.layers.forward(inpt)
 
 class StateModel(nn.Module):
-    def __init__(self, arch, lr) -> None:
+    def __init__(self, args:StateModelArgs) -> None:
         super().__init__()
-        self.arch = arch
-        self.lr = lr
+        self.args = args
         self.is_init = False
 
     def reset(self):
-        self.model = MLPNetwork(arch=self.arch)
-        self.optimizer = th.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=0)
+        self.model = MLPNetwork(arch=self.args.arch).to(self.args.device)
+        self.optimizer = th.optim.AdamW(self.model.parameters(), lr=self.args.lr, weight_decay=0)
                 
     def forward(self, inpt):
         if not self.is_init:
-            self.arch = [inpt.shape[-1]] + self.arch
+            self.args.arch = [inpt.shape[-1]] + self.args.arch
             self.reset()
             self.is_init = True
         return self.model.forward(inpt)

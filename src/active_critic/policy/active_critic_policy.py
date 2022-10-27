@@ -1,14 +1,16 @@
-from pyclbr import Function
 from typing import Dict, Optional, Tuple, Union
+from active_critic.model_src.state_model import StateModel
 
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel
-from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq
+from active_critic.utils.pytorch_utils import get_seq_end_mask, make_partially_observed_seq, calcMSE
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
 import pickle
+
+from torch.functional import Tensor
 
 class ACPOptResult:
     def __init__(self, gen_trj: th.Tensor, inpt_trj: th.Tensor = None, expected_succes_before: th.Tensor = None, expected_succes_after: th.Tensor = None) -> None:
@@ -21,7 +23,7 @@ class ACPOptResult:
 class ActiveCriticPolicySetup:
     def __init__(self) -> None:
         self.extractor: BaseFeaturesExtractor = None
-        self.new_epoch: Function = None
+        self.new_epoch = None
         self.optimisation_threshold: float = None
         self.epoch_len: int = None
         self.opt_steps: int = None
@@ -61,8 +63,10 @@ class ActiveCriticPolicy(BaseModel):
         self,
         observation_space,
         action_space,
-        actor: WholeSequenceModel,
-        critic: WholeSequenceModel,
+        actor: StateModel,
+        critic: StateModel,
+        predictor: WholeSequenceModel,
+        emitter: StateModel,
         acps: ActiveCriticPolicySetup = None
     ):
 
@@ -70,10 +74,10 @@ class ActiveCriticPolicy(BaseModel):
 
         self.actor = actor
         self.critic = critic
+        self.predicor = predictor
+        self.emitter = emitter
         self.args_obj = acps
-        self.register_buffer('gl', th.ones(
-            size=[1000, acps.epoch_len, critic.wsms.model_setup.d_output], dtype=th.float, device=acps.device))
-        self.history = ActiveCriticPolicyHistory()
+
         self.clip_min = th.tensor(self.action_space.low, device=acps.device)
         self.clip_max = th.tensor(self.action_space.high, device=acps.device)
         self.reset()
@@ -81,7 +85,64 @@ class ActiveCriticPolicy(BaseModel):
     def reset(self):
         self.last_goal = None
         self.current_step = 0
-        self.history.reset()
+
+    def predict_step(self, embeddings:th.Tensor, actions:th.Tensor, mask:th.Tensor = None):
+        predictor_input = th.cat((embeddings, actions), dim=-1)
+        next_embeddings = self.predicor.forward(predictor_input, tf_mask=mask)
+        return next_embeddings
+
+    def build_sequence(self, embeddings:th.Tensor, actions:th.Tensor, seq_len:int, mask:th.Tensor, detach:bool):
+        while (sl := embeddings.shape[1]) < seq_len:
+            if detach:
+                next_embedding = self.predict_step(embeddings=embeddings.detach(), actions=actions.detach()[:,:embeddings.shape[1]], mask=mask[:sl,:sl])
+                embeddings = th.cat((embeddings[:,:1], next_embedding), dim=1)
+            else:
+                next_embedding = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]], mask=mask[:sl,:sl])
+                embeddings = th.cat((embeddings, next_embedding[:,-1:]), dim=1)
+
+        return embeddings
+
+    def optimize_sequence(self, actions:th.Tensor, seq_embeddings:th.Tensor, mask:th.Tensor, goal_embeddings:th.Tensor, steps:int, detach:bool, current_step:int, reward_weight:float = 0):
+        actions = actions.detach().clone()
+        actions.requires_grad = True
+        seq_embeddings = seq_embeddings.detach().clone()
+        seq_embeddings.requires_grad = True
+        optimizer = th.optim.Adam([actions, seq_embeddings], lr=1e-2)
+        opt_paras = optimizer.state_dict()
+        for i in range(steps):
+            actions = actions.detach().clone()
+            actions.requires_grad = True
+            seq_embeddings = seq_embeddings.detach().clone()
+            seq_embeddings.requires_grad = True
+
+            last_embeddings = seq_embeddings.detach().clone()
+
+            optimizer = th.optim.Adam([actions, seq_embeddings], lr=1e-2)
+
+
+            if detach:
+                next_seq_embeddings = self.predict_step(embeddings=seq_embeddings, actions=actions, mask=mask)
+                loss_embedding = calcMSE(next_seq_embeddings[:,:-1], last_embeddings[:,1:])
+
+            else:
+                seq_embeddings = self.build_sequence(embeddings=seq_embeddings.detach()[:,:current_step], actions=actions, seq_len=actions.shape[1], mask=mask, detach=False)
+                loss_embedding = 0
+
+
+            optimizer.load_state_dict(opt_paras)
+
+            loss_reward = calcMSE(seq_embeddings[:,-1], goal_embeddings[:,1])
+            loss = loss_embedding + loss_reward * reward_weight
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            opt_paras = optimizer.state_dict()
+        if detach:
+            seq_embeddings = self.predict_step(embeddings=seq_embeddings, actions=actions, mask=mask)
+            loss_reward = calcMSE(seq_embeddings[:,-1], goal_embeddings[:,1])
+
+
+        return loss_reward, loss_embedding, actions, seq_embeddings
 
     def reset_epoch(self, vec_obsv: th.Tensor):
         self.current_step = 0
