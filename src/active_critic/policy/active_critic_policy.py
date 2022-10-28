@@ -32,6 +32,7 @@ class ActiveCriticPolicySetup:
         self.optimize: bool = None
         self.batch_size: int = None
         self.stop_opt: bool = None
+        self.mask:th.Tensor
         self.clip:bool = True
 
 
@@ -82,8 +83,15 @@ class ActiveCriticPolicy(BaseModel):
         self.clip_max = th.tensor(self.action_space.high, device=acps.device)
         self.reset()
 
-    def reset(self):
+    def reset(self, vec_obsv:th.Tensor = th.ones([1,1,3])):
         self.current_step = 0
+        self.last_goal = vec_obsv[:,0,-3:]
+        self.current_embeddings = vec_obsv
+        self.current_actions = None
+        self.goal_label = th.ones([vec_obsv.shape[1], self.args_obj.epoch_len, self.critic.args.arch[-1]])
+        self.init_scores = None
+        self.opt_scores = None
+
 
     def make_critic_input(self, embeddings:th.Tensor, actions:th.Tensor):
         input = th.cat((embeddings, actions), dim=-1)
@@ -94,16 +102,15 @@ class ActiveCriticPolicy(BaseModel):
         next_embeddings = self.predicor.forward(predictor_input, tf_mask=mask)
         return next_embeddings
 
-    def build_sequence(self, embeddings:th.Tensor, actions:th.Tensor, seq_len:int, mask:th.Tensor, detach:bool):
+    def build_sequence(self, embeddings:th.Tensor, actions:th.Tensor, seq_len:int, mask:th.Tensor):
         while (sl := embeddings.shape[1]) < seq_len:
-            if detach:
-                next_embedding = self.predict_step(embeddings=embeddings.detach(), actions=actions.detach()[:,:embeddings.shape[1]], mask=mask[:sl,:sl])
-                embeddings = th.cat((embeddings[:,:1], next_embedding), dim=1)
-            else:
-                next_embedding = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]], mask=mask[:sl,:sl])
-                embeddings = th.cat((embeddings, next_embedding[:,-1:]), dim=1)
+            if (actions is None) or (actions.shape[1] == embeddings.shape[1] - 1):
+                next_actions= self.actor.forward(embeddings[:,-1:])
+                actions = th.cat((actions, next_actions), dim=1)
+            next_embedding = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]], mask=mask[:sl,:sl])
+            embeddings = th.cat((embeddings, next_embedding[:,-1:]), dim=1)
 
-        return embeddings
+        return embeddings, actions
 
     def optimize_sequence(self, actions:th.Tensor, seq_embeddings:th.Tensor, mask:th.Tensor, goal_label:th.Tensor, steps:int, current_step:int):
         actions = actions.detach().clone()
@@ -119,7 +126,7 @@ class ActiveCriticPolicy(BaseModel):
             actions = actions.detach().clone()
             actions.requires_grad = True
             optimizer = th.optim.Adam([actions], lr=1e-2)
-            seq_embeddings = self.build_sequence(embeddings=seq_embeddings.detach()[:,:current_step], actions=actions, seq_len=actions.shape[1], mask=mask, detach=False)
+            seq_embeddings, seq_actions = self.build_sequence(embeddings=seq_embeddings.detach()[:,:current_step], actions=actions, seq_len=actions.shape[1], mask=mask, detach=False)
             critic_input = self.make_critic_input(embeddings=seq_embeddings, actions=actions)
 
             scores = self.critic.forward(critic_input)
@@ -134,7 +141,7 @@ class ActiveCriticPolicy(BaseModel):
             with th.no_grad():
                 actions[:,:current_step] = org_actions[:,:current_step]
 
-        return loss_reward, actions, seq_embeddings
+        return loss_reward, actions, seq_embeddings, scores
             
 
     def predict(
@@ -145,11 +152,33 @@ class ActiveCriticPolicy(BaseModel):
         deterministic: bool = False,
     ) -> th.Tensor:
 
-        embedding = self.emitter.forward(observation)
+        vec_obsv = self.args_obj.extractor.forward(observation)
+        embedding = self.emitter.forward(vec_obsv)
+
         
+        if (self.last_goal is None) or (self.args_obj.new_epoch(self.last_goal, vec_obsv)):
+            self.reset(vec_obsv=vec_obsv)
+            self.current_embeddings = embedding
+        else:
+            self.current_step += 1
+            self.current_embeddings = th.cat((self.current_embeddings, embedding), dim=1)
+        
+        next_action = self.actor.forward(embedding)
+        if self.current_actions is None:
+            self.current_actions = next_action
+        else:
+            self.current_actions = th.cat((self.current_actions, next_action), dim=1)
+        
+        if self.args_obj.optimize:
+            loss_reward, actions, seq_embeddings     = self.optimize_sequence(
+                                                                            actions=self.current_actions, 
+                                                                            seq_embeddings=self.current_embeddings, 
+                                                                            mask = self.args_obj.mask,
+                                                                            goal_label=self.goal_label,
+                                                                            steps=self.args_obj.opt_steps,
+                                                                            current_step=self.current_step)
 
-
-
+        return actions[:, self.current_step]
 
     def save_policy(self, add, data_path):
 
