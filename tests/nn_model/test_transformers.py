@@ -21,7 +21,7 @@ class TestTransformerModel(unittest.TestCase):
         ms.seq_len = seq_len
         ms.dropout = 0
         ms.ntoken = 1
-        ms.device = 'cuda'
+        ms.device = 'cpu'
 
         inpt_seq, outpt_seq = make_seq_encoding_data(batch_size=batch_size, seq_len=seq_len, ntoken=ntoken, d_out=d_output)
 
@@ -54,7 +54,7 @@ class TestTransformerModel(unittest.TestCase):
         ms.dropout = 0
         ms.ntoken = 1
         ms.lr = None
-        ms.device = 'cuda'
+        ms.device = 'cpu'
 
 
         inpt_seq, outpt_seq, mask = make_mask_data(batch_size=batch_size, seq_len=seq_len, ntoken=ntoken)

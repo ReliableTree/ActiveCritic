@@ -19,6 +19,5 @@ setup(
     "hashids",
     "stable-baselines3",
     "prettytable",
-    "imitation"
-    ]
+    "imitation"]
 )
