@@ -1,4 +1,4 @@
-from active_critic.model_src.whole_sequence_model import WholeSequenceModel, OptimizeMaximumCritic
+from active_critic.model_src.whole_sequence_model import WholeSequenceModel
 from active_critic.model_src.transformer import ModelSetup, TransformerModel
 import torch as th
 from active_critic.utils.test_utils import make_mask_data, make_seq_encoding_data, make_critic_data, make_wsm_setup

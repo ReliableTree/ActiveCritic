@@ -1,8 +1,8 @@
 import unittest
-from active_critic.model_src.transformer import ModelSetup, TransformerModel, generate_square_subsequent_mask
+from active_critic.model_src.transformer import ModelSetup, TransformerModel
 import torch as th
 from active_critic.utils.pytorch_utils import calcMSE
-from active_critic.utils.test_utils import make_seq_encoding_data, make_mask_data, make_critic_data
+from active_critic.utils.test_utils import make_seq_encoding_data, make_mask_data, generate_square_subsequent_mask
 
 
 class TestTransformerModel(unittest.TestCase):
@@ -21,11 +21,11 @@ class TestTransformerModel(unittest.TestCase):
         ms.seq_len = seq_len
         ms.dropout = 0
         ms.ntoken = 1
-        ms.device = 'cuda'
+        ms.device = 'cpu'
 
-        inpt_seq, outpt_seq = make_seq_encoding_data(batch_size=batch_size, seq_len=seq_len, ntoken=ntoken, d_out=d_output)
+        inpt_seq, outpt_seq = make_seq_encoding_data(batch_size=batch_size, seq_len=seq_len, ntoken=ntoken, d_out=d_output, device=ms.device)
 
-        model = TransformerModel(model_setup=ms).to('cuda')
+        model = TransformerModel(model_setup=ms).to('cpu')
         with th.no_grad():
             model.forward(inpt_seq)
         optimizer = th.optim.Adam(params=model.parameters(), lr=1e-3)
@@ -54,11 +54,11 @@ class TestTransformerModel(unittest.TestCase):
         ms.dropout = 0
         ms.ntoken = 1
         ms.lr = None
-        ms.device = 'cuda'
+        ms.device = 'cpu'
 
 
-        inpt_seq, outpt_seq, mask = make_mask_data(batch_size=batch_size, seq_len=seq_len, ntoken=ntoken)
-        model = TransformerModel(model_setup=ms).to('cuda')
+        inpt_seq, outpt_seq, mask = make_mask_data(batch_size=batch_size, seq_len=seq_len, ntoken=ntoken, device=ms.device)
+        model = TransformerModel(model_setup=ms).to('cpu')
         with th.no_grad():
             model.forward(inpt_seq)
         optimizer = th.optim.Adam(params=model.parameters(), lr=1e-3)
