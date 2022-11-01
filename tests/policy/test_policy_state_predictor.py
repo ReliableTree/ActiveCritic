@@ -48,7 +48,7 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 32, device='cpu', hori
     acps.opt_mask[:,-1] = 1
     return acps
 
-def setup_opt_state(device='cuda'):
+def setup_opt_state(device='cpu'):
     seq_len = 6
     action_dim = 2
     obs_dim = 3
@@ -69,17 +69,16 @@ def setup_opt_state(device='cuda'):
     critic = StateModel(args=critic_args)
 
     emitter_args = StateModelArgs()
-    emitter_args.arch = [20, embed_dim]
+    emitter_args.arch = [200, 200, embed_dim]
     emitter_args.device = device
     emitter_args.lr = lr
     emitter = StateModel(args=emitter_args)
 
-    predictor_args = make_wsm_setup(
-        seq_len=seq_len, d_output=embed_dim, device=device)
-    predictor_args.model_setup.d_hid = 200
-    predictor_args.model_setup.d_model = 200
-    predictor_args.model_setup.nlayers = 1
-    predictor = WholeSequenceModel(args=predictor_args)
+    predictor_args = StateModelArgs()
+    predictor_args.arch = [20, embed_dim]
+    predictor_args.device = device
+    predictor_args.lr = lr
+    predictor = StateModel(args=emitter_args)
 
 
     acps = make_acps(
@@ -97,7 +96,6 @@ def setup_opt_state(device='cuda'):
     return ac, acps, action_dim, obs_dim, batch_size, embed_dim, seq_len  
 
 class TestPolicy(unittest.TestCase):
-
     def test_actions_grad(self):
         th.manual_seed(0)
         device = 'cpu'
@@ -171,7 +169,7 @@ class TestPolicy(unittest.TestCase):
         mask = build_tf_horizon_mask(seq_len=seq_len, horizon=horizon, device=device)
         seq_embeddings, na = ac.build_sequence(embeddings=embeddings, actions=actions, seq_len=seq_len, mask=mask)
         org_actions = actions.detach().clone()
-        steps = 100
+        steps = 1000
         current_step = 2
 
         mask = build_tf_horizon_mask(seq_len=seq_len, horizon=horizon, device=device)
@@ -179,7 +177,6 @@ class TestPolicy(unittest.TestCase):
         opt_mask = th.zeros_like(goal_label, dtype=th.bool)
         opt_mask[:,-current_step:] = 1
         loss_reward, actions, seq_embeddings, scores = ac.optimize_sequence(actions, seq_embeddings, pred_mask=mask, opt_mask=opt_mask, steps=steps, current_step=current_step, goal_label=goal_label)
-
         self.assertTrue(loss_reward < 1e-4, 'Sequence optimisation failed.')
 
         self.assertTrue(th.equal(actions[:, :current_step], org_actions[:,:current_step]), 'Actions were overridden')
@@ -190,7 +187,7 @@ class TestPolicy(unittest.TestCase):
         device = 'cpu'
         ac, acps, action_dim, obs_dim, batch_size, embed_dim, seq_len = setup_opt_state(device=device)
         ac.history = DummyHistory()
-        
+        ac.predicor.args.arch = [200, 200, embed_dim]
         seq_len = 100
         horizon = 0
         steps = 100
@@ -236,11 +233,13 @@ class TestPolicy(unittest.TestCase):
         th.manual_seed(0)
         device = 'cpu'
         ac, acps, action_dim, obs_dim, batch_size, embed_dim, seq_len = setup_opt_state(device=device)
+        ac.predicor.args.arch = [200, 200, embed_dim]
         acps.opt_steps = 100
-        acps.inference_opt_lr = 1
+        acps.optimizer_class = th.optim.Adam
+        acps.inference_opt_lr = 1e-1
         observation = th.ones([batch_size, 1, obs_dim])
         action = ac.predict(observation=observation)
-        self.assertTrue(th.all((ac.history.scores[0][:,1:,-1] - ac.history.scores[0][:,:-1,-1]) >= 0), 'Scores are not monotonically increasing.')
+        self.assertTrue(th.all((ac.history.scores[0][:,0,-1] - ac.history.scores[0][:,-1,-1]) <= 0), 'Scores are not increasing.')
 
     def test_history_shape(self):
         th.manual_seed(0)
@@ -292,9 +291,9 @@ class TestPolicy(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    #unittest.main()
-    to = TestPolicy()
-    to.test_actions_grad()
-    #to.test_history_shape()
+    unittest.main()
+    #to = TestPolicy()
+    #to.test_score_history()
+    #to.test_actions_grad()
     #to.test_whole_vs_part_seq_optimizer()
     #to.test_optimize_n_step()

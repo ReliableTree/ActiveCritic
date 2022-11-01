@@ -73,7 +73,7 @@ class ActiveCriticPolicy(BaseModel):
         action_space,
         actor: StateModel,
         critic: StateModel,
-        predictor: WholeSequenceModel,
+        predictor: Union[WholeSequenceModel, StateModel],
         emitter: StateModel,
         acps: ActiveCriticPolicySetup = None
     ):
@@ -109,7 +109,10 @@ class ActiveCriticPolicy(BaseModel):
 
     def predict_step(self, embeddings:th.Tensor, actions:th.Tensor, mask:th.Tensor = None):
         predictor_input = self.make_critic_input(embeddings=embeddings, actions=actions)
-        next_embeddings = self.predicor.forward(predictor_input, tf_mask=mask)
+        if type(self.predicor) is WholeSequenceModel:
+            next_embeddings = self.predicor.forward(predictor_input, tf_mask=mask)
+        else:
+            next_embeddings = self.predicor.forward(predictor_input)
         return next_embeddings
 
     def build_sequence(self, embeddings:th.Tensor, actions:th.Tensor, seq_len:int, mask:th.Tensor):
@@ -121,8 +124,12 @@ class ActiveCriticPolicy(BaseModel):
                         actions = th.cat((actions, next_actions), dim=1)
                     else:
                         actions = next_actions
-            next_embedding = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]], mask=mask[:sl,:sl])
-            embeddings = th.cat((embeddings, next_embedding[:,-1:]), dim=1)
+            if type(self.predicor) is WholeSequenceModel:
+                next_embedding = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]], mask=mask[:sl,:sl])
+                embeddings = th.cat((embeddings, next_embedding[:,-1:]), dim=1)
+            else:
+                next_embedding = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]])
+                embeddings = th.cat((embeddings, next_embedding[:,-1:]), dim=1)
 
         return embeddings[:,:-1], actions
 
