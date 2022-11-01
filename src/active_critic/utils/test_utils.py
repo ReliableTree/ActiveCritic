@@ -84,7 +84,8 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 32, device='cuda'):
     acps.new_epoch=new_epoch
     acps.opt_steps=100
     acps.optimisation_threshold=0.5
-    acps.inference_opt_lr = 1e-1
+    acps.inference_opt_lr = 1e-2
+    acps.optimizer_class = th.optim.SGD
     acps.optimize = True
     acps.batch_size = batch_size
     acps.stop_opt = False

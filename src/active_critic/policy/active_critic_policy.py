@@ -1,3 +1,5 @@
+from inspect import ArgSpec
+from re import S
 from typing import Dict, Optional, Tuple, Union
 from active_critic.model_src.state_model import StateModel
 
@@ -25,14 +27,15 @@ class ActiveCriticPolicySetup:
         self.extractor: BaseFeaturesExtractor = None
         self.new_epoch = None
         self.optimisation_threshold: float = None
-        self.epoch_len: int = None
-        self.opt_steps: int = None
-        self.device: str = None
         self.inference_opt_lr: float = None
+        self.opt_steps: int = None
+        self.optimizer_class:th.optim.Optimizer = None
+        self.epoch_len: int = None
+        self.device: str = None
         self.optimize: bool = None
         self.batch_size: int = None
-        self.stop_opt: bool = None
-        self.mask:th.Tensor
+        self.pred_mask:th.Tensor = None,
+        self.opt_mask:th.Tensor=None,
         self.clip:bool = True
 
 
@@ -42,21 +45,25 @@ class ActiveCriticPolicyHistory:
 
 
     def reset(self):
-        self.gen_scores = []
-        self.opt_scores = []
+        self.scores = []
         self.gen_trj = []
+        self.opt_trj = []
 
 
-    def new_epoch(self, history:list([th.Tensor]), size:list([int, int, int]), device:str):
+    def new_epoch(self, history:list([th.Tensor]), size:list([int, int, int, int]), device:str): #batch size, opt step, seq len, score
         new_field = th.zeros(size=size, device=device)
         if len(history) == 0:
             history.append(new_field)
         else:
-            history[0] = th.cat((history[0], new_field))
+            history[0] = th.cat((history[0], new_field), dim=0)
 
 
-    def add_value(self, history:list([th.Tensor]), value:th.Tensor, current_step:int):
-        history[0][-value.shape[0]:, current_step] = value
+    def add_value(self, history:list([th.Tensor]), value:th.Tensor, opt_step:int=0):
+        if len(history[0].shape) == 4: #including opt step history
+            history[0][-value.shape[0]:, opt_step] = value
+        else:
+            history[0][-value.shape[0]:] = value
+
 
 
 class ActiveCriticPolicy(BaseModel):
@@ -79,20 +86,23 @@ class ActiveCriticPolicy(BaseModel):
         self.emitter = emitter
         self.args_obj = acps
 
+        self.history = ActiveCriticPolicyHistory()
+
         self.clip_min = th.tensor(self.action_space.low, device=acps.device)
         self.clip_max = th.tensor(self.action_space.high, device=acps.device)
-        self.reset()
+        self.last_goal = None
 
-    def reset(self, vec_obsv:th.Tensor = th.ones([1,1,3])):
+    def reset(self, vec_obsv:th.Tensor):
+
         self.current_step = 0
         self.last_goal = vec_obsv[:,0,-3:]
+        self.goal_label = th.ones([vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.args.arch[-1]])
+        self.history.new_epoch(history=self.history.opt_trj, size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
+        self.history.new_epoch(history=self.history.gen_trj, size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
+        self.history.new_epoch(history=self.history.scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps, self.args_obj.epoch_len, self.critic.args.arch[-1]], device=self.args_obj.device)
         self.current_embeddings = vec_obsv
         self.current_actions = None
-        self.goal_label = th.ones([vec_obsv.shape[1], self.args_obj.epoch_len, self.critic.args.arch[-1]])
-        self.init_scores = None
-        self.opt_scores = None
-
-
+        
     def make_critic_input(self, embeddings:th.Tensor, actions:th.Tensor):
         input = th.cat((embeddings, actions), dim=-1)
         return input
@@ -103,43 +113,58 @@ class ActiveCriticPolicy(BaseModel):
         return next_embeddings
 
     def build_sequence(self, embeddings:th.Tensor, actions:th.Tensor, seq_len:int, mask:th.Tensor):
-        while (sl := embeddings.shape[1]) < seq_len:
+        while (sl := embeddings.shape[1]) < seq_len + 1:
             if (actions is None) or (actions.shape[1] == embeddings.shape[1] - 1):
-                next_actions= self.actor.forward(embeddings[:,-1:])
-                actions = th.cat((actions, next_actions), dim=1)
+                with th.no_grad():
+                    next_actions= self.actor.forward(embeddings[:,-1:])
+                    if actions is not None:
+                        actions = th.cat((actions, next_actions), dim=1)
+                    else:
+                        actions = next_actions
             next_embedding = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]], mask=mask[:sl,:sl])
             embeddings = th.cat((embeddings, next_embedding[:,-1:]), dim=1)
 
-        return embeddings, actions
+        return embeddings[:,:-1], actions
 
-    def optimize_sequence(self, actions:th.Tensor, seq_embeddings:th.Tensor, mask:th.Tensor, goal_label:th.Tensor, steps:int, current_step:int):
-        actions = actions.detach().clone()
-        org_actions = actions.detach().clone()
-
-        actions.requires_grad = True
-        seq_embeddings = seq_embeddings.detach().clone()
-        org_embeddings = seq_embeddings.detach().clone()
-        
-        optimizer = th.optim.Adam([actions], lr=1e-2)
-        opt_paras = optimizer.state_dict()
-        for i in range(steps):
+    def optimize_sequence(self, actions:th.Tensor, seq_embeddings:th.Tensor, pred_mask:th.Tensor, opt_mask:th.Tensor, goal_label:th.Tensor, steps:int, current_step:int):
+        if actions is not None:
             actions = actions.detach().clone()
+            org_actions = actions.detach().clone()
             actions.requires_grad = True
-            optimizer = th.optim.Adam([actions], lr=1e-2)
-            seq_embeddings, seq_actions = self.build_sequence(embeddings=seq_embeddings.detach()[:,:current_step], actions=actions, seq_len=actions.shape[1], mask=mask, detach=False)
+        else:
+            org_actions = None
+
+        seq_embeddings = seq_embeddings.detach().clone()
+        if (actions is None) or actions.shape[1] != seq_embeddings.shape[1]:
+            _, actions = self.build_sequence(embeddings=seq_embeddings.detach()[:,:current_step+1], actions=actions, seq_len=self.args_obj.epoch_len, mask=pred_mask)
+            actions = actions.detach()
+            if self.current_step == 0:
+                self.history.add_value(history=self.history.gen_trj, value=actions.clone())
+            actions.requires_grad = True
+        
+        opt_paras = None
+        for opt_step in range(steps):
+            seq_embeddings, actions = self.build_sequence(embeddings=seq_embeddings.detach()[:,:current_step+1], actions=actions, seq_len=actions.shape[1], mask=pred_mask)
+            optimizer = self.args_obj.optimizer_class([actions], lr=self.args_obj.inference_opt_lr)
             critic_input = self.make_critic_input(embeddings=seq_embeddings, actions=actions)
 
             scores = self.critic.forward(critic_input)
-            optimizer.load_state_dict(opt_paras)
+            self.history.add_value(history=self.history.scores, value=scores.detach().clone(), opt_step=opt_step)
 
-            loss_reward = calcMSE(scores[:, current_step:], goal_label[:, current_step:])
+            if opt_paras is not None:
+                optimizer.load_state_dict(opt_paras)
+            else:
+                opt_paras = optimizer.state_dict()
+            loss_reward = calcMSE(scores[opt_mask], goal_label[opt_mask])
             loss = loss_reward
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             opt_paras = optimizer.state_dict()
-            with th.no_grad():
-                actions[:,:current_step] = org_actions[:,:current_step]
+
+            if org_actions is not None:
+                with th.no_grad():
+                    actions[:,:current_step] = org_actions[:,:current_step]
 
         return loss_reward, actions, seq_embeddings, scores
             
@@ -157,27 +182,23 @@ class ActiveCriticPolicy(BaseModel):
 
         
         if (self.last_goal is None) or (self.args_obj.new_epoch(self.last_goal, vec_obsv)):
+            if (self.last_goal is not None) and (self.args_obj.new_epoch(self.last_goal, vec_obsv)):
+                self.history.add_value(history=self.history.opt_trj, value=self.current_actions)
             self.reset(vec_obsv=vec_obsv)
             self.current_embeddings = embedding
         else:
             self.current_step += 1
             self.current_embeddings = th.cat((self.current_embeddings, embedding), dim=1)
-        
-        next_action = self.actor.forward(embedding)
-        if self.current_actions is None:
-            self.current_actions = next_action
-        else:
-            self.current_actions = th.cat((self.current_actions, next_action), dim=1)
-        
         if self.args_obj.optimize:
-            loss_reward, actions, seq_embeddings     = self.optimize_sequence(
-                                                                            actions=self.current_actions, 
-                                                                            seq_embeddings=self.current_embeddings, 
-                                                                            mask = self.args_obj.mask,
-                                                                            goal_label=self.goal_label,
-                                                                            steps=self.args_obj.opt_steps,
-                                                                            current_step=self.current_step)
-
+            loss_reward, actions, seq_embeddings, scores = self.optimize_sequence(
+                                                    actions=self.current_actions, 
+                                                    seq_embeddings=self.current_embeddings, 
+                                                    pred_mask = self.args_obj.pred_mask,
+                                                    opt_mask = self.args_obj.opt_mask,
+                                                    goal_label=self.goal_label,
+                                                    steps=self.args_obj.opt_steps,
+                                                    current_step=self.current_step)
+        self.current_actions = actions[:,:self.current_step+1]
         return actions[:, self.current_step]
 
     def save_policy(self, add, data_path):
