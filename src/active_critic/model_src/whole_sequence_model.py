@@ -1,4 +1,5 @@
 from abc import ABC, abstractstaticmethod
+from doctest import master
 import typing
 import torch as th
 import torch.nn as nn
@@ -37,11 +38,7 @@ class WholeSequenceModel(nn.Module, ABC):
         return result
 
     def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, prefix='', mask:th.Tensor=None) -> typing.Dict:
-        result = self.forward(inputs=inputs)
-        if mask is not None:
-            loss = self.loss_fct(result=result[mask], label=label[mask])
-        else:
-            loss = self.loss_fct(result=result, label=label)
+        loss = self.calc_loss(inpt=inputs, label=label, mask=mask)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -52,7 +49,8 @@ class WholeSequenceModel(nn.Module, ABC):
 
         return debug_dict
 
-    def loss_fct(self, result:th.Tensor, label:th.Tensor, mask:th.Tensor = None) -> th.Tensor:
+    def calc_loss(self, inpt:th.Tensor, label:th.Tensor, mask:th.Tensor = None) -> th.Tensor:
+        result = self.forward(inputs=inpt)
         if mask is not None:
             loss = calcMSE(result[mask], label[mask])
         else:

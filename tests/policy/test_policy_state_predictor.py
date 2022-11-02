@@ -46,6 +46,7 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 32, device='cpu', hori
     acps.pred_mask = build_tf_horizon_mask(seq_len=seq_len, horizon=horizon, device=device)
     acps.opt_mask = th.zeros([batch_size, seq_len, 1], device=device, dtype=bool)
     acps.opt_mask[:,-1] = 1
+    acps.clip = False
     return acps
 
 def setup_opt_state(device='cpu'):
@@ -169,7 +170,7 @@ class TestPolicy(unittest.TestCase):
         mask = build_tf_horizon_mask(seq_len=seq_len, horizon=horizon, device=device)
         seq_embeddings, na = ac.build_sequence(embeddings=embeddings, actions=actions, seq_len=seq_len, mask=mask)
         org_actions = actions.detach().clone()
-        steps = 1000
+        steps = 100
         current_step = 2
 
         mask = build_tf_horizon_mask(seq_len=seq_len, horizon=horizon, device=device)
@@ -291,9 +292,10 @@ class TestPolicy(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    #unittest.main()
     #to = TestPolicy()
     #to.test_score_history()
     #to.test_actions_grad()
     #to.test_whole_vs_part_seq_optimizer()
     #to.test_optimize_n_step()
+    pass

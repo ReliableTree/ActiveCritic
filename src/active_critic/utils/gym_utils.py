@@ -19,6 +19,10 @@ class DummyExtractor:
     def forward(self, features):
         if type(features) is np.ndarray:
             features = th.tensor(features)
+        if features.dtype is not th.float32:
+            features = features.float()
+        if len(features.shape) == 2:
+            features = features.unsqueeze(1)
         return features
 
 
@@ -99,10 +103,6 @@ class ResetCounterWrapper(gym.Wrapper):
     def step(self, action):
         
         obsv, rew, done, info = super().step(action)
-        if info['success']:
-            done = True
-        else:
-            rew = rew - 5
         return obsv, rew, done, info
 
 def make_vec_env(env_id, num_cpu, seq_len):
@@ -159,7 +159,7 @@ def parse_sampled_transitions_legacy(transitions, new_epoch, extractor, seq_len,
     rewards = th.tensor(fill_arrays(rewards, seq_len = seq_len), dtype=th.float, device=device)
     return actions, observations, rewards
 
-def parse_sampled_transitions(transitions, extractor, seq_len, device='cuda'):
+def parse_sampled_transitions(transitions, extractor, device='cuda'):
     observations = []
     actions = []
     rewards = []
@@ -184,9 +184,9 @@ def parse_sampled_transitions(transitions, extractor, seq_len, device='cuda'):
             epch_rewards = []
 
 
-    actions = th.tensor(fill_arrays(actions, seq_len = seq_len), dtype=th.float, device=device)
-    observations = th.tensor(fill_arrays(observations, seq_len = seq_len), dtype=th.float, device=device)
-    rewards = th.tensor(fill_arrays(rewards, seq_len = seq_len), dtype=th.float, device=device)
+    actions = th.tensor(actions, dtype=th.float, device=device)
+    observations = th.tensor(observations, dtype=th.float, device=device)
+    rewards = th.tensor(rewards, dtype=th.float, device=device)
     return actions, observations, rewards
 
 def fill_arrays(inpt, seq_len):
@@ -220,10 +220,10 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:
         seq_len = policy.args_obj.epoch_len
         transitions = sample_expert_transitions(
             policy.predict, env, episodes)
-        expected_rewards_after = policy.history.opt_scores[0]
-        expected_rewards_before = policy.history.gen_scores[0]
+        expected_rewards_after = policy.history.scores[0][:,-1]
+        expected_rewards_before = policy.history.scores[0][:, 0]
         datas = parse_sampled_transitions(
-            transitions=transitions, seq_len=seq_len, extractor=policy.args_obj.extractor, device=device)
+            transitions=transitions, extractor=policy.args_obj.extractor, device=device)
         device_data = []
         for data in datas:
             device_data.append(data[:episodes].to(policy.args_obj.device))

@@ -159,7 +159,7 @@ class TestLerner(unittest.TestCase):
             dobsv, dact, drews = data
             for epoch in range(dobsv.shape[0]):
                 predicted_actions = []
-                acl.policy.reset()
+                acl.policy.reset_epoch()
                 if th.count_nonzero(dobsv[epoch][:,-3:]) == th.numel(dobsv[epoch][:,-3:]):
                     for step in range(dobsv.shape[1]):
                         action = acl.policy.predict(observation=dobsv[epoch, step].unsqueeze(0))
@@ -183,7 +183,7 @@ class TestLerner(unittest.TestCase):
             dobsv, dact, drews = data
             for epoch in range(dobsv.shape[0]):
                 predicted_actions = []
-                acl.policy.reset()
+                acl.policy.reset_epoch()
                 if th.count_nonzero(dobsv[epoch][:,-3:]) == th.numel(dobsv[epoch][:,-3:]):
                     for step in range(dobsv.shape[1]):
                         action = acl.policy.predict(observation=dobsv[epoch, step].unsqueeze(0))

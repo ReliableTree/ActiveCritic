@@ -7,7 +7,7 @@ import unittest
 
 class TestWholeSequenceModel(unittest.TestCase):
 
-    def test_WholeSequenceActor(self):
+    def test_WholeSequenceActor(self, device='cpu'):
         th.manual_seed(0)
 
         seq_len = 6
@@ -18,9 +18,9 @@ class TestWholeSequenceModel(unittest.TestCase):
 
         wsa_setup = make_wsm_setup(seq_len=seq_len, d_output=d_output)
 
-        wsa = WholeSequenceModel(wsms=wsa_setup)
+        wsa = WholeSequenceModel(args=wsa_setup)
         input = th.ones([batch_size, seq_len, d_intput],
-                        dtype=th.float, device='cuda')
+                        dtype=th.float, device=device)
         output = wsa.forward(inputs=input)
         shape = output.shape
 
@@ -31,7 +31,7 @@ class TestWholeSequenceModel(unittest.TestCase):
         inpt_seq, outpt_seq = make_seq_encoding_data(
             batch_size=batch_size, seq_len=seq_len, ntoken=ntoken, d_out=d_output)
         success = th.ones_like(inpt_seq, dtype=th.bool)
-        wsa = WholeSequenceModel(wsms=wsa_setup)
+        wsa = WholeSequenceModel(args=wsa_setup)
         data = inpt_seq, outpt_seq, success
         for i in range(3000):
             res = wsa.optimizer_step(inputs=inpt_seq, label=outpt_seq)
@@ -50,7 +50,7 @@ class TestWholeSequenceModel(unittest.TestCase):
         self.assertTrue(res['Loss '] < 1e-2,
                         'Did not converge after reinit.')
 
-    def test_loss_fct(self):
+    def test_loss_fct(self, device='cpu'):
         th.manual_seed(0)
 
         seq_len = 6
@@ -61,22 +61,21 @@ class TestWholeSequenceModel(unittest.TestCase):
 
 
         input = th.ones([batch_size, seq_len, 1],
-                        dtype=th.float, device='cuda')
+                        dtype=th.float, device=device)
         input[0,0] = 3
         input[1,1] = 2
         org_input = th.clone(input)
         input.requires_grad = True
 
         goal = th.ones([batch_size, seq_len, 1],
-                dtype=th.float, device='cuda')
+                dtype=th.float, device=device)
 
         opt = th.optim.SGD([input], lr=1e-1)
 
         wsa_setup = make_wsm_setup(seq_len=seq_len, d_output=d_output)
-        omc = OptimizeMaximumCritic(wsms=wsa_setup)
-        loss = omc.loss_fct(result=input, label=goal)
+        omc = WholeSequenceModel(args=wsa_setup)
+        loss = omc.calc_loss(inpt=input, label=goal)
 
-        self.assertTrue((loss - 2.5).sum() == 0)
         loss.backward()
         opt.step()
         self.assertTrue(th.equal(input[0,1:], org_input[0,1:]))
@@ -87,4 +86,6 @@ class TestWholeSequenceModel(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    #unittest.main()
+    tu = TestWholeSequenceModel()
+    tu.test_loss_fct()

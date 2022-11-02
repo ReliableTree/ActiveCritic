@@ -12,13 +12,13 @@ from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env
 from active_critic.utils.pytorch_utils import generate_square_subsequent_mask
 
 
-def make_seq_encoding_data(batch_size, seq_len, ntoken, d_out, device = 'cuda'):
+def make_seq_encoding_data(batch_size, seq_len, ntoken, d_out, device = 'cpu'):
     inpt_seq = th.ones([batch_size,seq_len,ntoken], dtype=th.float, device=device)
     outpt_seq = th.ones([batch_size,seq_len,d_out], dtype=th.float, device=device)
     outpt_seq[:,::2] = 0
     return inpt_seq, outpt_seq
 
-def make_mask_data(batch_size, seq_len, ntoken, device = 'cuda'):
+def make_mask_data(batch_size, seq_len, ntoken, device = 'cpu'):
     mask = generate_square_subsequent_mask(seq_len).to(device)
     inpt_seq = th.ones([batch_size,seq_len,ntoken], dtype=th.float, device=device)
     inpt_seq[0,-1,0] = 0
@@ -26,14 +26,14 @@ def make_mask_data(batch_size, seq_len, ntoken, device = 'cuda'):
     outpt_seq[0] = 0
     return inpt_seq, outpt_seq, mask
 
-def make_critic_data(batch_size, seq_len, ntoken, device = 'cuda'):
+def make_critic_data(batch_size, seq_len, ntoken, device = 'cpu'):
     inpt_seq = th.ones([batch_size,seq_len,ntoken], dtype=th.float, device=device)
     inpt_seq[0,-1,0] = 0
     outpt_seq = th.ones([batch_size,1], dtype=th.float, device=device)
     outpt_seq[0] = 0
     return inpt_seq, outpt_seq
 
-def make_policy_obs_action(seq_len, ntoken, d_out, diff_ele, device = 'cuda'):
+def make_policy_obs_action(seq_len, ntoken, d_out, diff_ele, device = 'cpu'):
     o1 = th.zeros([1, seq_len, ntoken], dtype=th.float, device=device)
     o2 = th.zeros_like(o1)
     o2[0, diff_ele] = 1
@@ -46,7 +46,7 @@ def make_policy_obs_action(seq_len, ntoken, d_out, diff_ele, device = 'cuda'):
     
     return o, a
 
-def make_wsm_setup(seq_len, d_output, device='cuda'):
+def make_wsm_setup(seq_len, d_output, device='cpu'):
     wsm = WholeSequenceModelArgs()
     wsm.model_setup = ModelSetup()
     seq_len = seq_len
@@ -76,7 +76,7 @@ def make_obs_act_space(obs_dim, action_dim):
         np.array(action_low), np.array(action_high), (action_dim,), float)
     return observation_space, action_space
 
-def make_acps(seq_len, extractor, new_epoch, batch_size = 32, device='cuda'):
+def make_acps(seq_len, extractor, new_epoch, batch_size = 32, device='cpu'):
     acps = ActiveCriticPolicySetup()
     acps.device=device
     acps.epoch_len=seq_len
@@ -91,7 +91,7 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 32, device='cuda'):
     acps.stop_opt = False
     return acps
 
-def setup_ac_reach(seq_len = 5, device='cuda'):
+def setup_ac_reach(seq_len = 5, device='cpu'):
     seq_len = seq_len
     env, gt_policy = make_dummy_vec_env('reach', seq_len=seq_len)
     d_output = env.action_space.shape[0]

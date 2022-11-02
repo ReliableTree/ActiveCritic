@@ -20,7 +20,7 @@ def plot_attention(model_path):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device='cuda')
     acl.loadNetworkFromFile(path = model_path, device=device)
     acl.policy.eval()
-    acl.policy.reset()
+    acl.policy.reset_epoch()
     obs = env.reset()
     for i in range(40):
         actions = acl.policy.predict(obs)

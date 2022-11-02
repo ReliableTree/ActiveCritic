@@ -39,10 +39,7 @@ class StateModel(nn.Module):
             self.is_init = True
         return self.model.forward(inpt)
 
-    def optimizer_step(self, inpt, label):
-        result = self.model.forward(inpt=inpt)
+    def calc_loss(self, inpt, label):
+        result = self.forward(inpt=inpt)
         loss = calcMSE(result, label)
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-        return {'Loss ':loss.detach()}
+        return loss

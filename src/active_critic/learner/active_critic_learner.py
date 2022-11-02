@@ -53,6 +53,7 @@ class ActiveCriticLearner(nn.Module):
         self.logname = network_args_obj.logname
 
         self.scores = ACLScores()
+        self.training_samples = 0
 
         if network_args_obj.tboard:
             self.tboard = TBoardGraphs(
@@ -69,43 +70,55 @@ class ActiveCriticLearner(nn.Module):
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
     def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor):
-        acts, obsv, rews = make_part_obs_data(
-            actions=actions, observations=observations, rewards=rewards)
-        self.train_data.add_data(obsv=obsv.to(
-            'cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
+        self.train_data.add_data(obsv=observations, actions=actions, reward=rewards)
         self.train_loader = DataLoader(
             dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
-    def actor_step(self, data, loss_actor):
+    def model_step(self, data, losses):
         obsv, actions, reward = data
-        actor_input = self.policy.get_actor_input(
-            obs=obsv, actions=actions, rew=reward)
-        mask = get_rew_mask(reward)
-        debug_dict = self.policy.actor.optimizer_step(
-            inputs=actor_input, label=actions, mask=mask)
-        if loss_actor is None:
-            loss_actor = debug_dict['Loss '].unsqueeze(0)
-        else:
-            loss_actor = th.cat(
-                (loss_actor, debug_dict['Loss '].unsqueeze(0)), dim=0)
-        return loss_actor
+        embeddings = self.policy.emitter.forward(obsv)
 
-    def critic_step(self, data, loss_critic):
-        obsv, actions, reward = data
-        critic_inpt = self.policy.get_critic_input(acts=actions, obs_seq=obsv)
-        mask = get_rew_mask(reward)
+        actor_input = self.policy.get_actor_input(embeddings=embeddings, final_reward=reward)
+        loss_actor = self.policy.actor.calc_loss(
+            inpt=actor_input, label=actions)
 
-        debug_dict = self.policy.critic.optimizer_step(
-            inputs=critic_inpt, label=reward, mask=mask)
-        if loss_critic is None:
-            loss_critic = debug_dict['Loss '].unsqueeze(0)
+        critic_input = self.policy.get_critic_input(embeddings=embeddings, actions=actions)
+        with th.no_grad():
+            critic_score = self.policy.critic.forward(critic_input)
+        loss_critic = self.policy.critic.calc_loss(inpt=critic_input, label=reward)
+
+        loss_predictor = self.policy.predicor.calc_loss(inpt=critic_input[:,:-1], label=embeddings[:,1:])
+        
+        self.policy.emitter.optimizer.zero_grad()
+        self.policy.actor.optimizer.zero_grad()
+        self.policy.critic.optimizer.zero_grad()
+        self.policy.predicor.optimizer.zero_grad()
+
+        loss = loss_actor + loss_critic + loss_predictor
+        loss.backward()
+
+        self.policy.emitter.optimizer.step()
+        self.policy.actor.optimizer.step()
+        self.policy.critic.optimizer.step()
+        self.policy.predicor.optimizer.step()
+
+        if losses is None:
+            losses = [
+                loss_actor.unsqueeze(0),
+                loss_critic.unsqueeze(0),
+                loss_predictor.unsqueeze(0),
+            ]
         else:
-            loss_critic = th.cat(
-                (loss_critic, debug_dict['Loss '].unsqueeze(0)), dim=0)
-        return loss_critic
+            losses[0] = th.cat((losses[0], loss_actor.unsqueeze(0)), dim=0)
+            losses[1] = th.cat((losses[1], loss_critic.unsqueeze(0)), dim=0)
+            losses[2] = th.cat((losses[2], loss_predictor.unsqueeze(0)), dim=0)
+        return losses
+
 
     def add_training_data(self):
+        self.training_samples += 1
         h = time.perf_counter()
+        self.policy.reset()
         actions, observations, rewards, _, _ = sample_new_episode(
             policy=self.policy,
             env=self.env,
@@ -122,14 +135,13 @@ class ActiveCriticLearner(nn.Module):
             rewards=rewards
         )
 
-    def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic):
+    def train_step(self, train_loader, losses):
         for data in train_loader:
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
-            loss_actor = actor_step(device_data, loss_actor)
-            loss_critic = critic_step(device_data, loss_critic)
-        return loss_actor, loss_critic
+            losses = self.model_step(device_data, losses)
+        return losses
 
     def train(self, epochs):
         next_val = self.network_args.val_every
@@ -140,23 +152,19 @@ class ActiveCriticLearner(nn.Module):
                 self.add_training_data()
 
             self.policy.eval()
-            loss_actor = None
-            loss_critic = None
+            losses = None
             mean_actor = float('inf')
             mean_critic = float('inf')
+            mean_predictor = float('inf')
 
-            while (mean_actor > self.network_args.actor_threshold) or (mean_critic > self.network_args.critic_threshold):
+            while (mean_actor > self.network_args.actor_threshold) \
+                or (mean_critic > self.network_args.critic_threshold)\
+                or (mean_predictor > self.network_args.predictor_threshold):
 
-                loss_actor, loss_critic = self.train_step(
-                    train_loader=self.train_loader,
-                    actor_step=self.actor_step,
-                    critic_step=self.critic_step,
-                    loss_actor=loss_actor,
-                    loss_critic=loss_critic
-                )
-
-                mean_actor = loss_actor.mean()
-                mean_critic = loss_critic.mean()
+                losses = self.train_step(train_loader=self.train_loader, losses=losses)
+                mean_actor = losses[0].mean()
+                mean_critic = losses[1].mean()
+                mean_predictor = losses[2].mean()
 
                 self.scores.update_min_score(
                     self.scores.mean_critic, mean_critic)
@@ -165,19 +173,19 @@ class ActiveCriticLearner(nn.Module):
 
                 debug_dict = {
                     'Loss Actor': mean_actor,
-                    'Loss Critic': mean_critic
+                    'Loss Critic': mean_critic,
+                    'Loss Predictor': mean_predictor
                 }
-                self.write_tboard_scalar(debug_dict=debug_dict, train=True)
+                self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=epoch)
                 self.global_step += len(self.train_data)
-            if epoch >= next_val:
-                next_val = epoch + self.network_args.val_every
+            if self.global_step >= next_val:
+                next_val = self.global_step + self.network_args.val_every
                 if self.network_args.tboard:
-                    self.run_validation()
+                    self.run_validation(step = epoch)
 
     def write_tboard_scalar(self, debug_dict, train, step=None):
         if step is None:
-            step = self.global_step
-        step = int(len(self.train_data) / self.policy.args_obj.epoch_len)
+            step = int(len(self.train_data) / self.policy.args_obj.epoch_len)
 
         if self.network_args.tboard:
             for para, value in debug_dict.items():
@@ -187,7 +195,7 @@ class ActiveCriticLearner(nn.Module):
                 else:
                     self.tboard.addValidationScalar(para, value, step)
 
-    def run_validation(self):
+    def run_validation(self, step = None):
         h = time.perf_counter()
         opt_actions, gen_actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
             policy=self.policy,
@@ -198,21 +206,23 @@ class ActiveCriticLearner(nn.Module):
         debug_dict = {
             'Validation epoch time': th.tensor(time.perf_counter() - h)
         }
-        self.write_tboard_scalar(debug_dict=debug_dict, train=False)
+        self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=step)
 
         for i in range(min(opt_actions.shape[0], 4)):
             self.createGraphs([gen_actions[i], opt_actions[i]], ['Generated Actions ' + str(i), 'Opimized Actions '+str(i)], plot_name='Trajectories')
-            self.createGraphs([rewards[i], self.policy.history.opt_scores[0][i], self.policy.history.gen_scores[0][i]], 
+            self.createGraphs([rewards[i], self.policy.history.scores[0][i, -1], self.policy.history.scores[0][i, 0]], 
                                 ['GT Reward ' + str(i), 'Expected Optimized Reward '+str(i), 'Expected Generated Reward '+str(i)], plot_name='Rewards')
 
-        last_reward, _ = rewards.max(dim=1)
+
+
+        last_reward = rewards[:,-1]
         best_model = self.scores.update_max_score(
             self.scores.mean_reward, last_reward.mean())
         if best_model:
             self.saveNetworkToFile(add='best_validation', data_path=os.path.join(
                 self.network_args.data_path, self.logname))
-        last_expected_rewards_before, _ = expected_rewards_before.max(dim=1)
-        last_expected_reward_after, _ = expected_rewards_after.max(dim=1)
+        last_expected_rewards_before = expected_rewards_before[:,-1]
+        last_expected_reward_after = expected_rewards_after[:,-1]
         self.analyze_critic_scores(
             last_reward, last_expected_rewards_before, '')
         self.analyze_critic_scores(
@@ -227,8 +237,8 @@ class ActiveCriticLearner(nn.Module):
         print(f'Success Rate: {success.mean()}')
         print(f'Reward: {last_reward.mean()}')
         print(
-            f'training samples: {int(len(self.train_data) / self.policy.args_obj.epoch_len)}')
-        self.write_tboard_scalar(debug_dict=debug_dict, train=False)
+            f'training samples: {self.training_samples}')
+        self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=step)
 
 
     def analyze_critic_scores(self, reward: th.Tensor, expected_reward: th.Tensor, add: str):
@@ -243,7 +253,6 @@ class ActiveCriticLearner(nn.Module):
         expected_fail_float = expected_fail.type(th.float)
         fail_float = fail.type(th.float).reshape(-1)
         success_float = success.type(th.float).reshape(-1)
-
         tp = (expected_success_float * success_float)[success == 1].mean()
         if success_float.sum() == 0:
             tp = th.tensor(0)

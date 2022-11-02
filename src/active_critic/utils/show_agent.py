@@ -31,7 +31,7 @@ def show_agent(model_path):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device='cuda')
     acl.loadNetworkFromFile(path = model_path, device=device)
     acl.policy.eval()
-    acl.policy.reset()
+    acl.policy.reset_epoch()
     env = make_env('reach', 100)
     
     obs = env.reset()

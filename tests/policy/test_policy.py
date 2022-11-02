@@ -240,7 +240,7 @@ class TestPolicy(unittest.TestCase):
         acps.inference_opt_lr = 1
         observation = th.ones([batch_size, 1, obs_dim])
         action = ac.predict(observation=observation)
-        self.assertTrue(th.all((ac.history.scores[0][:,1:,-1] - ac.history.scores[0][:,:-1,-1]) >= 0), 'Scores are not monotonically increasing.')
+        self.assertTrue(th.all((ac.history.scores[0][:,-1,-1] - ac.history.scores[0][:,0,-1]) >= 0), 'Scores are not increasing.')
 
     def test_history_shape(self):
         th.manual_seed(0)
@@ -294,7 +294,7 @@ class TestPolicy(unittest.TestCase):
 if __name__ == '__main__':
     #unittest.main()
     to = TestPolicy()
-    to.test_actions_grad()
+    #to.test_actions_grad()
     #to.test_history_shape()
     #to.test_whole_vs_part_seq_optimizer()
-    #to.test_optimize_n_step()
+    to.test_optimize_n_step()

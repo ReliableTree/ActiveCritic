@@ -1,4 +1,5 @@
 from abc import ABC, abstractstaticmethod
+from tkinter.messagebox import NO
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import torch as th
 
@@ -18,4 +19,5 @@ class ActiveCriticLearnerArgs:
         self.add_data_every:int = None
         self.actor_threshold:float = None
         self.critic_threshold:float = None
+        self.predictor_threshold:float = None
         self.num_cpu:int = None
