@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 from hashids import Hashids
 import os
-import torch as th
+import math
 
 class TBoardGraphs():
     def __init__(self, logname= None, data_path = None):
@@ -15,7 +15,7 @@ class TBoardGraphs():
             self.__tboard_train      = tf.summary.create_file_writer(self.logdir + "train/")
             self.__tboard_validation = tf.summary.create_file_writer(self.logdir + "validate/")
             #self.voice               = Voice(path=data_path)
-        self.fig, self.ax = plt.subplots(2,2)
+        self.fig_dict = {}
         self.legend = None
 
     def startDebugger(self):
@@ -52,21 +52,40 @@ class TBoardGraphs():
             return inpt
 
     def plot_graph(self, trjs:list([np.array]), trj_names:list([str]), trj_colors:list([str]), plot_name:str, step:int):
-        fig, ax = self.fig, self.ax
+        dim = trjs[0].shape[-1]
+        columns = min(math.ceil(math.sqrt(dim)), 3)
+        rows = math.ceil(dim/columns)
 
-        for sp in range(4):
-            idx = sp // 2
-            idy = sp  % 2
-            ax[idx, idy].clear()
+        if dim not in self.fig_dict:
+            self.fig_dict[dim] = plt.subplots(rows, columns)
+
+        fig, ax = self.fig_dict[dim]
+
+        for sp in range(dim):
+            idx = sp  % columns
+            idy = sp // columns
+            if rows > 1:
+                ax[idy, idx].clear()
+            elif dim > 1:
+                ax[idy].clear()
+            else:
+                ax.clear()
         
         for sp in range(trjs[0].shape[-1]):
-            idx = sp // 2
-            idy = sp  % 2
-            
+
+            idx = sp  % columns
+            idy = sp // columns
+
             ls = []
 
             for trj_num in range(len(trjs)):
-                l, = ax[idx, idy].plot(range(trjs[trj_num].shape[0]), trjs[trj_num][:,sp], color=trj_colors[trj_num], label=trj_names[trj_num])
+                if rows > 1:
+                    l, = ax[idy, idx].plot(range(trjs[trj_num].shape[0]), trjs[trj_num][:,sp], color=trj_colors[trj_num], label=trj_names[trj_num])
+                elif dim > 1:
+                    l, = ax[idy].plot(range(trjs[trj_num].shape[0]), trjs[trj_num][:,sp], color=trj_colors[trj_num], label=trj_names[trj_num])
+                else:
+                    l, = ax.plot(range(trjs[trj_num].shape[0]), trjs[trj_num][:,sp], color=trj_colors[trj_num], label=trj_names[trj_num])
+
                 ls.append(l)
 
         if self.legend is not None:

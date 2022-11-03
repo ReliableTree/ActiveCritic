@@ -49,6 +49,8 @@ class ActiveCriticPolicyHistory:
         self.scores = []
         self.gen_trj = []
         self.opt_trj = []
+        self.pred_emb = []
+        self.act_emb = []
 
 
     def new_epoch(self, history:list([th.Tensor]), size:list([int, int, int, int]), device:str): #batch size, opt step, seq len, score
@@ -59,12 +61,13 @@ class ActiveCriticPolicyHistory:
             history[0] = th.cat((history[0], new_field), dim=0)
 
 
-    def add_value(self, history:list([th.Tensor]), value:th.Tensor, opt_step:int=0, step:int=0):
+    def add_value(self, history:list([th.Tensor]), value:th.Tensor, opt_step:int=0, step:int=None):
         if len(history[0].shape) == 4: #including opt step history
             history[0][-value.shape[0]:, opt_step, step] = value[:,step]
-        else:
+        elif step is None:
             history[0][-value.shape[0]:] = value
-
+        else:
+            history[0][-value.shape[0]:, step:step+1] = value
 
 
 class ActiveCriticPolicy(BaseModel):
@@ -102,9 +105,13 @@ class ActiveCriticPolicy(BaseModel):
         self.last_goal = vec_obsv[:,0,-3:]
         self.goal_label = th.ones([vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.args.arch[-1]])
         self.final_reward = th.ones([vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.args.arch[-1]])
+        
         self.history.new_epoch(history=self.history.opt_trj, size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
         self.history.new_epoch(history=self.history.gen_trj, size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
         self.history.new_epoch(history=self.history.scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps, self.args_obj.epoch_len, self.critic.args.arch[-1]], device=self.args_obj.device)
+        self.history.new_epoch(history=self.history.pred_emb, size=[vec_obsv.shape[0], self.args_obj.epoch_len -1, self.emitter.args.arch[-1]], device=self.args_obj.device)
+        self.history.new_epoch(history=self.history.act_emb, size=[vec_obsv.shape[0], self.args_obj.epoch_len -1, self.emitter.args.arch[-1]], device=self.args_obj.device)
+        
         self.current_embeddings = vec_obsv
         self.current_actions = None
         
@@ -217,6 +224,14 @@ class ActiveCriticPolicy(BaseModel):
                                                     goal_label=self.goal_label,
                                                     steps=self.args_obj.opt_steps,
                                                     current_step=self.current_step)
+        if self.current_step == 0:
+            self.history.add_value(self.history.pred_emb, seq_embeddings[:,self.current_step+1:self.current_step+2], step=self.current_step)
+        elif self.current_step == self.args_obj.epoch_len - 1:
+            self.history.add_value(self.history.act_emb, seq_embeddings[:,self.current_step:self.current_step+1], step=self.current_step - 1)
+        else:
+            self.history.add_value(self.history.pred_emb, seq_embeddings[:,self.current_step+1:self.current_step+2], step=self.current_step)
+            self.history.add_value(self.history.act_emb, seq_embeddings[:,self.current_step:self.current_step+1], step=self.current_step - 1)
+
         self.current_actions = actions[:,:self.current_step+1]
         return actions.cpu().numpy()[:, self.current_step]
 

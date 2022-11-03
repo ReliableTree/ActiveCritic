@@ -212,6 +212,10 @@ class ActiveCriticLearner(nn.Module):
             self.createGraphs([gen_actions[i], opt_actions[i]], ['Generated Actions ' + str(i), 'Opimized Actions '+str(i)], plot_name='Trajectories')
             self.createGraphs([rewards[i], self.policy.history.scores[0][i, -1], self.policy.history.scores[0][i, 0]], 
                                 ['GT Reward ' + str(i), 'Expected Optimized Reward '+str(i), 'Expected Generated Reward '+str(i)], plot_name='Rewards')
+            act_embedding = self.policy.history.act_emb[0][i]
+            pred_embedding = self.policy.history.pred_emb[0][i]
+            
+            self.createGraphs([act_embedding, pred_embedding], ['Actual Embedding ' + str(i), 'Predicted Embedding '+str(i)], plot_name='Embeddings')
 
 
 
