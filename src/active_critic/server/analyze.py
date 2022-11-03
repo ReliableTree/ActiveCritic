@@ -84,28 +84,28 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
 def make_acl(device):
     device = device
     acla = ActiveCriticLearnerArgs()
-    acla.data_path = '/home/hendrik/Documents/master_project/LokalData/TransformerImitationLearning/'
-    #acla.data_path = '/data/bing/hendrik/'
+    #acla.data_path = '/home/hendrik/Documents/master_project/LokalData/TransformerImitationLearning/'
+    acla.data_path = '/data/bing/hendrik/'
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
     acla.logname = 'reach_plot_predictive_embedding'
     acla.tboard = True
     acla.batch_size = 32
-    acla.validation_episodes = 1
+    acla.validation_episodes = 50
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
     acla.predictor_threshold = 1e-2
-    acla.num_cpu = 2
+    acla.num_cpu = 25
 
     batch_size = 32
-    seq_len = 2
+    seq_len = 100
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=batch_size, seq_len=seq_len)
     
-    acps.opt_steps = 1
-    acla.val_every = 1
-    acla.add_data_every = 1
+    acps.opt_steps = 20
+    acla.val_every = 500
+    acla.add_data_every = 50
 
     
 
