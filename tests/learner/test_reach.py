@@ -25,7 +25,7 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 2, device='cpu', horiz
     acps.epoch_len=seq_len
     acps.extractor=extractor
     acps.new_epoch=new_epoch
-    acps.opt_steps=100
+    acps.opt_steps=1
     acps.inference_opt_lr = 1e-1
     acps.optimizer_class = th.optim.Adam
     acps.optimize = True
@@ -33,12 +33,14 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 2, device='cpu', horiz
     acps.pred_mask = build_tf_horizon_mask(seq_len=seq_len, horizon=horizon, device=device)
     acps.opt_mask = th.zeros([seq_len, 1], device=device, dtype=bool)
     acps.opt_mask[:,-1] = 1
+    acps.opt_goal = True
     return acps
 
 def setup_opt_state(batch_size, seq_len, device='cpu'):
-    num_cpu = 2
+    num_cpu = 1
     env, expert = make_vec_env('reach', num_cpu, seq_len=seq_len)
-    embed_dim = 10
+    d_output = env.action_space.shape[0]
+    embed_dim = 20
     lr = 1e-3
 
     actor_args = StateModelArgs()
@@ -52,6 +54,12 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
     critic_args.device = device
     critic_args.lr = lr
     critic = StateModel(args=critic_args)
+
+    inv_critic_args = StateModelArgs()
+    inv_critic_args.arch = [20, embed_dim + env.action_space.shape[0]]
+    inv_critic_args.device = device
+    inv_critic_args.lr = lr
+    inv_critic = StateModel(args=inv_critic_args)
 
     emitter_args = StateModelArgs()
     emitter_args.arch = [20, embed_dim]
@@ -68,13 +76,14 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
 
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device, batch_size=batch_size)
-    acps.opt_steps = 2
+    acps.clip = True
     ac = ActiveCriticPolicy(observation_space=env.observation_space, 
                             action_space=env.action_space,
                             actor=actor,
                             critic=critic,
                             predictor=predictor,
                             emitter=emitter,
+                            inverse_critic=inv_critic,
                             acps=acps)
     return ac, acps, batch_size, seq_len, env, expert
 
@@ -86,30 +95,33 @@ def make_acl():
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'reach_opt_last'
+    acla.logname = 'reach_plot_embedding'
     acla.tboard = True
     acla.batch_size = 32
-    acla.val_every = 10
-    acla.add_data_every = 1
-    acla.validation_episodes = 10
+    acla.validation_episodes = 1
     acla.training_epsiodes = 1
-    acla.actor_threshold = 5e-2
-    acla.critic_threshold = 5e-2
-    acla.predictor_threshold = 5e-2
+    acla.actor_threshold = 1e-2
+    acla.critic_threshold = 1e-2
+    acla.predictor_threshold = 1e-2
     acla.num_cpu = 1
 
     batch_size = 2
-    seq_len = 10
-    epsiodes = 30
+    seq_len = 5
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=batch_size, seq_len=seq_len)
+    
+    acps.opt_steps = 2
+    acla.val_every = 1
+    acla.add_data_every = 1
+
+    
+
     eval_env, expert = make_vec_env('reach', num_cpu=acla.num_cpu, seq_len=seq_len)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
-    return acl, env, expert, seq_len, epsiodes, device
-
+    return acl, env, expert, seq_len, device
 
 if __name__ == '__main__':
-    acl, env, expert, seq_len, epsiodes, device = make_acl()
+    acl, env, expert, seq_len, device = make_acl()
 
     obsv = env.reset()
-    action = acl.policy.predict(obsv)
-    obsv = env.step(actions = action)
+    acl.policy.reset()
+    acl.policy.predict(observation=obsv)

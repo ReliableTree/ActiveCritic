@@ -82,7 +82,7 @@ class ActiveCriticPolicy(BaseModel):
         critic: StateModel,
         predictor: Union[WholeSequenceModel, StateModel],
         emitter: StateModel,
-        inverse_critic: StateModel=None
+        inverse_critic: StateModel
     ):
 
         super().__init__(observation_space, action_space)
@@ -138,7 +138,8 @@ class ActiveCriticPolicy(BaseModel):
     def get_actor_input(self, embeddings:th.Tensor, goal_emb_acts:th.Tensor):
         #embessings = [batch, seq, emb]
         #goal_embeddings = [batch, 1]
-        return th.cat((embeddings, goal_emb_acts[:,None]), dim=-1)
+        goal_emb_acts = goal_emb_acts.unsqueeze(1).repeat([1, embeddings.shape[1], 1])
+        return th.cat((embeddings, goal_emb_acts), dim=-1)
 
 
     def get_inverse_critic_input(self, goal_state:th.Tensor, goal_scores:th.Tensor):
@@ -189,6 +190,7 @@ class ActiveCriticPolicy(BaseModel):
             goal_state=goal_state,
             lr=lr,
             opt_steps=opt_steps)
+
         goal_emb_act = self.project_embeddings(embeddings=goal_emb_act, goal_state=goal_state)
         goal_emb_act = self.clip_actions(emb_acts=goal_emb_act)
         return goal_emb_act.detach()
@@ -294,7 +296,6 @@ class ActiveCriticPolicy(BaseModel):
 
             optimizer = optimizer_class([actions], lr=lr)
             critic_inpt = self.get_predictor_input(embeddings=seq_embeddings, actions=actions)
-            
             scores = self.critic.forward(critic_inpt)
             self.history.add_value(history=self.history.scores, value=scores.detach().clone(), opt_step=opt_step, step=current_step)
 
