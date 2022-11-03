@@ -8,10 +8,9 @@ from active_critic.utils.dataset import DatasetAC
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from active_critic.utils.dataset import DatasetAC
-from active_critic.model_src.whole_sequence_model import (
-    WholeSequenceModelSetup, WholeSequenceModel)
+from active_critic.model_src.whole_sequence_model import (WholeSequenceModel)
 from active_critic.model_src.transformer import (
-    ModelSetup, generate_square_subsequent_mask)
+    ModelSetup)
 from active_critic.policy.active_critic_policy import ActiveCriticPolicySetup, ActiveCriticPolicy
 import argparse
 

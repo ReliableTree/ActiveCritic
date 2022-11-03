@@ -12,7 +12,6 @@ from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
 import pickle
-
 from torch.functional import Tensor
 
 class ACPOptResult:
@@ -106,7 +105,7 @@ class ActiveCriticPolicy(BaseModel):
     def reset_epoch(self, vec_obsv:th.Tensor):
         self.current_step = 0
         self.last_goal = vec_obsv[:,0,-3:]
-        self.goal_label = th.ones([vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.args.arch[-1]])
+        self.goal_label = th.ones([vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.args.arch[-1]], device=self.args_obj.device)
 
         
         self.history.new_epoch(history=self.history.opt_trj, size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
@@ -126,7 +125,7 @@ class ActiveCriticPolicy(BaseModel):
         else:
             #TODO
             #Generalize goal embeddings for whole sequence actor.
-            self.goal_emb_acts = th.ones([vec_obsv.shape[0], 1, self.critic.args.arch[-1]])
+            self.goal_emb_acts = th.ones([vec_obsv.shape[0], 1, self.critic.args.arch[-1]], device=self.args_obj.device)
 
         self.current_embeddings = vec_obsv
         self.current_actions = None
