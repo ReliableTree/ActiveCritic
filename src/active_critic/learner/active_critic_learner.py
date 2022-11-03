@@ -78,11 +78,11 @@ class ActiveCriticLearner(nn.Module):
         obsv, actions, reward = data
         embeddings = self.policy.emitter.forward(obsv)
 
-        actor_input = self.policy.get_actor_input(embeddings=embeddings, final_reward=reward)
+        actor_input = self.policy.get_actor_input(embeddings=embeddings, goal_emb_acts=reward)
         loss_actor = self.policy.actor.calc_loss(
             inpt=actor_input, label=actions)
 
-        critic_input = self.policy.get_critic_input(embeddings=embeddings, actions=actions)
+        critic_input = self.policy.get_predictor_input(embeddings=embeddings, actions=actions)
         with th.no_grad():
             critic_score = self.policy.critic.forward(critic_input)
         loss_critic = self.policy.critic.calc_loss(inpt=critic_input, label=reward)

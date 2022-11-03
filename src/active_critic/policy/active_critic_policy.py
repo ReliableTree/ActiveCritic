@@ -7,7 +7,7 @@ from active_critic.model_src.state_model import StateModel
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel
-from active_critic.utils.pytorch_utils import get_seq_end_mask, make_partially_observed_seq, calcMSE
+from active_critic.utils.pytorch_utils import calcMSE
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -37,6 +37,7 @@ class ActiveCriticPolicySetup:
         self.batch_size: int = None
         self.pred_mask:th.Tensor = None,
         self.opt_mask:th.Tensor=None,
+        self.opt_goal:th.Tensor=None,
         self.clip:bool = True
 
 
@@ -47,6 +48,7 @@ class ActiveCriticPolicyHistory:
 
     def reset(self):
         self.scores = []
+        self.goal_scores = []
         self.gen_trj = []
         self.opt_trj = []
         self.pred_emb = []
@@ -73,13 +75,14 @@ class ActiveCriticPolicyHistory:
 class ActiveCriticPolicy(BaseModel):
     def __init__(
         self,
+        acps: ActiveCriticPolicySetup,
         observation_space,
         action_space,
         actor: StateModel,
         critic: StateModel,
         predictor: Union[WholeSequenceModel, StateModel],
         emitter: StateModel,
-        acps: ActiveCriticPolicySetup = None
+        inverse_critic: StateModel=None
     ):
 
         super().__init__(observation_space, action_space)
@@ -89,6 +92,7 @@ class ActiveCriticPolicy(BaseModel):
         self.predicor = predictor
         self.emitter = emitter
         self.args_obj = acps
+        self.inverse_critic = inverse_critic
 
         self.clip_min = th.tensor(self.action_space.low, device=acps.device, dtype=th.float32)
         self.clip_max = th.tensor(self.action_space.high, device=acps.device, dtype=th.float32)
@@ -100,43 +104,129 @@ class ActiveCriticPolicy(BaseModel):
         self.last_goal = None
 
     def reset_epoch(self, vec_obsv:th.Tensor):
-
         self.current_step = 0
         self.last_goal = vec_obsv[:,0,-3:]
         self.goal_label = th.ones([vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.args.arch[-1]])
-        self.final_reward = th.ones([vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.args.arch[-1]])
+
         
         self.history.new_epoch(history=self.history.opt_trj, size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
         self.history.new_epoch(history=self.history.gen_trj, size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
         self.history.new_epoch(history=self.history.scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps, self.args_obj.epoch_len, self.critic.args.arch[-1]], device=self.args_obj.device)
         self.history.new_epoch(history=self.history.pred_emb, size=[vec_obsv.shape[0], self.args_obj.epoch_len -1, self.emitter.args.arch[-1]], device=self.args_obj.device)
         self.history.new_epoch(history=self.history.act_emb, size=[vec_obsv.shape[0], self.args_obj.epoch_len -1, self.emitter.args.arch[-1]], device=self.args_obj.device)
-        
+        self.history.new_epoch(history=self.history.goal_scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps, self.critic.args.arch[-1]], device=self.args_obj.device)
+
+        if self.optimize_goal_emb_acts:
+            self.goal_emb_acts = self.get_goal_emb_act(
+                goal_state=self.last_goal,
+                goal_label=self.goal_label,
+                lr=self.args_obj.inference_opt_lr,
+                opt_steps=self.args_obj.opt_steps
+            )
+        else:
+            #TODO
+            #Generalize goal embeddings for whole sequence actor.
+            self.goal_emb_acts = th.ones([vec_obsv.shape[0], 1, self.critic.args.arch[-1]])
+
         self.current_embeddings = vec_obsv
         self.current_actions = None
         
-    def get_critic_input(self, embeddings:th.Tensor, actions:th.Tensor):
+    def get_predictor_input(self, embeddings:th.Tensor, actions:th.Tensor):
         input = th.cat((embeddings, actions), dim=-1)
         return input
 
-    def get_actor_input(self, embeddings:th.Tensor, final_reward:th.Tensor):
+    def get_actor_input(self, embeddings:th.Tensor, goal_emb_acts:th.Tensor):
         #embessings = [batch, seq, emb]
-        #goal_label = [batch, seq, 1]
-        return th.cat((embeddings, final_reward), dim=-1)
+        #goal_embeddings = [batch, 1]
+        return th.cat((embeddings, goal_emb_acts[:,None]), dim=-1)
+
+
+    def get_inverse_critic_input(self, goal_state:th.Tensor, goal_scores:th.Tensor):
+        return th.cat((goal_state, goal_scores), dim=-1)
+
 
     def predict_step(self, embeddings:th.Tensor, actions:th.Tensor, mask:th.Tensor = None):
-        predictor_input = self.get_critic_input(embeddings=embeddings, actions=actions)
+        predictor_input = self.get_predictor_input(embeddings=embeddings, actions=actions)
         if type(self.predicor) is WholeSequenceModel:
             next_embeddings = self.predicor.forward(predictor_input, tf_mask=mask)
         else:
             next_embeddings = self.predicor.forward(predictor_input)
         return next_embeddings
 
-    def build_sequence(self, embeddings:th.Tensor, actions:th.Tensor, seq_len:int, mask:th.Tensor):
+    def project_embeddings(self, embeddings:th.Tensor, goal_state:th.Tensor):
+        if goal_state is not None:
+            if len(embeddings.shape) == 3:
+                with th.no_grad():
+                    embeddings[:,:,:goal_state.shape[-1]] = goal_state[:, None]
+            else:
+                with th.no_grad():
+                    embeddings[:,:goal_state.shape[-1]] = goal_state    
+        return embeddings
+
+   
+    def clip_actions(self, emb_acts:th.Tensor):
+        if len(emb_acts.shape) == 3:
+            with th.no_grad():
+                emb_acts[:,:,-self.actor.args.arch[-1]:] = th.clamp(emb_acts[:,:,-self.actor.args.arch[-1]:], min=self.clip_min, max=self.clip_max)
+        else:
+            with th.no_grad():
+                    emb_acts[:,-self.actor.args.arch[-1]:] = th.clamp(emb_acts[:,-self.actor.args.arch[-1]:], min=self.clip_min, max=self.clip_max)
+        return emb_acts
+
+    def get_goal_emb_act(self, 
+            goal_state:th.Tensor,
+            goal_label:th.Tensor,
+            lr:float,
+            opt_steps:int):
+
+        inv_crit_inpt = self.get_inverse_critic_input(goal_state=goal_state, goal_scores=goal_label[:,-1])
+        goal_emb_act = self.inverse_critic.forward(inpt=inv_crit_inpt)
+        goal_emb_act = self.project_embeddings(embeddings=goal_emb_act, goal_state=goal_state)
+        goal_emb_act = self.clip_actions(emb_acts=goal_emb_act)
+        goal_emb_act = self.optimize_goal_emb_acts(
+            goal_emb_acts=goal_emb_act,
+            goal_label=goal_label,
+            goal_state=goal_state,
+            lr=lr,
+            opt_steps=opt_steps)
+        goal_emb_act = self.project_embeddings(embeddings=goal_emb_act, goal_state=goal_state)
+        goal_emb_act = self.clip_actions(emb_acts=goal_emb_act)
+        return goal_emb_act.detach()
+
+
+    def optimize_goal_emb_acts(self, 
+            goal_emb_acts:th.Tensor,
+            goal_state:th.Tensor, 
+            goal_label:th.Tensor,
+            lr:float,
+            opt_steps:int):
+        goal_emb_acts = goal_emb_acts.detach().clone()
+        goal_emb_acts.requires_grad = True
+        goal_optimizer = th.optim.Adam([goal_emb_acts], lr=lr)
+        for i in range(opt_steps):
+            scores = self.critic.forward(goal_emb_acts)
+            loss = calcMSE(scores, goal_label[:, -1])
+            goal_optimizer.zero_grad()
+            loss.backward()
+            goal_optimizer.step()
+            self.history.add_value(self.history.goal_scores, scores.detach().clone().unsqueeze(1), step=i)
+            goal_emb_acts = self.project_embeddings(embeddings=goal_emb_acts, goal_state=goal_state)
+        return goal_emb_acts.detach()
+
+
+    def build_sequence(self, 
+            embeddings:th.Tensor, 
+            actions:th.Tensor, 
+            seq_len:int, 
+            goal_state:th.Tensor, 
+            goal_emb_acts:th.Tensor, 
+            mask:th.Tensor):
         while (sl := embeddings.shape[1]) < seq_len + 1:
             if (actions is None) or (actions.shape[1] == embeddings.shape[1] - 1):
                 with th.no_grad():
-                    actor_inpt = self.get_actor_input(embeddings[:,-1:], self.final_reward[:,-1:])
+                    #TODO:
+                    #Generalize actor input for whole sequence model
+                    actor_inpt = self.get_actor_input(embeddings=embeddings[:,-1:], goal_emb_acts=goal_emb_acts) #self.final_reward[:,-1:]
                     next_actions= self.actor.forward(actor_inpt)
                     if actions is not None:
                         actions = th.cat((actions, next_actions), dim=1)
@@ -144,13 +234,29 @@ class ActiveCriticPolicy(BaseModel):
                         actions = next_actions
             if type(self.predicor) is WholeSequenceModel:
                 next_embedding = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]], mask=mask[:sl,:sl])
-                embeddings = th.cat((embeddings, next_embedding[:,-1:]), dim=1)
             else:
                 next_embedding = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]])
-                embeddings = th.cat((embeddings, next_embedding[:,-1:]), dim=1)
+            embeddings = self.project_embeddings(embeddings=embeddings, goal_state=goal_state)
+            embeddings = th.cat((embeddings, next_embedding[:,-1:]), dim=1)
+        
         return embeddings[:,:-1], actions
 
-    def optimize_sequence(self, actions:th.Tensor, seq_embeddings:th.Tensor, pred_mask:th.Tensor, opt_mask:th.Tensor, goal_label:th.Tensor, steps:int, current_step:int):
+    def optimize_sequence(self, 
+        actions:th.Tensor, 
+        seq_embeddings:th.Tensor, 
+        pred_mask:th.Tensor, 
+        opt_mask:th.Tensor, 
+        goal_label:th.Tensor, 
+        goal_emb_acts:th.Tensor,
+        steps:int, 
+        current_step:int,
+        seq_len:int,
+        optimizer_class:th.optim.Optimizer,
+        lr:float,
+        goal_state:th.Tensor = None,
+        ):
+
+
         if actions is not None:
             actions = actions.detach().clone()
             org_actions = actions.detach().clone()
@@ -159,21 +265,37 @@ class ActiveCriticPolicy(BaseModel):
             org_actions = None
 
         seq_embeddings = seq_embeddings.detach().clone()
-        if (actions is None) or actions.shape[1] != seq_embeddings.shape[1]:
-            _, actions = self.build_sequence(embeddings=seq_embeddings.detach()[:,:current_step+1], actions=actions, seq_len=self.args_obj.epoch_len, mask=pred_mask)
+        if (actions is None) or (actions.shape[1] != seq_embeddings.shape[1]):
+            _, actions = self.build_sequence(
+                embeddings=seq_embeddings.detach()[:,:current_step+1], 
+                actions=actions, 
+                seq_len=seq_len, 
+                goal_emb_acts=goal_emb_acts,
+                goal_state=goal_state,
+                mask=pred_mask)
+
             if self.args_obj.clip:
                 actions = th.clamp(actions, min=self.clip_min, max=self.clip_max)
             actions = actions.detach()
             if self.current_step == 0:
                 self.history.add_value(history=self.history.gen_trj, value=actions.clone())
             actions.requires_grad = True
+
+        
         opt_paras = None
         for opt_step in range(steps):
-            seq_embeddings, actions = self.build_sequence(embeddings=seq_embeddings.detach()[:,:current_step+1], actions=actions, seq_len=actions.shape[1], mask=pred_mask)
-            optimizer = self.args_obj.optimizer_class([actions], lr=self.args_obj.inference_opt_lr)
-            critic_input = self.get_critic_input(embeddings=seq_embeddings, actions=actions)
+            seq_embeddings, actions = self.build_sequence(
+                embeddings=seq_embeddings.detach()[:,:current_step+1], 
+                actions=actions, 
+                seq_len=seq_len, 
+                goal_emb_acts=goal_emb_acts,
+                goal_state=goal_state,
+                mask=pred_mask)
 
-            scores = self.critic.forward(critic_input)
+            optimizer = optimizer_class([actions], lr=lr)
+            critic_inpt = self.get_predictor_input(embeddings=seq_embeddings, actions=actions)
+            
+            scores = self.critic.forward(critic_inpt)
             self.history.add_value(history=self.history.scores, value=scores.detach().clone(), opt_step=opt_step, step=current_step)
 
             if opt_paras is not None:
@@ -192,6 +314,8 @@ class ActiveCriticPolicy(BaseModel):
             if self.args_obj.clip:
                 with th.no_grad():
                     th.clamp(actions, min=self.clip_min, max=self.clip_max, out=actions)
+            
+            seq_embeddings = self.project_embeddings(seq_embeddings, goal_state)
 
         return loss.detach(), actions.detach(), seq_embeddings.detach(), scores.detach()
             
@@ -202,7 +326,7 @@ class ActiveCriticPolicy(BaseModel):
         state: Optional[Tuple[np.ndarray, ...]] = None,
         episode_start: Optional[np.ndarray] = None,
         deterministic: bool = False,
-    ) -> th.Tensor:
+    ) -> np.array:
         vec_obsv = self.args_obj.extractor.forward(observation)
         embedding = self.emitter.forward(vec_obsv)
 
@@ -222,8 +346,13 @@ class ActiveCriticPolicy(BaseModel):
                                                     pred_mask = self.args_obj.pred_mask,
                                                     opt_mask = self.args_obj.opt_mask,
                                                     goal_label=self.goal_label,
+                                                    goal_emb_acts=self.goal_emb_acts,
                                                     steps=self.args_obj.opt_steps,
-                                                    current_step=self.current_step)
+                                                    current_step=self.current_step,
+                                                    seq_len=self.args_obj.epoch_len,
+                                                    optimizer_class=self.args_obj.optimizer_class,
+                                                    lr=self.args_obj.inference_opt_lr,
+                                                    goal_state=self.last_goal)
         if self.current_step == 0:
             self.history.add_value(self.history.pred_emb, seq_embeddings[:,self.current_step+1:self.current_step+2], step=self.current_step)
         elif self.current_step == self.args_obj.epoch_len - 1:
