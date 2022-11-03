@@ -328,7 +328,7 @@ class ActiveCriticPolicy(BaseModel):
         episode_start: Optional[np.ndarray] = None,
         deterministic: bool = False,
     ) -> np.array:
-        vec_obsv = self.args_obj.extractor.forward(observation)
+        vec_obsv = self.args_obj.extractor.forward(observation).to(self.args_obj.device)
         embedding = self.emitter.forward(vec_obsv)
 
         
