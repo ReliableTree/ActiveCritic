@@ -311,14 +311,13 @@ class ActiveCriticPolicy(BaseModel):
             if org_actions is not None:
                 with th.no_grad():
                     actions[:,:current_step] = org_actions[:,:current_step]
+            actions = actions.nan_to_num()
             if self.args_obj.clip:
                 with th.no_grad():
                     th.clamp(actions, min=self.clip_min, max=self.clip_max, out=actions)
             
             seq_embeddings = self.project_embeddings(seq_embeddings, goal_state)
-        if self.args_obj.clip:
-            with th.no_grad():
-                th.clamp(actions, min=self.clip_min, max=self.clip_max, out=actions)
+
         return loss.detach(), actions.detach(), seq_embeddings.detach(), scores.detach()
             
 
