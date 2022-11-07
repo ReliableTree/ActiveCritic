@@ -316,7 +316,9 @@ class ActiveCriticPolicy(BaseModel):
                     th.clamp(actions, min=self.clip_min, max=self.clip_max, out=actions)
             
             seq_embeddings = self.project_embeddings(seq_embeddings, goal_state)
-
+        if self.args_obj.clip:
+            with th.no_grad():
+                th.clamp(actions, min=self.clip_min, max=self.clip_max, out=actions)
         return loss.detach(), actions.detach(), seq_embeddings.detach(), scores.detach()
             
 

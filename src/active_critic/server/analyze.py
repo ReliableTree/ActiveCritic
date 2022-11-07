@@ -89,23 +89,23 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'reach_plot_predictive_embedding'
+    acla.logname = 'reach_plot_predictive_embedding_sparse'
     acla.tboard = True
     acla.batch_size = 32
-    acla.validation_episodes = 50
+    acla.validation_episodes = 5
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
     acla.predictor_threshold = 1e-2
-    acla.num_cpu = 25
+    acla.num_cpu = 5
 
     batch_size = 32
     seq_len = 100
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=batch_size, seq_len=seq_len)
     
     acps.opt_steps = 20
-    acla.val_every = 500
-    acla.add_data_every = 50
+    acla.val_every = 10
+    acla.add_data_every = 1
 
     
 

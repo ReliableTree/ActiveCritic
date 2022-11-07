@@ -78,16 +78,16 @@ class ActiveCriticLearner(nn.Module):
         obsv, actions, reward = data
         embeddings = self.policy.emitter.forward(obsv)
 
-        best_rewards, indices = reward.max(dim=1)
-        indices = indices.reshape(-1)
-        best_obsv = obsv[tuple((th.arange(len(indices)), indices))]
-        best_action = actions[tuple((th.arange(len(indices)), indices))]
+        last_rewards = reward[:,-1]
+
+        last_obsv = obsv[:, -1]
+        last_action = actions[:, -1]
 
         with th.no_grad():
-            best_embedding = self.policy.emitter.forward(best_obsv)
+            last_embedding = self.policy.emitter.forward(last_obsv)
 
-        inv_critic_label = self.policy.get_predictor_input(embeddings=best_embedding, actions=best_action)
-        inv_critic_inpt = self.policy.get_inverse_critic_input(goal_state=best_obsv[:, -3:], goal_scores=best_rewards)
+        inv_critic_label = self.policy.get_predictor_input(embeddings=last_embedding, actions=last_action)
+        inv_critic_inpt = self.policy.get_inverse_critic_input(goal_state=last_obsv[:, -3:], goal_scores=last_rewards)
 
         loss_inv_critic = self.policy.inverse_critic.calc_loss(inv_critic_inpt, inv_critic_label)
 
@@ -164,8 +164,8 @@ class ActiveCriticLearner(nn.Module):
         next_val = self.network_args.val_every
         next_add = 0
         for epoch in range(epochs):
-            if (not self.network_args.imitation_phase) and (self.global_step >= next_add):
-                next_add += self.network_args.add_data_every
+            if (not self.network_args.imitation_phase) and (epoch >= next_add):
+                next_add = epoch + self.network_args.add_data_every
                 self.add_training_data()
 
             self.policy.eval()
@@ -197,8 +197,8 @@ class ActiveCriticLearner(nn.Module):
                 }
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
                 self.global_step += len(self.train_data)
-            if self.global_step >= next_val:
-                next_val = self.global_step + self.network_args.val_every
+            if epoch >= next_val:
+                next_val = epoch + self.network_args.val_every
                 if self.network_args.tboard:
                     self.run_validation(step = epoch)
 
@@ -255,7 +255,8 @@ class ActiveCriticLearner(nn.Module):
         debug_dict = {
             'Success Rate': success.mean(),
             'Reward': last_reward.mean(),
-            'Training Epochs': th.tensor(int(len(self.train_data)/self.policy.args_obj.epoch_len))
+            'Training Epochs': th.tensor(int(len(self.train_data)/self.policy.args_obj.epoch_len)),
+            'Expected Success Imrovement': last_expected_reward_after.mean() - last_expected_rewards_before.mean()
         }
         print(f'Success Rate: {success.mean()}')
         print(f'Reward: {last_reward.mean()}')
