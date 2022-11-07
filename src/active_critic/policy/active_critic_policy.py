@@ -287,7 +287,7 @@ class ActiveCriticPolicy(BaseModel):
         for opt_step in range(steps):
             seq_embeddings, actions = self.build_sequence(
                 embeddings=seq_embeddings.detach()[:,:current_step+1], 
-                actions=actions, 
+                actions=actions.detach(), 
                 seq_len=seq_len, 
                 goal_emb_acts=goal_emb_acts,
                 goal_state=goal_state,
@@ -311,10 +311,11 @@ class ActiveCriticPolicy(BaseModel):
             if org_actions is not None:
                 with th.no_grad():
                     actions[:,:current_step] = org_actions[:,:current_step]
-            actions = actions.nan_to_num()
             if self.args_obj.clip:
                 with th.no_grad():
                     th.clamp(actions, min=self.clip_min, max=self.clip_max, out=actions)
+            with th.no_grad():
+                th.nan_to_num(actions, out=actions)
             
             seq_embeddings = self.project_embeddings(seq_embeddings, goal_state)
 

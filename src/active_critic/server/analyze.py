@@ -103,7 +103,7 @@ def make_acl(device):
     seq_len = 100
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=batch_size, seq_len=seq_len)
     
-    acps.opt_steps = 20
+    acps.opt_steps = 5
     acla.val_every = 10
     acla.add_data_every = 1
 
