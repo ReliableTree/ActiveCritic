@@ -204,7 +204,7 @@ class ActiveCriticPolicy(BaseModel):
         goal_emb_acts = goal_emb_acts.detach().clone()
         goal_emb_acts.requires_grad = True
         goal_optimizer = th.optim.Adam([goal_emb_acts], lr=lr)
-        for i in range(opt_steps):
+        for i in range(10*opt_steps):
             scores = self.critic.forward(goal_emb_acts)
             loss = calcMSE(scores, goal_label[:, -1])
             goal_optimizer.zero_grad()
@@ -287,7 +287,7 @@ class ActiveCriticPolicy(BaseModel):
         for opt_step in range(steps):
             seq_embeddings, actions = self.build_sequence(
                 embeddings=seq_embeddings.detach()[:,:current_step+1], 
-                actions=actions.detach(), 
+                actions=actions, 
                 seq_len=seq_len, 
                 goal_emb_acts=goal_emb_acts,
                 goal_state=goal_state,

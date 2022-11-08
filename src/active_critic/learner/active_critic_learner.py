@@ -222,8 +222,12 @@ class ActiveCriticLearner(nn.Module):
             device=self.network_args.device,
             episodes=self.network_args.validation_episodes,
             return_gen_trj=True)
+        goal_scores_before = self.policy.history.goal_scores[0][:,0].mean()
+        goal_scores_after = self.policy.history.goal_scores[0][:,-1].mean()
         debug_dict = {
-            'Validation epoch time': th.tensor(time.perf_counter() - h)
+            'Validation epoch time': th.tensor(time.perf_counter() - h),
+            'Expected Goal Scores Before': goal_scores_before,
+            'Expected Goal Scores After': goal_scores_after,
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=step)
 

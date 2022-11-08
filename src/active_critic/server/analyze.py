@@ -24,7 +24,7 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 2, device='cpu', horiz
     acps.optimize = True
     acps.batch_size = batch_size
     acps.pred_mask = build_tf_horizon_mask(seq_len=seq_len, horizon=horizon, device=device)
-    acps.opt_mask = th.zeros([seq_len, 1], device=device, dtype=bool)
+    acps.opt_mask = th.ones([seq_len, 1], device=device, dtype=bool)
     acps.opt_mask[:,-1] = 1
     acps.opt_goal = True
     return acps
@@ -89,7 +89,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'reach_plot_predictive_embedding_sparse'
+    acla.logname = 'reach_plot_predictive_embedding_dense_lr1'
     acla.tboard = True
     acla.batch_size = 32
     acla.validation_episodes = 5
@@ -103,8 +103,8 @@ def make_acl(device):
     seq_len = 100
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=batch_size, seq_len=seq_len)
     
-    acps.opt_steps = 5
-    acla.val_every = 10
+    acps.opt_steps = 20
+    acla.val_every = 1
     acla.add_data_every = 1
 
     
