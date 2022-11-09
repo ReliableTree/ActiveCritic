@@ -64,7 +64,7 @@ class ActiveCriticPolicyHistory:
 
     def add_value(self, history:list([th.Tensor]), value:th.Tensor, opt_step:int=0, step:int=None):
         if len(history[0].shape) == 4: #including opt step history
-            history[0][-value.shape[0]:, opt_step, step] = value[:,step]
+            history[0][-value.shape[0]:, opt_step] = value
         elif step is None:
             history[0][-value.shape[0]:] = value
         else:
@@ -147,10 +147,7 @@ class ActiveCriticPolicy(BaseModel):
 
     def predict_step(self, embeddings:th.Tensor, actions:th.Tensor, mask:th.Tensor = None):
         predictor_input = self.get_predictor_input(embeddings=embeddings, actions=actions)
-        if type(self.predicor) is WholeSequenceModel:
-            next_embeddings = self.predicor.forward(predictor_input, tf_mask=mask)
-        else:
-            next_embeddings = self.predicor.forward(predictor_input)
+        next_embeddings = self.predicor.forward(predictor_input, tf_mask=mask)
         return next_embeddings
 
     def project_embeddings(self, embeddings:th.Tensor, goal_state:th.Tensor):
@@ -215,32 +212,32 @@ class ActiveCriticPolicy(BaseModel):
         return goal_emb_acts.detach()
 
 
-    def build_sequence(self, 
-            embeddings:th.Tensor, 
-            actions:th.Tensor, 
-            seq_len:int, 
-            goal_state:th.Tensor, 
-            goal_emb_acts:th.Tensor, 
-            mask:th.Tensor):
-        while (sl := embeddings.shape[1]) < seq_len + 1:
-            if (actions is None) or (actions.shape[1] == embeddings.shape[1] - 1):
-                with th.no_grad():
-                    #TODO:
-                    #Generalize actor input for whole sequence model
-                    actor_inpt = self.get_actor_input(embeddings=embeddings[:,-1:], goal_emb_acts=goal_emb_acts) #self.final_reward[:,-1:]
-                    next_actions= self.actor.forward(actor_inpt)
-                    if actions is not None:
-                        actions = th.cat((actions, next_actions), dim=1)
-                    else:
-                        actions = next_actions
-            if type(self.predicor) is WholeSequenceModel:
-                next_embedding = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]], mask=mask[:sl,:sl])
-            else:
-                next_embedding = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]])
-            embeddings = self.project_embeddings(embeddings=embeddings, goal_state=goal_state)
-            embeddings = th.cat((embeddings, next_embedding[:,-1:]), dim=1)
-        
-        return embeddings[:,:-1], actions
+    def build_sequence(
+        self,
+        embeddings:th.Tensor,
+        actions:th.Tensor,
+        seq_len:int,
+        goal_state:th.Tensor, 
+        goal_emb_acts:th.Tensor, 
+        tf_mask:th.Tensor,
+        actor:StateModel, 
+        predictor: Union[WholeSequenceModel, StateModel] ):
+        init_embedding = embeddings.detach().clone()
+        for i in range(seq_len - 1):
+            embeddings = embeddings.detach()
+            if actions is None or actions.shape[1] == i:
+                actions = actor.forward(embeddings)
+                if self.args_obj.clip:
+                    with th.no_grad():
+                        th.clamp(actions, min=self.clip_min, max=self.clip_max, out=actions)
+            next_embedings = self.predict_step(embeddings=embeddings, actions=actions[:,:i+1], mask=tf_mask[:i+1,:i+1])
+            embeddings = th.cat((init_embedding.clone(), next_embedings), dim=1)
+        if actions.shape[1] == seq_len - 1:
+            actions = th.cat((actions, actor.forward(embeddings[:,-1:])), dim=1)
+        if self.args_obj.clip:
+            with th.no_grad():
+                th.clamp(actions, min=self.clip_min, max=self.clip_max, out=actions)
+        return embeddings, actions
 
     def optimize_sequence(self, 
         actions:th.Tensor, 
@@ -273,7 +270,9 @@ class ActiveCriticPolicy(BaseModel):
                 seq_len=seq_len, 
                 goal_emb_acts=goal_emb_acts,
                 goal_state=goal_state,
-                mask=pred_mask)
+                tf_mask=pred_mask,
+                actor=self.actor,
+                predictor=self.predicor)
 
             if self.args_obj.clip:
                 actions = th.clamp(actions, min=self.clip_min, max=self.clip_max)
@@ -291,7 +290,9 @@ class ActiveCriticPolicy(BaseModel):
                 seq_len=seq_len, 
                 goal_emb_acts=goal_emb_acts,
                 goal_state=goal_state,
-                mask=pred_mask)
+                tf_mask=pred_mask,
+                actor=self.actor,
+                predictor=self.predicor)
 
             optimizer = optimizer_class([actions], lr=lr)
             critic_inpt = self.get_predictor_input(embeddings=seq_embeddings, actions=actions)
