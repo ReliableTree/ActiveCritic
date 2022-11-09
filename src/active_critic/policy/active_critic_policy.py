@@ -7,7 +7,7 @@ from active_critic.model_src.state_model import StateModel
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel
-from active_critic.utils.pytorch_utils import calcMSE
+from active_critic.utils.pytorch_utils import calcMSE, printProgressBar
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -106,7 +106,7 @@ class ActiveCriticPolicy(BaseModel):
     def reset_epoch(self, vec_obsv:th.Tensor):
         self.current_step = 0
         self.last_goal = vec_obsv[:,0,-3:]
-        self.goal_label = th.ones([vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.args.arch[-1]], device=self.args_obj.device)
+        self.goal_label = th.zeros([vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.args.arch[-1]], device=self.args_obj.device)
 
         
         self.history.new_epoch(history=self.history.opt_trj, size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
@@ -134,6 +134,9 @@ class ActiveCriticPolicy(BaseModel):
     def get_predictor_input(self, embeddings:th.Tensor, actions:th.Tensor):
         input = th.cat((embeddings, actions), dim=-1)
         return input
+
+    def get_critic_input(self, embeddings:th.Tensor, actions:th.Tensor):
+        return embeddings
 
     def get_actor_input(self, embeddings:th.Tensor, goal_emb_acts:th.Tensor):
         #embessings = [batch, seq, emb]
@@ -307,7 +310,7 @@ class ActiveCriticPolicy(BaseModel):
                 predictor=self.predicor)
 
             optimizer = optimizer_class([actions], lr=lr)
-            critic_inpt = self.get_predictor_input(embeddings=seq_embeddings, actions=actions)
+            critic_inpt = self.get_critic_input(embeddings=seq_embeddings, actions=actions)
             scores = self.critic.forward(critic_inpt)
             self.history.add_value(history=self.history.scores, value=scores.detach().clone(), opt_step=opt_step, step=current_step)
 
@@ -354,6 +357,9 @@ class ActiveCriticPolicy(BaseModel):
         else:
             self.current_step += 1
             self.current_embeddings = th.cat((self.current_embeddings, embedding), dim=1)
+        
+        printProgressBar(iteration=self.current_step, total=self.args_obj.epoch_len, suffix='Predicting Epsiode')
+
         if self.args_obj.optimize:
             loss_reward, actions, seq_embeddings, scores = self.optimize_sequence(
                                                     actions=self.current_actions, 

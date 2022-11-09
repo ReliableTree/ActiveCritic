@@ -82,10 +82,12 @@ class ActiveCriticLearner(nn.Module):
         loss_actor = self.policy.actor.calc_loss(
             inpt=actor_input, label=actions)
 
-        critic_input = self.policy.get_predictor_input(embeddings=embeddings, actions=actions)
+        critic_input = self.policy.get_critic_input(embeddings=embeddings, actions=actions)
         loss_critic = self.policy.critic.calc_loss(inpt=critic_input, label=reward)
 
-        loss_predictor = self.policy.predicor.calc_loss(inpt=critic_input[:,:-1], label=embeddings[:,1:], tf_mask=self.policy.args_obj.pred_mask[:-1, :-1])
+        predictor_input = self.policy.get_predictor_input(embeddings=embeddings, actions=actions)
+
+        loss_predictor = self.policy.predicor.calc_loss(inpt=predictor_input[:,:-1], label=embeddings[:,1:], tf_mask=self.policy.args_obj.pred_mask[:-1, :-1])
 
         
         
@@ -102,7 +104,6 @@ class ActiveCriticLearner(nn.Module):
         self.policy.critic.optimizer.step()
         self.policy.predicor.optimizer.step()
 
-        loss_gen_trj = th.ones_like(loss_critic)
 
 
         gen_embeddings, gen_actions = self.policy.build_sequence(
@@ -114,7 +115,7 @@ class ActiveCriticLearner(nn.Module):
             actions=None,
             goal_state=None,
             goal_emb_acts=self.policy.goal_label[:,-1])
-        gen_critic_inputs = self.policy.get_predictor_input(gen_embeddings, gen_actions)
+        gen_critic_inputs = self.policy.get_critic_input(gen_embeddings, gen_actions)
         gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=self.policy.goal_label, mask=self.policy.args_obj.opt_mask)
         self.policy.critic.optimizer.zero_grad()
         self.policy.actor.optimizer.zero_grad()
@@ -124,7 +125,7 @@ class ActiveCriticLearner(nn.Module):
 
         self.policy.actor.optimizer.step()
         self.policy.predicor.optimizer.step()
-        self.policy.critic.optimizer.step()
+        #self.policy.critic.optimizer.step()
 
 
         if losses is None:
@@ -188,6 +189,12 @@ class ActiveCriticLearner(nn.Module):
 
             while (mean_critic > self.network_args.critic_threshold)\
                 or (mean_predictor > self.network_args.predictor_threshold):
+                print('_________________')
+                print(mean_critic)
+                print(self.network_args.critic_threshold)
+                print(mean_predictor)
+                print(self.network_args.predictor_threshold)
+
 
                 losses = self.train_step(train_loader=self.train_loader)
                 mean_actor = losses[0].mean()

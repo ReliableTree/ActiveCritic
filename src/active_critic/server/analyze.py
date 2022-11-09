@@ -23,7 +23,7 @@ def make_wsm_setup(seq_len, d_output, device='cpu'):
     wsm.model_setup.nhead = 1
     wsm.model_setup.d_hid = 200
     wsm.model_setup.d_model = 200
-    wsm.model_setup.nlayers = 2
+    wsm.model_setup.nlayers = 3
     wsm.model_setup.seq_len = seq_len
     wsm.model_setup.dropout = 0
     wsm.lr = 5e-4
@@ -39,12 +39,12 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 2, device='cpu', horiz
     acps.extractor=extractor
     acps.new_epoch=new_epoch
     acps.opt_steps=100
-    acps.inference_opt_lr = 1e-1
+    acps.inference_opt_lr = 1e-2
     acps.optimizer_class = th.optim.Adam
     acps.optimize = True
     acps.batch_size = batch_size
     acps.pred_mask = build_tf_horizon_mask(seq_len=seq_len, horizon=seq_len, device=device)
-    acps.opt_mask = th.ones([seq_len, 1], device=device, dtype=bool)
+    acps.opt_mask = th.zeros([seq_len, 1], device=device, dtype=bool)
     acps.opt_mask[:,-1] = 1
     acps.opt_goal = True
     acps.optimize_goal_emb_acts = False
@@ -58,13 +58,13 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
     lr = 5e-4
 
     actor_args = StateModelArgs()
-    actor_args.arch = [200, 200, env.action_space.shape[0]]
+    actor_args.arch = [2000, 2000, env.action_space.shape[0]]
     actor_args.device = device
     actor_args.lr = lr
     actor = StateModel(args=actor_args)
 
     critic_args = StateModelArgs()
-    critic_args.arch = [200, 200, 1]
+    critic_args.arch = [2000, 2000, 1]
     critic_args.device = device
     critic_args.lr = lr
     critic = StateModel(args=critic_args)
@@ -76,15 +76,15 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
     inv_critic = StateModel(args=inv_critic_args)
 
     emitter_args = StateModelArgs()
-    emitter_args.arch = [200, 200, embed_dim]
+    emitter_args.arch = [2000, 2000, embed_dim]
     emitter_args.device = device
     emitter_args.lr = lr
     emitter = StateModel(args=emitter_args)
 
     predictor_args = make_wsm_setup(
     seq_len=seq_len, d_output=embed_dim, device=device)
-    predictor_args.model_setup.d_hid = 200
-    predictor_args.model_setup.d_model = 200
+    predictor_args.model_setup.d_hid = 2000
+    predictor_args.model_setup.d_model = 2000
     predictor = WholeSequenceModel(args=predictor_args)
 
 
@@ -110,19 +110,19 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'test_no_critic'
+    acla.logname = 'inverse_sparse_50'
     acla.tboard = True
     acla.batch_size = 32
     acla.validation_episodes = 20
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
-    acla.critic_threshold = 1e-3
-    acla.predictor_threshold = 1e-3
+    acla.critic_threshold = 1e-2
+    acla.predictor_threshold = 1e-2
     acla.gen_scores_threshold = 1e-1
     acla.num_cpu = acla.validation_episodes
 
     batch_size = 32
-    seq_len = 10
+    seq_len = 50
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=batch_size, seq_len=seq_len)
     
     acps.opt_steps = 20
