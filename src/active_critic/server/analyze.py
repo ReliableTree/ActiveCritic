@@ -44,7 +44,7 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 2, device='cpu', horiz
     acps.optimize = True
     acps.batch_size = batch_size
     acps.pred_mask = build_tf_horizon_mask(seq_len=seq_len, horizon=seq_len, device=device)
-    acps.opt_mask = th.zeros([seq_len, 1], device=device, dtype=bool)
+    acps.opt_mask = th.ones([seq_len, 1], device=device, dtype=bool)
     acps.opt_mask[:,-1] = 1
     acps.opt_goal = True
     acps.optimize_goal_emb_acts = False
@@ -110,7 +110,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'inverse_sparse_50'
+    acla.logname = 'inverse_dense_50'
     acla.tboard = True
     acla.batch_size = 32
     acla.validation_episodes = 20
