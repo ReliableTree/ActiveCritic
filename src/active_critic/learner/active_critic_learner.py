@@ -78,8 +78,9 @@ class ActiveCriticLearner(nn.Module):
         obsv, actions, reward = data
         embeddings = self.policy.emitter.forward(obsv)
 
+        actor_input = self.policy.get_actor_input(embeddings=embeddings, goal_emb_acts=reward[0,-1])
         loss_actor = self.policy.actor.calc_loss(
-            inpt=embeddings, label=actions)
+            inpt=actor_input, label=actions)
 
         critic_input = self.policy.get_predictor_input(embeddings=embeddings, actions=actions)
         loss_critic = self.policy.critic.calc_loss(inpt=critic_input, label=reward)
@@ -101,6 +102,9 @@ class ActiveCriticLearner(nn.Module):
         self.policy.critic.optimizer.step()
         self.policy.predicor.optimizer.step()
 
+        loss_gen_trj = th.ones_like(loss_critic)
+
+
         gen_embeddings, gen_actions = self.policy.build_sequence(
             actor=self.policy.actor, 
             predictor=self.policy.predicor, 
@@ -109,15 +113,16 @@ class ActiveCriticLearner(nn.Module):
             tf_mask=self.policy.args_obj.pred_mask,
             actions=None,
             goal_state=None,
-            goal_emb_acts=None)
+            goal_emb_acts=self.policy.goal_label[:,-1])
         gen_critic_inputs = self.policy.get_predictor_input(gen_embeddings, gen_actions)
         gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=self.policy.goal_label, mask=self.policy.args_obj.opt_mask)
         self.policy.actor.optimizer.zero_grad()
         self.policy.predicor.optimizer.zero_grad()
         loss_gen_trj = gen_loss_critic.mean()
         loss_gen_trj.backward()
+
         self.policy.actor.optimizer.step()
-        self.policy.predicor.optimizer.zero_grad()
+        self.policy.predicor.optimizer.step()
 
 
         if losses is None:
@@ -178,8 +183,7 @@ class ActiveCriticLearner(nn.Module):
             mean_predictor = float('inf')
             mean_gen_score = float('inf')
 
-            while (mean_actor > self.network_args.actor_threshold) \
-                or (mean_critic > self.network_args.critic_threshold)\
+            while (mean_critic > self.network_args.critic_threshold)\
                 or (mean_predictor > self.network_args.predictor_threshold)\
                 or (mean_gen_score > self.network_args.gen_scores_threshold):
 
@@ -269,8 +273,7 @@ class ActiveCriticLearner(nn.Module):
         }
         print(f'Success Rate: {success.mean()}')
         print(f'Reward: {last_reward.mean()}')
-        print(
-            f'training samples: {self.training_samples}')
+        print(f'training samples: {self.training_samples}')
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=self.training_samples)
 
 

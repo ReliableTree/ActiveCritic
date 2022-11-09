@@ -38,6 +38,7 @@ class ActiveCriticPolicySetup:
         self.opt_mask:th.Tensor=None,
         self.opt_goal:th.Tensor=None,
         self.clip:bool = True
+        self.optimize_goal_emb_acts:bool = False
 
 
 class ActiveCriticPolicyHistory:
@@ -115,7 +116,7 @@ class ActiveCriticPolicy(BaseModel):
         self.history.new_epoch(history=self.history.act_emb, size=[vec_obsv.shape[0], self.args_obj.epoch_len -1, self.emitter.args.arch[-1]], device=self.args_obj.device)
         self.history.new_epoch(history=self.history.goal_scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps, self.critic.args.arch[-1]], device=self.args_obj.device)
 
-        if self.optimize_goal_emb_acts:
+        if self.args_obj.optimize_goal_emb_acts:
             self.goal_emb_acts = self.get_goal_emb_act(
                 goal_state=self.last_goal,
                 goal_label=self.goal_label,
@@ -125,7 +126,7 @@ class ActiveCriticPolicy(BaseModel):
         else:
             #TODO
             #Generalize goal embeddings for whole sequence actor.
-            self.goal_emb_acts = th.ones([vec_obsv.shape[0], 1, self.critic.args.arch[-1]], device=self.args_obj.device)
+            self.goal_emb_acts = self.goal_label[0,-1]
 
         self.current_embeddings = vec_obsv
         self.current_actions = None
@@ -137,7 +138,7 @@ class ActiveCriticPolicy(BaseModel):
     def get_actor_input(self, embeddings:th.Tensor, goal_emb_acts:th.Tensor):
         #embessings = [batch, seq, emb]
         #goal_embeddings = [batch, 1]
-        goal_emb_acts = goal_emb_acts.unsqueeze(1).repeat([1, embeddings.shape[1], 1])
+        goal_emb_acts = goal_emb_acts.reshape([1,1,-1]).repeat([embeddings.shape[0], embeddings.shape[1], 1])
         return th.cat((embeddings, goal_emb_acts), dim=-1)
 
 
@@ -231,7 +232,8 @@ class ActiveCriticPolicy(BaseModel):
         while embeddings.shape[1] < seq_len:
             embeddings = embeddings.detach()
             if actions is None or actions.shape[1] == embeddings.shape[1]-1:
-                actions = actor.forward(embeddings)
+                actor_inpt = self.get_actor_input(embeddings=embeddings, goal_emb_acts=goal_emb_acts)
+                actions = actor.forward(actor_inpt)
                 if self.args_obj.clip:
                     with th.no_grad():
                         th.clamp(actions, min=self.clip_min, max=self.clip_max, out=actions)
@@ -242,7 +244,8 @@ class ActiveCriticPolicy(BaseModel):
             next_embedings = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]], mask=tf_mask[:embeddings.shape[1],:embeddings.shape[1]])
             embeddings = th.cat((init_embedding.clone(), next_embedings[:, init_embedding.shape[1]-1:]), dim=1)
         if actions.shape[1] == seq_len - 1:
-            actions = th.cat((actions, actor.forward(embeddings[:,-1:])), dim=1)
+            actor_inpt = self.get_actor_input(embeddings=embeddings[:,-1:], goal_emb_acts=goal_emb_acts)
+            actions = th.cat((actions, actor.forward(actor_inpt)), dim=1)
         if self.args_obj.clip:
             with th.no_grad():
                 th.clamp(actions, min=self.clip_min, max=self.clip_max, out=actions)

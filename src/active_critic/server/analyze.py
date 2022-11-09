@@ -39,7 +39,7 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 2, device='cpu', horiz
     acps.extractor=extractor
     acps.new_epoch=new_epoch
     acps.opt_steps=100
-    acps.inference_opt_lr = 1e-1
+    acps.inference_opt_lr = 1e-2
     acps.optimizer_class = th.optim.Adam
     acps.optimize = True
     acps.batch_size = batch_size
@@ -47,6 +47,7 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 2, device='cpu', horiz
     acps.opt_mask = th.ones([seq_len, 1], device=device, dtype=bool)
     acps.opt_mask[:,-1] = 1
     acps.opt_goal = True
+    acps.optimize_goal_emb_acts = False
     return acps
 
 def setup_opt_state(batch_size, seq_len, device='cpu'):
@@ -104,28 +105,28 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
 def make_acl(device):
     device = device
     acla = ActiveCriticLearnerArgs()
-    #acla.data_path = '/home/hendrik/Documents/master_project/LokalData/TransformerImitationLearning/'
+    #acla.data_path = '/home/hendrik/Documents/master_project/LokalData/WSM/'
     acla.data_path = '/data/bing/hendrik/'
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'reach_wsm_predicotr'
+    acla.logname = 'reach_wsm_predicotr_25_steps'
     acla.tboard = True
     acla.batch_size = 32
-    acla.validation_episodes = 5
+    acla.validation_episodes = 25
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
     acla.predictor_threshold = 1e-2
-    acla.gen_scores_threshold = 1e-1
-    acla.num_cpu = 5
+    acla.gen_scores_threshold = 0.3
+    acla.num_cpu = 25
 
     batch_size = 32
-    seq_len = 10
+    seq_len = 100
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=batch_size, seq_len=seq_len)
     
-    acps.opt_steps = 2
-    acla.val_every = 1
+    acps.opt_steps = 25
+    acla.val_every = 10
     acla.add_data_every = 1
 
     
