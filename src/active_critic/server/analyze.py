@@ -26,7 +26,7 @@ def make_wsm_setup(seq_len, d_output, device='cpu'):
     wsm.model_setup.nlayers = 2
     wsm.model_setup.seq_len = seq_len
     wsm.model_setup.dropout = 0
-    wsm.lr = 1e-3
+    wsm.lr = 5e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.Adam
     wsm.optimizer_kwargs = {}
@@ -39,7 +39,7 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 2, device='cpu', horiz
     acps.extractor=extractor
     acps.new_epoch=new_epoch
     acps.opt_steps=100
-    acps.inference_opt_lr = 1e-2
+    acps.inference_opt_lr = 1e-1
     acps.optimizer_class = th.optim.Adam
     acps.optimize = True
     acps.batch_size = batch_size
@@ -55,7 +55,7 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
     env, expert = make_vec_env('reach', num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
     embed_dim = 20
-    lr = 1e-3
+    lr = 5e-4
 
     actor_args = StateModelArgs()
     actor_args.arch = [200, 200, env.action_space.shape[0]]
@@ -110,22 +110,22 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'reach_wsm_predicotr_25_steps'
+    acla.logname = 'test_no_critic'
     acla.tboard = True
     acla.batch_size = 32
-    acla.validation_episodes = 25
+    acla.validation_episodes = 20
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
-    acla.critic_threshold = 1e-2
-    acla.predictor_threshold = 1e-2
-    acla.gen_scores_threshold = 0.3
-    acla.num_cpu = 25
+    acla.critic_threshold = 1e-3
+    acla.predictor_threshold = 1e-3
+    acla.gen_scores_threshold = 1e-1
+    acla.num_cpu = acla.validation_episodes
 
     batch_size = 32
-    seq_len = 100
+    seq_len = 10
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=batch_size, seq_len=seq_len)
     
-    acps.opt_steps = 25
+    acps.opt_steps = 20
     acla.val_every = 10
     acla.add_data_every = 1
 

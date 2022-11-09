@@ -116,6 +116,7 @@ class ActiveCriticLearner(nn.Module):
             goal_emb_acts=self.policy.goal_label[:,-1])
         gen_critic_inputs = self.policy.get_predictor_input(gen_embeddings, gen_actions)
         gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=self.policy.goal_label, mask=self.policy.args_obj.opt_mask)
+        self.policy.critic.optimizer.zero_grad()
         self.policy.actor.optimizer.zero_grad()
         self.policy.predicor.optimizer.zero_grad()
         loss_gen_trj = gen_loss_critic.mean()
@@ -123,6 +124,7 @@ class ActiveCriticLearner(nn.Module):
 
         self.policy.actor.optimizer.step()
         self.policy.predicor.optimizer.step()
+        self.policy.critic.optimizer.step()
 
 
         if losses is None:
@@ -144,7 +146,7 @@ class ActiveCriticLearner(nn.Module):
         self.training_samples += 1
         h = time.perf_counter()
         self.policy.reset()
-        actions, observations, rewards, _, _ = sample_new_episode(
+        actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
             policy=self.policy,
             env=self.env,
             device=self.network_args.device,
@@ -153,6 +155,7 @@ class ActiveCriticLearner(nn.Module):
         debug_dict = {
             'Training epoch time': th.tensor(time.perf_counter() - h)
         }
+        self.createGraphs(trjs=[rewards[0], expected_rewards_after[0], expected_rewards_before[0]], trj_names=['GT Rewards', 'Expected Rewards Opt', 'Expected Rewards Before'], plot_name='training rewards')
         self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.training_samples)
         self.add_data(
             actions=actions,
@@ -184,8 +187,7 @@ class ActiveCriticLearner(nn.Module):
             mean_gen_score = float('inf')
 
             while (mean_critic > self.network_args.critic_threshold)\
-                or (mean_predictor > self.network_args.predictor_threshold)\
-                or (mean_gen_score > self.network_args.gen_scores_threshold):
+                or (mean_predictor > self.network_args.predictor_threshold):
 
                 losses = self.train_step(train_loader=self.train_loader)
                 mean_actor = losses[0].mean()
