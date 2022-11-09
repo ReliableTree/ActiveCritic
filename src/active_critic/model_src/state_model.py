@@ -39,7 +39,10 @@ class StateModel(nn.Module):
             self.is_init = True
         return self.model.forward(inpt)
 
-    def calc_loss(self, inpt, label):
+    def calc_loss(self, inpt, label, mask=None):
         result = self.forward(inpt=inpt)
-        loss = calcMSE(result, label)
+        if mask is not None:
+            loss = calcMSE(result, label)
+        else:
+            loss = calcMSE(result[:, mask], label[:, mask])
         return loss

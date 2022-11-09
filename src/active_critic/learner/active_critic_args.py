@@ -20,4 +20,5 @@ class ActiveCriticLearnerArgs:
         self.actor_threshold:float = None
         self.critic_threshold:float = None
         self.predictor_threshold:float = None
+        self.gen_scores_threshold:float = None
         self.num_cpu:int = None

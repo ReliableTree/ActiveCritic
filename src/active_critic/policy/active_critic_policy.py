@@ -223,15 +223,24 @@ class ActiveCriticPolicy(BaseModel):
         actor:StateModel, 
         predictor: Union[WholeSequenceModel, StateModel] ):
         init_embedding = embeddings.detach().clone()
-        for i in range(seq_len - 1):
+        if actions is not None:
+            init_actions = actions.detach().clone()
+        else:
+            init_actions = None
+        
+        while embeddings.shape[1] < seq_len:
             embeddings = embeddings.detach()
-            if actions is None or actions.shape[1] == i:
+            if actions is None or actions.shape[1] == embeddings.shape[1]-1:
                 actions = actor.forward(embeddings)
                 if self.args_obj.clip:
                     with th.no_grad():
                         th.clamp(actions, min=self.clip_min, max=self.clip_max, out=actions)
-            next_embedings = self.predict_step(embeddings=embeddings, actions=actions[:,:i+1], mask=tf_mask[:i+1,:i+1])
-            embeddings = th.cat((init_embedding.clone(), next_embedings), dim=1)
+                if init_actions is None:
+                    init_actions = actions.detach().clone()
+            if not init_actions.shape[1] == seq_len:
+                actions = th.cat((init_actions.clone(), actions[:, init_actions.shape[1]:]), dim=1)
+            next_embedings = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]], mask=tf_mask[:embeddings.shape[1],:embeddings.shape[1]])
+            embeddings = th.cat((init_embedding.clone(), next_embedings[:, init_embedding.shape[1]-1:]), dim=1)
         if actions.shape[1] == seq_len - 1:
             actions = th.cat((actions, actor.forward(embeddings[:,-1:])), dim=1)
         if self.args_obj.clip:

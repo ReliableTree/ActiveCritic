@@ -7,10 +7,30 @@ from active_critic.utils.pytorch_utils import build_tf_horizon_mask
 from active_critic.utils.dataset import DatasetAC
 from active_critic.policy.active_critic_policy import ActiveCriticPolicySetup, ActiveCriticPolicy
 from active_critic.model_src.state_model import *
+from active_critic.model_src.whole_sequence_model import WholeSequenceModel, WholeSequenceModelArgs
+from active_critic.model_src.transformer import ModelSetup
 
 
 from gym import Env
 th.manual_seed(0)
+
+def make_wsm_setup(seq_len, d_output, device='cpu'):
+    wsm = WholeSequenceModelArgs()
+    wsm.model_setup = ModelSetup()
+    seq_len = seq_len
+    d_output = d_output
+    wsm.model_setup.d_output = d_output
+    wsm.model_setup.nhead = 1
+    wsm.model_setup.d_hid = 200
+    wsm.model_setup.d_model = 200
+    wsm.model_setup.nlayers = 2
+    wsm.model_setup.seq_len = seq_len
+    wsm.model_setup.dropout = 0
+    wsm.lr = 1e-3
+    wsm.model_setup.device = device
+    wsm.optimizer_class = th.optim.Adam
+    wsm.optimizer_kwargs = {}
+    return wsm
 
 def make_acps(seq_len, extractor, new_epoch, batch_size = 2, device='cpu', horizon = 0):
     acps = ActiveCriticPolicySetup()
@@ -23,7 +43,7 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 2, device='cpu', horiz
     acps.optimizer_class = th.optim.Adam
     acps.optimize = True
     acps.batch_size = batch_size
-    acps.pred_mask = build_tf_horizon_mask(seq_len=seq_len, horizon=horizon, device=device)
+    acps.pred_mask = build_tf_horizon_mask(seq_len=seq_len, horizon=seq_len, device=device)
     acps.opt_mask = th.ones([seq_len, 1], device=device, dtype=bool)
     acps.opt_mask[:,-1] = 1
     acps.opt_goal = True
@@ -60,11 +80,11 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
     emitter_args.lr = lr
     emitter = StateModel(args=emitter_args)
 
-    predictor_args = StateModelArgs()
-    predictor_args.arch = [200, 200, embed_dim]
-    predictor_args.device = device
-    predictor_args.lr = lr
-    predictor = StateModel(args=emitter_args)
+    predictor_args = make_wsm_setup(
+    seq_len=seq_len, d_output=embed_dim, device=device)
+    predictor_args.model_setup.d_hid = 200
+    predictor_args.model_setup.d_model = 200
+    predictor = WholeSequenceModel(args=predictor_args)
 
 
     acps = make_acps(
@@ -89,7 +109,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'reach_plot_predictive_embedding_dense_lr1'
+    acla.logname = 'reach_wsm_predicotr'
     acla.tboard = True
     acla.batch_size = 32
     acla.validation_episodes = 5
@@ -97,13 +117,14 @@ def make_acl(device):
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
     acla.predictor_threshold = 1e-2
+    acla.gen_scores_threshold = 1e-1
     acla.num_cpu = 5
 
     batch_size = 32
-    seq_len = 100
+    seq_len = 10
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=batch_size, seq_len=seq_len)
     
-    acps.opt_steps = 20
+    acps.opt_steps = 2
     acla.val_every = 1
     acla.add_data_every = 1
 

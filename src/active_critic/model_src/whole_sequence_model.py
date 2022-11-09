@@ -49,8 +49,8 @@ class WholeSequenceModel(nn.Module, ABC):
 
         return debug_dict
 
-    def calc_loss(self, inpt:th.Tensor, label:th.Tensor, mask:th.Tensor = None) -> th.Tensor:
-        result = self.forward(inputs=inpt)
+    def calc_loss(self, inpt:th.Tensor, label:th.Tensor, mask:th.Tensor = None, tf_mask:th.Tensor=None) -> th.Tensor:
+        result = self.forward(inputs=inpt, tf_mask=tf_mask)
         if mask is not None:
             loss = calcMSE(result[mask], label[mask])
         else:

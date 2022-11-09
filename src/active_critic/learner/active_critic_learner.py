@@ -78,57 +78,60 @@ class ActiveCriticLearner(nn.Module):
         obsv, actions, reward = data
         embeddings = self.policy.emitter.forward(obsv)
 
-        last_rewards = reward[:,-1]
-
-        last_obsv = obsv[:, -1]
-        last_action = actions[:, -1]
-
-        with th.no_grad():
-            last_embedding = self.policy.emitter.forward(last_obsv)
-
-        inv_critic_label = self.policy.get_predictor_input(embeddings=last_embedding, actions=last_action)
-        inv_critic_inpt = self.policy.get_inverse_critic_input(goal_state=last_obsv[:, -3:], goal_scores=last_rewards)
-
-        loss_inv_critic = self.policy.inverse_critic.calc_loss(inv_critic_inpt, inv_critic_label)
-
-        final_emb_acts = self.policy.get_predictor_input(embeddings=embeddings[:,-1], actions=actions[:,-1])
-
-        actor_input = self.policy.get_actor_input(embeddings=embeddings, goal_emb_acts=final_emb_acts)
         loss_actor = self.policy.actor.calc_loss(
-            inpt=actor_input, label=actions)
+            inpt=embeddings, label=actions)
 
         critic_input = self.policy.get_predictor_input(embeddings=embeddings, actions=actions)
         loss_critic = self.policy.critic.calc_loss(inpt=critic_input, label=reward)
 
-        loss_predictor = self.policy.predicor.calc_loss(inpt=critic_input[:,:-1], label=embeddings[:,1:])
+        loss_predictor = self.policy.predicor.calc_loss(inpt=critic_input[:,:-1], label=embeddings[:,1:], tf_mask=self.policy.args_obj.pred_mask[:-1, :-1])
+
+        
         
         self.policy.emitter.optimizer.zero_grad()
         self.policy.actor.optimizer.zero_grad()
         self.policy.critic.optimizer.zero_grad()
         self.policy.predicor.optimizer.zero_grad()
-        self.policy.inverse_critic.optimizer.zero_grad()
 
-        loss = loss_actor + loss_critic + loss_predictor + loss_inv_critic
+        loss = loss_actor + loss_critic + loss_predictor
         loss.backward()
 
         self.policy.emitter.optimizer.step()
         self.policy.actor.optimizer.step()
         self.policy.critic.optimizer.step()
         self.policy.predicor.optimizer.step()
-        self.policy.inverse_critic.optimizer.step()
+
+        gen_embeddings, gen_actions = self.policy.build_sequence(
+            actor=self.policy.actor, 
+            predictor=self.policy.predicor, 
+            seq_len=self.policy.args_obj.epoch_len, 
+            embeddings=embeddings[:,:1], 
+            tf_mask=self.policy.args_obj.pred_mask,
+            actions=None,
+            goal_state=None,
+            goal_emb_acts=None)
+        gen_critic_inputs = self.policy.get_predictor_input(gen_embeddings, gen_actions)
+        gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=self.policy.goal_label, mask=self.policy.args_obj.opt_mask)
+        self.policy.actor.optimizer.zero_grad()
+        self.policy.predicor.optimizer.zero_grad()
+        loss_gen_trj = gen_loss_critic.mean()
+        loss_gen_trj.backward()
+        self.policy.actor.optimizer.step()
+        self.policy.predicor.optimizer.zero_grad()
+
 
         if losses is None:
             losses = [
                 loss_actor.unsqueeze(0),
                 loss_critic.unsqueeze(0),
                 loss_predictor.unsqueeze(0),
-                loss_inv_critic.unsqueeze(0)
+                loss_gen_trj.unsqueeze(0)
             ]
         else:
             losses[0] = th.cat((losses[0], loss_actor.unsqueeze(0)), dim=0)
             losses[1] = th.cat((losses[1], loss_critic.unsqueeze(0)), dim=0)
             losses[2] = th.cat((losses[2], loss_predictor.unsqueeze(0)), dim=0)
-            losses[3] = th.cat((losses[3], loss_inv_critic.unsqueeze(0)), dim=0)
+            losses[3] = th.cat((losses[3], loss_gen_trj.unsqueeze(0)), dim=0)
         return losses
 
 
@@ -152,7 +155,8 @@ class ActiveCriticLearner(nn.Module):
             rewards=rewards
         )
 
-    def train_step(self, train_loader, losses):
+    def train_step(self, train_loader):
+        losses = None
         for data in train_loader:
             device_data = []
             for dat in data:
@@ -169,20 +173,21 @@ class ActiveCriticLearner(nn.Module):
                 self.add_training_data()
 
             self.policy.eval()
-            losses = None
             mean_actor = float('inf')
             mean_critic = float('inf')
             mean_predictor = float('inf')
+            mean_gen_score = float('inf')
 
             while (mean_actor > self.network_args.actor_threshold) \
                 or (mean_critic > self.network_args.critic_threshold)\
-                or (mean_predictor > self.network_args.predictor_threshold):
+                or (mean_predictor > self.network_args.predictor_threshold)\
+                or (mean_gen_score > self.network_args.gen_scores_threshold):
 
-                losses = self.train_step(train_loader=self.train_loader, losses=losses)
+                losses = self.train_step(train_loader=self.train_loader)
                 mean_actor = losses[0].mean()
                 mean_critic = losses[1].mean()
                 mean_predictor = losses[2].mean()
-                mean_inv_critic = losses[3].mean()
+                mean_gen_score = losses[3].mean()
 
                 self.scores.update_min_score(
                     self.scores.mean_critic, mean_critic)
@@ -193,7 +198,7 @@ class ActiveCriticLearner(nn.Module):
                     'Loss Actor': mean_actor,
                     'Loss Critic': mean_critic,
                     'Loss Predictor': mean_predictor,
-                    'Loss Inv Critic': mean_inv_critic
+                    'Loss Gen Score': mean_gen_score
                 }
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
                 self.global_step += len(self.train_data)
