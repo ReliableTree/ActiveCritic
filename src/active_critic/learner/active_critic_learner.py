@@ -156,6 +156,7 @@ class ActiveCriticLearner(nn.Module):
         debug_dict = {
             'Training epoch time': th.tensor(time.perf_counter() - h)
         }
+        print(f'Training Reward: {rewards[:,-1]}')
         self.createGraphs(trjs=[rewards[0], expected_rewards_after[0], expected_rewards_before[0]], trj_names=['GT Rewards', 'Expected Rewards Opt', 'Expected Rewards Before'], plot_name='training rewards')
         self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.training_samples)
         self.add_data(

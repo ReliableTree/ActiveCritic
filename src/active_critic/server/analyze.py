@@ -44,10 +44,12 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 2, device='cpu', horiz
     acps.optimize = True
     acps.batch_size = batch_size
     acps.pred_mask = build_tf_horizon_mask(seq_len=seq_len, horizon=seq_len, device=device)
-    acps.opt_mask = th.ones([seq_len, 1], device=device, dtype=bool)
+    acps.opt_mask = th.zeros([seq_len, 1], device=device, dtype=bool)
     acps.opt_mask[:,-1] = 1
     acps.opt_goal = True
     acps.optimize_goal_emb_acts = False
+    acps.goal_label_multiplier = 1
+
     return acps
 
 def setup_opt_state(batch_size, seq_len, device='cpu'):
@@ -116,8 +118,8 @@ def make_acl(device):
     acla.validation_episodes = 20
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
-    acla.critic_threshold = 1e-2
-    acla.predictor_threshold = 1e-2
+    acla.critic_threshold = 1e-3
+    acla.predictor_threshold = 1e-3
     acla.gen_scores_threshold = 1e-1
     acla.num_cpu = acla.validation_episodes
 

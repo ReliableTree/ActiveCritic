@@ -39,6 +39,7 @@ class ActiveCriticPolicySetup:
         self.opt_goal:th.Tensor=None,
         self.clip:bool = True
         self.optimize_goal_emb_acts:bool = False
+        self.goal_label_multiplier:float = 1
 
 
 class ActiveCriticPolicyHistory:
@@ -106,8 +107,8 @@ class ActiveCriticPolicy(BaseModel):
     def reset_epoch(self, vec_obsv:th.Tensor):
         self.current_step = 0
         self.last_goal = vec_obsv[:,0,-3:]
-        self.goal_label = th.zeros([vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.args.arch[-1]], device=self.args_obj.device)
-
+        self.goal_label = th.ones([vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.args.arch[-1]], device=self.args_obj.device)
+        self.goal_label *= self.args_obj.goal_label_multiplier
         
         self.history.new_epoch(history=self.history.opt_trj, size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
         self.history.new_epoch(history=self.history.gen_trj, size=[vec_obsv.shape[0], self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
