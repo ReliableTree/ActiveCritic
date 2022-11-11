@@ -93,7 +93,7 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
 
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device, batch_size=batch_size)
-    acps.clip = True
+    acps.clip = False
     ac = ActiveCriticPolicy(observation_space=env.observation_space, 
                             action_space=env.action_space,
                             actor=actor,
@@ -113,7 +113,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'Autoregressive_Dense_no_Opt'
+    acla.logname = 'Autoregressive_Dense_no_Opt_No_Clip'
     acla.tboard = True
     acla.batch_size = 32
     acla.validation_episodes = 20
