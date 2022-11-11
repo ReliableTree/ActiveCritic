@@ -380,7 +380,7 @@ class ActiveCriticPolicy(BaseModel):
                                                     optimizer_class=self.args_obj.optimizer_class,
                                                     lr=self.args_obj.inference_opt_lr,
                                                     goal_state=self.last_goal)
-        if self.current_step == 0:
+        '''if self.current_step == 0:
             self.history.add_value(self.history.pred_emb, seq_embeddings[:,self.current_step+1:self.current_step+2], step=self.current_step)
         elif self.current_step == self.args_obj.epoch_len - 1:
             self.history.add_value(self.history.act_emb, seq_embeddings[:,self.current_step:self.current_step+1], step=self.current_step - 1)
@@ -388,7 +388,7 @@ class ActiveCriticPolicy(BaseModel):
         else:
             self.history.add_value(self.history.pred_emb, seq_embeddings[:,self.current_step+1:self.current_step+2], step=self.current_step)
             self.history.add_value(self.history.act_emb, seq_embeddings[:,self.current_step:self.current_step+1], step=self.current_step - 1)
-
+        '''
         #self.current_actions = actions[:,:self.current_step+1]
         if self.current_actions is None:
             self.current_actions = actions
