@@ -253,6 +253,7 @@ class ActiveCriticLearner(nn.Module):
                     self.policy.init_models()
                     self.network_args.patients *= 2
                     print('init model')
+            self.current_patients = 0
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every
                 if self.network_args.tboard:
