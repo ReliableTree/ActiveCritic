@@ -21,6 +21,7 @@ class ActiveCriticLearnerArgs:
         self.critic_threshold:float = None
         self.predictor_threshold:float = None
         self.gen_scores_threshold:float = None
+        self.loss_auto_predictor_threshold:float = None
         self.num_cpu:int = None
         self.use_pain:bool = None
         self.patients:int = None
