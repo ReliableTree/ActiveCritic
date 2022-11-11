@@ -49,8 +49,10 @@ class ActiveCriticPolicyHistory:
 
     def reset(self):
         self.scores = []
-        self.goal_scores = []
         self.trj = []
+        self.emb = []
+
+        self.goal_scores = []
         self.pred_emb = []
         self.act_emb = []
 
@@ -116,6 +118,8 @@ class ActiveCriticPolicy(BaseModel):
         
         self.history.new_epoch(history=self.history.trj, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 1, self.args_obj.epoch_len, self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
         self.history.new_epoch(history=self.history.scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 1, self.args_obj.epoch_len, self.args_obj.epoch_len, self.critic.args.arch[-1]], device=self.args_obj.device)
+        self.history.new_epoch(history=self.history.emb, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 1, self.args_obj.epoch_len, self.args_obj.epoch_len, self.emitter.args.arch[-1]], device=self.args_obj.device)
+
         self.history.new_epoch(history=self.history.pred_emb, size=[vec_obsv.shape[0], self.args_obj.epoch_len -1, self.emitter.args.arch[-1]], device=self.args_obj.device)
         self.history.new_epoch(history=self.history.act_emb, size=[vec_obsv.shape[0], self.args_obj.epoch_len -1, self.emitter.args.arch[-1]], device=self.args_obj.device)
         self.history.new_epoch(history=self.history.goal_scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps, self.critic.args.arch[-1]], device=self.args_obj.device)
@@ -231,9 +235,7 @@ class ActiveCriticPolicy(BaseModel):
                 if self.args_obj.clip:
                     with th.no_grad():
                         th.clamp(actions, min=self.clip_min, max=self.clip_max, out=actions)
-                if init_actions is None:
-                    init_actions = actions.detach().clone()
-            if not init_actions.shape[1] == seq_len:
+            if (init_actions is not None) and (not init_actions.shape[1] == seq_len):
                 actions = th.cat((init_actions.clone(), actions[:, init_actions.shape[1]:]), dim=1)
             next_embedings = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]], mask=tf_mask[:embeddings.shape[1],:embeddings.shape[1]])
             embeddings = th.cat((init_embedding.clone(), next_embedings[:, init_embedding.shape[1]-1:]), dim=1)
@@ -270,7 +272,7 @@ class ActiveCriticPolicy(BaseModel):
 
         seq_embeddings = seq_embeddings.detach().clone()
         if (actions is None) or (actions.shape[1] != seq_embeddings.shape[1]):
-            embeddings, actions = self.build_sequence(
+            seq_embeddings, actions = self.build_sequence(
                 embeddings=seq_embeddings.detach()[:,:current_step+1], 
                 actions=actions, 
                 seq_len=seq_len, 
@@ -286,10 +288,11 @@ class ActiveCriticPolicy(BaseModel):
             actions.requires_grad = True
 
         with th.no_grad():
-            critic_inpt = self.get_critic_input(embeddings=embeddings, actions=actions)
+            critic_inpt = self.get_critic_input(embeddings=seq_embeddings, actions=actions)
             scores = self.critic.forward(critic_inpt)
             self.history.add_opt_stp_seq(self.history.trj, actions, 0, self.current_step)
             self.history.add_opt_stp_seq(self.history.scores, scores, 0, self.current_step)
+            self.history.add_opt_stp_seq(self.history.emb, seq_embeddings, 0, self.current_step)
 
         
         opt_paras = None
@@ -310,6 +313,7 @@ class ActiveCriticPolicy(BaseModel):
 
             self.history.add_opt_stp_seq(self.history.scores, scores, opt_step=opt_step+1, step=self.current_step)
             self.history.add_opt_stp_seq(self.history.trj, actions, opt_step=opt_step+1, step=self.current_step)
+            self.history.add_opt_stp_seq(self.history.emb, seq_embeddings, opt_step=opt_step+1, step=self.current_step)
 
             if opt_paras is not None:
                 optimizer.load_state_dict(opt_paras)
@@ -332,7 +336,7 @@ class ActiveCriticPolicy(BaseModel):
             
 
             
-        return loss.detach(), actions.detach(), seq_embeddings.detach(), scores.detach()
+        return actions.detach(), seq_embeddings.detach()
             
 
     def predict(
@@ -356,7 +360,7 @@ class ActiveCriticPolicy(BaseModel):
         printProgressBar(iteration=self.current_step, total=self.args_obj.epoch_len, suffix='Predicting Epsiode')
 
         if self.args_obj.optimize:
-            loss_reward, actions, seq_embeddings, scores = self.optimize_sequence(
+            actions, seq_embeddings = self.optimize_sequence(
                                                     actions=self.current_actions, 
                                                     seq_embeddings=self.current_embeddings, 
                                                     pred_mask = self.args_obj.pred_mask,

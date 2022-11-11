@@ -44,7 +44,7 @@ def make_acps(seq_len, extractor, new_epoch, batch_size = 2, device='cpu', horiz
     acps.optimize = True
     acps.batch_size = batch_size
     acps.pred_mask = build_tf_horizon_mask(seq_len=seq_len, horizon=seq_len, device=device)
-    acps.opt_mask = th.zeros([seq_len, 1], device=device, dtype=bool)
+    acps.opt_mask = th.ones([seq_len, 1], device=device, dtype=bool)
     acps.opt_mask[:,-1] = 1
     acps.opt_goal = True
     acps.optimize_goal_emb_acts = False
@@ -57,7 +57,7 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
     env, expert = make_vec_env('reach', num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
     embed_dim = 20
-    lr = 5e-4
+    lr = 1e-4
 
     actor_args = StateModelArgs()
     actor_args.arch = [2000, 2000, env.action_space.shape[0]]
@@ -87,6 +87,7 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
     seq_len=seq_len, d_output=embed_dim, device=device)
     predictor_args.model_setup.d_hid = 2000
     predictor_args.model_setup.d_model = 2000
+    predictor_args.lr = lr
     predictor = WholeSequenceModel(args=predictor_args)
 
 
@@ -107,19 +108,19 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
 def make_acl(device):
     device = device
     acla = ActiveCriticLearnerArgs()
-    #acla.data_path = '/home/hendrik/Documents/master_project/LokalData/WSM/'
-    acla.data_path = '/data/bing/hendrik/'
+    acla.data_path = '/home/hendrik/Documents/master_project/LokalData/WSM/'
+    #acla.data_path = '/data/bing/hendrik/'
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'inverse_dense_50'
+    acla.logname = 'Autoregressive_Dense_no_Opt'
     acla.tboard = True
     acla.batch_size = 32
-    acla.validation_episodes = 20
+    acla.validation_episodes = 1
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
-    acla.critic_threshold = 1e-3
-    acla.predictor_threshold = 1e-3
+    acla.critic_threshold = 1e-2
+    acla.predictor_threshold = 1e-2
     acla.gen_scores_threshold = 1e-1
     acla.num_cpu = acla.validation_episodes
 
@@ -127,8 +128,8 @@ def make_acl(device):
     seq_len = 50
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=batch_size, seq_len=seq_len)
     
-    acps.opt_steps = 20
-    acla.val_every = 10
+    acps.opt_steps = 0
+    acla.val_every = 1
     acla.add_data_every = 1
 
     

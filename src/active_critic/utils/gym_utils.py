@@ -214,7 +214,7 @@ def sample_expert_transitions(policy, env, episodes):
     return flatten_trajectories(rollouts)
 
 
-def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:int=1, return_gen_trj = False):
+def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:int=1):
         policy.eval()
         policy.reset()
         transitions = sample_expert_transitions(
@@ -228,9 +228,4 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:
         for data in datas:
             device_data.append(data[:episodes].to(policy.args_obj.device))
         actions, observations, rewards = device_data
-        rewards = rewards
-
-        if return_gen_trj:
-            return actions, policy.history.trj[0][:episodes, 0, 0], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]
-        else:
-            return actions, observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]
+        return actions, observations, rewards
