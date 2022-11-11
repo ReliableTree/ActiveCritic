@@ -113,7 +113,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'Autoregressive_Sparse_GenLossMin'
+    acla.logname = 'Dont recompute current actions'
     acla.tboard = True
     acla.batch_size = 32
     acla.validation_episodes = 20
