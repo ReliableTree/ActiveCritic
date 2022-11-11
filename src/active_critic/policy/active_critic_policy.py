@@ -366,7 +366,7 @@ class ActiveCriticPolicy(BaseModel):
         
         printProgressBar(iteration=self.current_step, total=self.args_obj.epoch_len, suffix='Predicting Epsiode')
 
-        if self.args_obj.optimize and (self.current_actions is not None):
+        if self.args_obj.optimize and (self.current_actions is None):
             actions, seq_embeddings = self.optimize_sequence(
                                                     actions=self.current_actions, 
                                                     seq_embeddings=self.current_embeddings, 
