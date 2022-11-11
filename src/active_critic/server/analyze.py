@@ -113,7 +113,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'Autoregressive_Dense_no_Opt_No_Clip'
+    acla.logname = 'Autoregressive_Dense_no_Opt_Use_Pain'
     acla.tboard = True
     acla.batch_size = 32
     acla.validation_episodes = 20
@@ -123,6 +123,7 @@ def make_acl(device):
     acla.predictor_threshold = 1e-2
     acla.gen_scores_threshold = 1e-1
     acla.num_cpu = acla.validation_episodes
+    acla.use_pain = True
 
     batch_size = 32
     seq_len = 50

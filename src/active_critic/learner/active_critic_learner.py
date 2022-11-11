@@ -96,6 +96,7 @@ class ActiveCriticLearner(nn.Module):
             gen_critic_inputs = self.policy.get_critic_input(pred_embeddings, gen_actions)
             gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=self.policy.goal_label, mask=self.policy.args_obj.opt_mask, print_fn=False)
             
+
             self.policy.actor.optimizer.zero_grad()
             self.policy.predicor.optimizer.zero_grad()
 
@@ -110,7 +111,13 @@ class ActiveCriticLearner(nn.Module):
                 auto_loss = loss_auto_predictor_mean.detach()
             else:
                 auto_loss += loss_auto_predictor_mean.detach()
+
             loss = gen_loss_mean + loss_auto_predictor_mean
+            
+            if self.network_args.use_pain:
+                pain = self.pain_boundaries(gen_actions, -1, 1)
+                loss = loss + pain
+
             loss.backward()
 
             self.policy.actor.optimizer.step()
@@ -197,6 +204,12 @@ class ActiveCriticLearner(nn.Module):
                 device_data.append(dat.to(self.network_args.device))
             losses = self.model_step(device_data, losses)
         return losses
+
+    def pain_boundaries(self, actions:th.Tensor, min_bound:float, max_bound:float):
+        pain = ((actions[actions < min_bound] - min_bound)**2).sum().nan_to_num()
+        pain += ((actions[actions > max_bound] - max_bound)**2).sum().nan_to_num()
+        pain = pain / actions.numel()
+        return pain
 
     def train(self, epochs):
         next_val = self.network_args.val_every
