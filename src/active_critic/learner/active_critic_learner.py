@@ -116,7 +116,7 @@ class ActiveCriticLearner(nn.Module):
             goal_state=None,
             goal_emb_acts=self.policy.goal_label[:,-1])
         gen_critic_inputs = self.policy.get_critic_input(gen_embeddings, gen_actions)
-        gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=self.policy.goal_label, mask=self.policy.args_obj.opt_mask)
+        gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=self.policy.goal_label, mask=self.policy.args_obj.opt_mask, print_fn=False)
         self.policy.critic.optimizer.zero_grad()
         self.policy.actor.optimizer.zero_grad()
         self.policy.predicor.optimizer.zero_grad()
@@ -190,12 +190,6 @@ class ActiveCriticLearner(nn.Module):
 
             while (mean_critic > self.network_args.critic_threshold)\
                 or (mean_predictor > self.network_args.predictor_threshold):
-                print('_________________')
-                print(mean_critic)
-                print(self.network_args.critic_threshold)
-                print(mean_predictor)
-                print(self.network_args.predictor_threshold)
-
 
                 losses = self.train_step(train_loader=self.train_loader)
                 mean_actor = losses[0].mean()

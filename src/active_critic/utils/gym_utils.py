@@ -217,11 +217,11 @@ def sample_expert_transitions(policy, env, episodes):
 def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:int=1, return_gen_trj = False):
         policy.eval()
         policy.reset()
-        seq_len = policy.args_obj.epoch_len
         transitions = sample_expert_transitions(
             policy.predict, env, episodes)
-        expected_rewards_after = policy.history.scores[0][:,-1]
-        expected_rewards_before = policy.history.scores[0][:, 0]
+        #torch.Size([1, 41, 10, 10, 1])
+        expected_rewards_after = policy.history.scores[0][:,-1, -1]
+        expected_rewards_before = policy.history.scores[0][:, 0, 0]
         datas = parse_sampled_transitions(
             transitions=transitions, extractor=policy.args_obj.extractor, device=device)
         device_data = []
@@ -231,6 +231,6 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:
         rewards = rewards
 
         if return_gen_trj:
-            return actions, policy.history.gen_trj[0][:episodes], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]
+            return actions, policy.history.trj[0][:episodes, 0, 0], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]
         else:
             return actions, observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]
