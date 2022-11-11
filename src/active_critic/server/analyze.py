@@ -116,7 +116,7 @@ def make_acl(device):
     acla.logname = 'Autoregressive_Dense_no_Opt'
     acla.tboard = True
     acla.batch_size = 32
-    acla.validation_episodes = 1
+    acla.validation_episodes = 20
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
@@ -129,7 +129,7 @@ def make_acl(device):
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=batch_size, seq_len=seq_len)
     
     acps.opt_steps = 0
-    acla.val_every = 1
+    acla.val_every = 10
     acla.add_data_every = 1
 
     
