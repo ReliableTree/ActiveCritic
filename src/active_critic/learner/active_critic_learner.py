@@ -131,7 +131,6 @@ class ActiveCriticLearner(nn.Module):
 
 
 
-
     def model_step(self, data, losses):
         obsv, actions, reward = data
         embeddings = self.policy.emitter.forward(obsv)
@@ -224,10 +223,13 @@ class ActiveCriticLearner(nn.Module):
             mean_actor = float('inf')
             mean_critic = float('inf')
             mean_predictor = float('inf')
-            mean_gen_score = float('inf')
+            loss_auto_predictor_mean = float('inf')
+            gen_loss_mean = float('inf')
 
             while (mean_critic > self.network_args.critic_threshold)\
-                or (mean_predictor > self.network_args.predictor_threshold):
+                or (mean_predictor > self.network_args.predictor_threshold)\
+                or (loss_auto_predictor_mean > self.network_args.loss_auto_predictor_threshold)\
+                or (gen_loss_mean > self.network_args.gen_scores_threshold):
 
                 losses = self.train_step(train_loader=self.train_loader)
                 mean_critic = losses[0].mean()

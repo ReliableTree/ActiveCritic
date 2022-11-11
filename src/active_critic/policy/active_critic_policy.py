@@ -112,7 +112,7 @@ class ActiveCriticPolicy(BaseModel):
          self.emitter.init_model()
          self.predicor.init_model()
 
-         
+
     def reset(self):
         self.history = ActiveCriticPolicyHistory()
         self.last_goal = None
@@ -366,7 +366,7 @@ class ActiveCriticPolicy(BaseModel):
         
         printProgressBar(iteration=self.current_step, total=self.args_obj.epoch_len, suffix='Predicting Epsiode')
 
-        if self.args_obj.optimize:
+        if self.args_obj.optimize and (self.current_actions is not None):
             actions, seq_embeddings = self.optimize_sequence(
                                                     actions=self.current_actions, 
                                                     seq_embeddings=self.current_embeddings, 
@@ -389,8 +389,10 @@ class ActiveCriticPolicy(BaseModel):
             self.history.add_value(self.history.pred_emb, seq_embeddings[:,self.current_step+1:self.current_step+2], step=self.current_step)
             self.history.add_value(self.history.act_emb, seq_embeddings[:,self.current_step:self.current_step+1], step=self.current_step - 1)
 
-        self.current_actions = actions[:,:self.current_step+1]
-        return actions.cpu().numpy()[:, self.current_step]
+        #self.current_actions = actions[:,:self.current_step+1]
+        if self.current_actions is None:
+            self.current_actions = actions
+        return self.current_actions.cpu().numpy()[:, self.current_step]
 
     def save_policy(self, add, data_path):
 
