@@ -36,7 +36,7 @@ class TestStateModel(unittest.TestCase):
             loss.backward()
             sm.optimizer.step()
         self.assertTrue(loss < 1e-5, 'Loss did not converge.')
-        sm.reset()
+        sm.init_model()
         loss = sm.calc_loss(inpt=inpt, label=label)
         self.assertTrue(loss > 1e-2, 'Reset did not change the network.')
         for i in range(1000):

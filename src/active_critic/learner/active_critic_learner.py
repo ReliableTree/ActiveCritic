@@ -62,6 +62,7 @@ class ActiveCriticLearner(nn.Module):
 
         self.train_data = DatasetAC(device='cpu')
         self.train_data.onyl_positiv = False
+        self.current_patients = 0
 
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
@@ -113,7 +114,7 @@ class ActiveCriticLearner(nn.Module):
                 auto_loss += loss_auto_predictor_mean.detach()
 
             loss = gen_loss_mean + loss_auto_predictor_mean
-            
+
             if self.network_args.use_pain:
                 pain = self.pain_boundaries(gen_actions, -1, 1)
                 loss = loss + pain
@@ -247,6 +248,11 @@ class ActiveCriticLearner(nn.Module):
                 }
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
                 self.global_step += len(self.train_data)
+                self.current_patients += len(self.train_data)
+                if self.current_patients > self.network_args.patients:
+                    self.policy.init_models()
+                    self.network_args.patients *= 2
+                    print('init model')
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every
                 if self.network_args.tboard:

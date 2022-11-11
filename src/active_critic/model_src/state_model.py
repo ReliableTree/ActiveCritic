@@ -28,14 +28,14 @@ class StateModel(nn.Module):
         self.args = args
         self.is_init = False
 
-    def reset(self):
+    def init_model(self):
         self.model = MLPNetwork(arch=self.args.arch).to(self.args.device)
         self.optimizer = th.optim.AdamW(self.model.parameters(), lr=self.args.lr, weight_decay=0)
                 
     def forward(self, inpt):
         if not self.is_init:
             self.args.arch = [inpt.shape[-1]] + self.args.arch
-            self.reset()
+            self.init_model()
             self.is_init = True
         return self.model.forward(inpt)
 

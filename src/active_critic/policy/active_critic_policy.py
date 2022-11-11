@@ -106,6 +106,13 @@ class ActiveCriticPolicy(BaseModel):
 
         self.reset()
 
+    def init_models(self):
+         self.actor.init_model()
+         self.critic.init_model()
+         self.emitter.init_model()
+         self.predicor.init_model()
+
+         
     def reset(self):
         self.history = ActiveCriticPolicyHistory()
         self.last_goal = None
