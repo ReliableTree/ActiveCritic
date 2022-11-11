@@ -108,8 +108,8 @@ def setup_opt_state(batch_size, seq_len, device='cpu'):
 def make_acl(device):
     device = device
     acla = ActiveCriticLearnerArgs()
-    acla.data_path = '/home/hendrik/Documents/master_project/LokalData/WSM/'
-    #acla.data_path = '/data/bing/hendrik/'
+    #acla.data_path = '/home/hendrik/Documents/master_project/LokalData/WSM/'
+    acla.data_path = '/data/bing/hendrik/'
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
