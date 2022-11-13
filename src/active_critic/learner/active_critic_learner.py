@@ -17,7 +17,6 @@ from gym.envs.mujoco import MujocoEnv
 from torch.utils.data.dataloader import DataLoader
 import numpy as np
 
-
 class ACLScores:
     def __init__(self) -> None:
         self.mean_actor = [float('inf')]
@@ -63,6 +62,7 @@ class ActiveCriticLearner(nn.Module):
         self.train_data = DatasetAC(device='cpu')
         self.train_data.onyl_positiv = False
         self.current_patients = 0
+        self.pain_step = 0
 
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
@@ -75,100 +75,138 @@ class ActiveCriticLearner(nn.Module):
         self.train_loader = DataLoader(
             dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
-    def predicotr_step(self, data):
+    def improve_pred_step(self, data, step):
         obsv, actions, reward = data
         embeddings = self.policy.emitter.forward(obsv)
         inpt_embeddings = embeddings.clone()
         auto_loss = None
+        for seq_step in range(obsv.shape[1] - 1):
+            if seq_step == (step % (obsv.shape[1] - 1)):
+                embeddings = embeddings.detach()
+                pred_embeddings, gen_actions = self.policy.build_sequence(
+                    actor=self.policy.actor, 
+                    predictor=self.policy.predicor, 
+                    seq_len=self.policy.args_obj.epoch_len, 
+                    embeddings=inpt_embeddings[:,:seq_step+1], 
+                    tf_mask=self.policy.args_obj.pred_mask,
+                    actions=actions.detach(),
+                    goal_state=None,
+                    goal_emb_acts=self.policy.goal_label[:,-1])
+
+                gen_critic_inputs = self.policy.get_critic_input(pred_embeddings, gen_actions)
+                gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=reward, mask=self.policy.args_obj.opt_mask, print_fn=False)
+                
+                self.policy.predicor.optimizer.zero_grad()
+                self.policy.critic.optimizer.zero_grad()
+
+                auto_loss_mean = gen_loss_critic.mean()
+                if auto_loss is None:
+                    auto_loss = auto_loss_mean.detach()
+                else:
+                    auto_loss += auto_loss_mean.detach()
+
+                loss = auto_loss_mean
+                loss.backward()
+
+                self.policy.predicor.optimizer.step()
+                self.policy.critic.optimizer.step()
+
+        #auto_loss /= seq_step
+
+        return auto_loss
+
+
+
+    def improve_seq_step(self, data, step):
+        obsv, actions, reward = data
+        embeddings = self.policy.emitter.forward(obsv)
+        inpt_embeddings = embeddings.clone()
         gen_critic_loss = None
-        for step in range(obsv.shape[1] - 1):
-            embeddings = embeddings.detach()
-            pred_embeddings, gen_actions = self.policy.build_sequence(
-                actor=self.policy.actor, 
-                predictor=self.policy.predicor, 
-                seq_len=self.policy.args_obj.epoch_len, 
-                embeddings=inpt_embeddings[:,:step+1], 
-                tf_mask=self.policy.args_obj.pred_mask,
-                actions=actions[:,:step],
-                goal_state=None,
-                goal_emb_acts=self.policy.goal_label[:,-1])
+        for i in range(obsv.shape[1] - 1):
+            if i == (step%(obsv.shape[1] - 1)):
+                seq_step = 0
+                embeddings = embeddings.detach()
+                pred_embeddings, gen_actions = self.policy.build_sequence(
+                    actor=self.policy.actor, 
+                    predictor=self.policy.predicor, 
+                    seq_len=self.policy.args_obj.epoch_len, 
+                    embeddings=inpt_embeddings[:,:seq_step+1], 
+                    tf_mask=self.policy.args_obj.pred_mask,
+                    actions=actions[:,:seq_step],
+                    goal_state=None,
+                    goal_emb_acts=self.policy.goal_label[:,-1])
 
-            loss_predictor = calcMSE(embeddings, pred_embeddings) 
-            gen_critic_inputs = self.policy.get_critic_input(pred_embeddings, gen_actions)
-            gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=self.policy.goal_label, mask=self.policy.args_obj.opt_mask, print_fn=False)
-            
+                gen_critic_inputs = self.policy.get_critic_input(pred_embeddings, gen_actions)
+                gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=self.policy.goal_label, mask=self.policy.args_obj.opt_mask, print_fn=False)
+                
+                act_critic_inputs = self.policy.get_critic_input(embeddings.detach(), actions.detach())
+                act_loss_critic = self.policy.critic.calc_loss(inpt=act_critic_inputs, label=reward)
 
-            self.policy.actor.optimizer.zero_grad()
-            self.policy.predicor.optimizer.zero_grad()
+                self.policy.actor.optimizer.zero_grad()
+                self.policy.predicor.optimizer.zero_grad()
 
-            gen_loss_mean = gen_loss_critic.mean()
-            if gen_critic_loss is None:
-                gen_critic_loss = gen_loss_mean.detach()
-            else:
-                gen_critic_loss += gen_loss_mean.detach()
-            
-            loss_auto_predictor_mean = loss_predictor.mean()
-            if auto_loss is None:
-                auto_loss = loss_auto_predictor_mean.detach()
-            else:
-                auto_loss += loss_auto_predictor_mean.detach()
+                gen_loss_mean = gen_loss_critic.mean()
+                gen_loss_mean = gen_loss_mean * (obsv.shape[1] - seq_step) / obsv.shape[1]
+                act_loss_mean = act_loss_critic.mean()
 
-            loss = gen_loss_mean + loss_auto_predictor_mean
+                if gen_critic_loss is None:
+                    gen_critic_loss = gen_loss_mean.detach()
+                else:
+                    gen_critic_loss += gen_loss_mean.detach()
 
-            if self.network_args.use_pain:
-                pain = self.pain_boundaries(gen_actions, -1, 1)
-                loss = loss + pain
+                loss = gen_loss_mean+act_loss_mean
 
-            loss.backward()
+                if self.network_args.use_pain:
+                    pain = self.pain_boundaries(gen_actions, -1, 1)
+                    loss = loss + pain
+                else:
+                    pain = -1
+                self.pain_step += 1
+                self.write_tboard_scalar({'Pain': th.tensor(pain)}, train=True, step=self.pain_step)
+                loss.backward()
 
-            self.policy.actor.optimizer.step()
-            self.policy.predicor.optimizer.step()
+                self.policy.actor.optimizer.step()
+                self.policy.predicor.optimizer.step()
+                self.policy.critic.optimizer.step()
 
-        auto_loss /= step
-        gen_critic_loss /= step
+        #gen_critic_loss /= step
 
-        return auto_loss, gen_critic_loss
-
+        return gen_critic_loss
 
 
-    def model_step(self, data, losses):
+    def model_step(self, data, losses, step):
         obsv, actions, reward = data
         embeddings = self.policy.emitter.forward(obsv)
 
         critic_input = self.policy.get_critic_input(embeddings=embeddings, actions=actions)
         loss_critic = self.policy.critic.calc_loss(inpt=critic_input, label=reward)
-
-        predictor_input = self.policy.get_predictor_input(embeddings=embeddings, actions=actions)
-
-        loss_predictor = self.policy.predicor.calc_loss(inpt=predictor_input[:,:-1], label=embeddings[:,1:], tf_mask=self.policy.args_obj.pred_mask[:-1, :-1])
-
         
         
         self.policy.emitter.optimizer.zero_grad()
         self.policy.critic.optimizer.zero_grad()
-        self.policy.predicor.optimizer.zero_grad()
 
-        loss = loss_critic + loss_predictor
+        loss = loss_critic
         loss.backward()
 
         self.policy.emitter.optimizer.step()
         self.policy.critic.optimizer.step()
-        self.policy.predicor.optimizer.step()
 
-        loss_auto_predictor_mean, gen_loss_mean = self.predicotr_step(data=data)
+        loss_auto_predictor_mean = self.improve_pred_step(data=data, step=step)
+        gen_loss_mean = self.improve_seq_step(data=data, step = step)
+        
 
 
 
         if losses is None:
             losses = [
                 loss_critic.unsqueeze(0),
-                loss_predictor.unsqueeze(0),
+                loss_auto_predictor_mean.unsqueeze(0),
                 loss_auto_predictor_mean.unsqueeze(0),
                 gen_loss_mean.unsqueeze(0)
             ]
         else:
             losses[0] = th.cat((losses[0], loss_critic.unsqueeze(0)), dim=0)
-            losses[1] = th.cat((losses[1], loss_predictor.unsqueeze(0)), dim=0)
+            losses[1] = th.cat((losses[1], loss_auto_predictor_mean.unsqueeze(0)), dim=0)
             losses[2] = th.cat((losses[2], loss_auto_predictor_mean.unsqueeze(0)), dim=0)
             losses[3] = th.cat((losses[3], gen_loss_mean.unsqueeze(0)), dim=0)
         return losses
@@ -178,11 +216,14 @@ class ActiveCriticLearner(nn.Module):
         self.training_samples += 1
         h = time.perf_counter()
         self.policy.reset()
+        opt_seq = self.policy.args_obj.optimize
+        self.policy.args_obj.optimize = False
         actions, observations, rewards= sample_new_episode(
             policy=self.policy,
             env=self.env,
             device=self.network_args.device,
             episodes=self.network_args.training_epsiodes)
+        self.policy.args_obj.opt_goal = opt_seq
 
         debug_dict = {
             'Training epoch time': th.tensor(time.perf_counter() - h)
@@ -196,13 +237,13 @@ class ActiveCriticLearner(nn.Module):
             rewards=rewards
         )
 
-    def train_step(self, train_loader):
+    def train_step(self, train_loader, step):
         losses = None
         for data in train_loader:
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
-            losses = self.model_step(device_data, losses)
+            losses = self.model_step(device_data, losses, step=step)
         return losses
 
     def pain_boundaries(self, actions:th.Tensor, min_bound:float, max_bound:float):
@@ -214,6 +255,8 @@ class ActiveCriticLearner(nn.Module):
     def train(self, epochs):
         next_val = self.network_args.val_every
         next_add = 0
+        self.run_validation(step = 0)
+
         for epoch in range(epochs):
             if (not self.network_args.imitation_phase) and (epoch >= next_add):
                 next_add = epoch + self.network_args.add_data_every
@@ -225,13 +268,15 @@ class ActiveCriticLearner(nn.Module):
             mean_predictor = float('inf')
             loss_auto_predictor_mean = float('inf')
             gen_loss_mean = float('inf')
-
-            while (mean_critic > self.network_args.critic_threshold)\
+            step = 0
+            while ((mean_critic > self.network_args.critic_threshold)\
                 or (mean_predictor > self.network_args.predictor_threshold)\
                 or (loss_auto_predictor_mean > self.network_args.loss_auto_predictor_threshold)\
-                or (gen_loss_mean > self.network_args.gen_scores_threshold):
+                or (gen_loss_mean > self.network_args.gen_scores_threshold)) and \
+                self.current_patients < self.network_args.patients:
 
-                losses = self.train_step(train_loader=self.train_loader)
+
+                losses = self.train_step(train_loader=self.train_loader, step = step)
                 mean_critic = losses[0].mean()
                 mean_predictor = losses[1].mean()
                 loss_auto_predictor_mean = losses[2].mean()
@@ -251,21 +296,23 @@ class ActiveCriticLearner(nn.Module):
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
                 self.global_step += len(self.train_data)
                 self.current_patients += len(self.train_data)
-                if self.current_patients > self.network_args.patients:
+                step += 1
+                '''if self.current_patients > self.network_args.patients:
                     self.policy.init_models()
                     self.network_args.patients *= 2
-                    print('init model')
+                    print('init model')'''
             self.current_patients = 0
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every
                 if self.network_args.tboard:
-                    self.run_validation(step = epoch)
+                    self.run_validation(step = epoch+1)
 
     def write_tboard_scalar(self, debug_dict, train, step=None):
         if step is None:
             step = int(len(self.train_data) / self.policy.args_obj.epoch_len)
 
         if self.network_args.tboard:
+
             for para, value in debug_dict.items():
                 value = value.detach().to('cpu')
                 if train:

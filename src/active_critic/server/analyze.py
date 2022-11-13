@@ -113,22 +113,22 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'Dont recompute current actions'
+    acla.logname = 'Test'
     acla.tboard = True
     acla.batch_size = 32
-    acla.validation_episodes = 20
+    acla.validation_episodes = 2
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
     acla.predictor_threshold = 1e-2
-    acla.gen_scores_threshold = 2e-1
+    acla.gen_scores_threshold = 1
     acla.loss_auto_predictor_threshold = 3e-2
     acla.num_cpu = acla.validation_episodes
     acla.use_pain = True
     acla.patients = 100
 
     batch_size = 32
-    seq_len = 50
+    seq_len = 10
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=batch_size, seq_len=seq_len)
     
     acps.opt_steps = 0

@@ -366,7 +366,8 @@ class ActiveCriticPolicy(BaseModel):
         
         printProgressBar(iteration=self.current_step, total=self.args_obj.epoch_len, suffix='Predicting Epsiode')
 
-        if self.args_obj.optimize and (self.current_actions is None):
+
+        if self.args_obj.optimize:
             actions, seq_embeddings = self.optimize_sequence(
                                                     actions=self.current_actions, 
                                                     seq_embeddings=self.current_embeddings, 
@@ -380,6 +381,20 @@ class ActiveCriticPolicy(BaseModel):
                                                     optimizer_class=self.args_obj.optimizer_class,
                                                     lr=self.args_obj.inference_opt_lr,
                                                     goal_state=self.last_goal)
+            self.current_actions = actions[:,:self.current_step+1]
+
+        elif self.current_actions is None:
+            seq_embeddings, actions = self.build_sequence(
+                embeddings=embedding.detach(), 
+                actions=None, 
+                seq_len=self.args_obj.epoch_len, 
+                goal_emb_acts=self.goal_emb_acts,
+                goal_state=self.last_goal,
+                tf_mask=self.args_obj.pred_mask,
+                actor=self.actor,
+                predictor=self.predicor)
+            self.current_actions = actions.detach()
+
         '''if self.current_step == 0:
             self.history.add_value(self.history.pred_emb, seq_embeddings[:,self.current_step+1:self.current_step+2], step=self.current_step)
         elif self.current_step == self.args_obj.epoch_len - 1:
@@ -389,9 +404,7 @@ class ActiveCriticPolicy(BaseModel):
             self.history.add_value(self.history.pred_emb, seq_embeddings[:,self.current_step+1:self.current_step+2], step=self.current_step)
             self.history.add_value(self.history.act_emb, seq_embeddings[:,self.current_step:self.current_step+1], step=self.current_step - 1)
         '''
-        #self.current_actions = actions[:,:self.current_step+1]
-        if self.current_actions is None:
-            self.current_actions = actions
+
         return self.current_actions.cpu().numpy()[:, self.current_step]
 
     def save_policy(self, add, data_path):
