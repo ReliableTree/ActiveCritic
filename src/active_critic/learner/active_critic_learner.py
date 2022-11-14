@@ -216,14 +216,14 @@ class ActiveCriticLearner(nn.Module):
         self.training_samples += 1
         h = time.perf_counter()
         self.policy.reset()
-        opt_seq = self.policy.args_obj.optimize
-        self.policy.args_obj.optimize = False
+        #opt_seq = self.policy.args_obj.optimize
+        #self.policy.args_obj.optimize = False
         actions, observations, rewards= sample_new_episode(
             policy=self.policy,
             env=self.env,
             device=self.network_args.device,
             episodes=self.network_args.training_epsiodes)
-        self.policy.args_obj.opt_goal = opt_seq
+        #self.policy.args_obj.opt_goal = opt_seq
 
         debug_dict = {
             'Training epoch time': th.tensor(time.perf_counter() - h)

@@ -235,7 +235,7 @@ class ActiveCriticPolicy(BaseModel):
             init_actions = None
         
         while embeddings.shape[1] < seq_len:
-            embeddings = embeddings.detach()
+            #embeddings = embeddings.detach()
             if actions is None or actions.shape[1] == embeddings.shape[1]-1:
                 actor_inpt = self.get_actor_input(embeddings=embeddings, goal_emb_acts=goal_emb_acts)
                 actions = actor.forward(actor_inpt)
@@ -245,7 +245,8 @@ class ActiveCriticPolicy(BaseModel):
             if (init_actions is not None) and (not init_actions.shape[1] == seq_len):
                 actions = th.cat((init_actions.clone(), actions[:, init_actions.shape[1]:]), dim=1)
             next_embedings = self.predict_step(embeddings=embeddings, actions=actions[:,:embeddings.shape[1]], mask=tf_mask[:embeddings.shape[1],:embeddings.shape[1]])
-            embeddings = th.cat((init_embedding.clone(), next_embedings[:, init_embedding.shape[1]-1:]), dim=1)
+            #embeddings = th.cat((init_embedding.clone(), next_embedings[:, init_embedding.shape[1]-1:]), dim=1)
+            embeddings = th.cat((embeddings, next_embedings[:, -1:]), dim=1)
         if actions.shape[1] == seq_len - 1:
             actor_inpt = self.get_actor_input(embeddings=embeddings[:,-1:], goal_emb_acts=goal_emb_acts)
             actions = th.cat((actions, actor.forward(actor_inpt)), dim=1)
