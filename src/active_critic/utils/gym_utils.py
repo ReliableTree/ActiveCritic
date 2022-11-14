@@ -77,18 +77,22 @@ class ImitationLearningWrapper:
             actions.append(self.policy.get_action(obs))
         return actions
 
-def make_dummy_vec_env(name, seq_len):
+def make_dummy_vec_env(name, seq_len, env=None):
     policy_dict = make_policy_dict()
-
-    env_tag = name
     max_episode_steps = seq_len
-    env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
-    env._freeze_rand_vec = False
+
+    if env is None:
+        env_tag = name
+        env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
+        env._freeze_rand_vec = False
+        vec_expert = ImitationLearningWrapper(
+            policy=policy_dict[env_tag][0], env=dv1)
+    else:
+        vec_expert = None
     reset_env = ResetCounterWrapper(env=env)
     timelimit = TimeLimit(env=reset_env, max_episode_steps=max_episode_steps)
     dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(timelimit)])
-    vec_expert = ImitationLearningWrapper(
-        policy=policy_dict[env_tag][0], env=dv1)
+
     return dv1, vec_expert
 
 class ResetCounterWrapper(gym.Wrapper):
