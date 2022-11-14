@@ -133,7 +133,7 @@ def make_acl(device):
     acla.logname = 'keep graph embeddings'
     acla.tboard = True
     acla.batch_size = 32
-    acla.validation_episodes = 10
+    acla.validation_episodes = 40
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-3

@@ -67,11 +67,11 @@ class ActiveCriticPolicyHistory:
 
     def add_value(self, history:list([th.Tensor]), value:th.Tensor, opt_step:int=0, step:int=None):
         if len(history[0].shape) == 4: #including opt step history
-            history[0][-value.shape[0]:, opt_step] = value
+            history[0][-value.shape[0]:, opt_step] = value.detach()
         elif step is None:
-            history[0][-value.shape[0]:] = value
+            history[0][-value.shape[0]:] = value.detach()
         else:
-            history[0][-value.shape[0]:, step:step+1] = value
+            history[0][-value.shape[0]:, step:step+1] = value.detach()
 
     def add_opt_stp_seq(self, history:list([th.Tensor]), value:th.Tensor, opt_step, step):
         #value: batch_size, seq_len, dim
