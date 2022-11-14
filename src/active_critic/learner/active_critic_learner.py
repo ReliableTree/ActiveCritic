@@ -241,7 +241,7 @@ class ActiveCriticLearner(nn.Module):
         losses = None
         for data in train_loader:
             epch_len = data[0].shape[1]
-            for beg_step in range((data[0].shape[1]-1)):
+            for beg_step in range((data[0].shape[1]-2)):
                 device_data = []
                 self.policy.args_obj.epoch_len = epch_len - beg_step
                 for dat in data:
