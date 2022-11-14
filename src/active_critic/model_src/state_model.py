@@ -48,7 +48,7 @@ class StateModel(nn.Module):
             print(label[:, mask])
             print(calcMSE(result[:, mask], label[:, mask]))
             1/0
-        if mask is not None:
+        if mask is None:
             loss = calcMSE(result, label)
         else:
             loss = calcMSE(result[:, mask], label[:, mask])

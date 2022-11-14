@@ -94,7 +94,7 @@ class ActiveCriticLearner(nn.Module):
                     goal_emb_acts=self.policy.goal_label[:,-1])
 
                 gen_critic_inputs = self.policy.get_critic_input(pred_embeddings, gen_actions)
-                gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=reward, mask=self.policy.args_obj.opt_mask, print_fn=False)
+                gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=reward, mask=self.policy.args_obj.opt_mask[:gen_critic_inputs.shape[1]], print_fn=False)
                 
                 self.policy.predicor.optimizer.zero_grad()
                 self.policy.critic.optimizer.zero_grad()
@@ -137,7 +137,7 @@ class ActiveCriticLearner(nn.Module):
                     goal_emb_acts=self.policy.goal_label[:,-1])
 
                 gen_critic_inputs = self.policy.get_critic_input(pred_embeddings, gen_actions)
-                gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=self.policy.goal_label, mask=self.policy.args_obj.opt_mask, print_fn=False)
+                gen_loss_critic = self.policy.critic.calc_loss(inpt=gen_critic_inputs, label=self.policy.goal_label[:, :gen_critic_inputs.shape[1]], mask=self.policy.args_obj.opt_mask[:gen_critic_inputs.shape[1]], print_fn=False)
                 
                 act_critic_inputs = self.policy.get_critic_input(embeddings.detach(), actions.detach())
                 act_loss_critic = self.policy.critic.calc_loss(inpt=act_critic_inputs, label=reward)
@@ -240,10 +240,14 @@ class ActiveCriticLearner(nn.Module):
     def train_step(self, train_loader, step):
         losses = None
         for data in train_loader:
-            device_data = []
-            for dat in data:
-                device_data.append(dat.to(self.network_args.device))
-            losses = self.model_step(device_data, losses, step=step)
+            epch_len = data[0].shape[1]
+            for beg_step in range((data[0].shape[1]-1)):
+                device_data = []
+                self.policy.args_obj.epoch_len = epch_len - beg_step
+                for dat in data:
+                    device_data.append(dat[:,beg_step:].to(self.network_args.device))
+                losses = self.model_step(device_data, losses, step=step)
+            self.policy.args_obj.epoch_len = epch_len
         return losses
 
     def pain_boundaries(self, actions:th.Tensor, min_bound:float, max_bound:float):
