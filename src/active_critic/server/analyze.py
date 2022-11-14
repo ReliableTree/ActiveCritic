@@ -133,7 +133,7 @@ def make_acl(device):
     acla.logname = 'keep graph embeddings'
     acla.tboard = True
     acla.batch_size = 32
-    acla.validation_episodes = 40
+    acla.validation_episodes = 10
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-3
@@ -144,7 +144,7 @@ def make_acl(device):
     acla.use_pain = True
     acla.patients = 1000
     
-    seq_len = 100
+    seq_len = 40
     ac, acps, batch_size, seq_len, env, expert= setup_opt_state(device=device, batch_size=acla.batch_size, seq_len=seq_len)
     
     acps.opt_steps = 0
