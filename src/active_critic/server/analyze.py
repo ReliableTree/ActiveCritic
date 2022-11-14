@@ -130,7 +130,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'push data trough 40'
+    acla.logname = 'keep graph embeddings'
     acla.tboard = True
     acla.batch_size = 32
     acla.validation_episodes = 40
