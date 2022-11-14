@@ -350,6 +350,8 @@ class ActiveCriticLearner(nn.Module):
             episodes=self.network_args.validation_episodes
             )
 
+        rewards = rewards.detach()
+
         debug_dict = {
             'Validation epoch time': th.tensor(time.perf_counter() - h),
         }
