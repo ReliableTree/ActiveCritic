@@ -4,6 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel
+from active_critic.model_src.state_model import StateModel
 from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -61,8 +62,10 @@ class ActiveCriticPolicy(BaseModel):
         self,
         observation_space,
         action_space,
+        emissionNW: WholeSequenceModel,
+        predictionNW: WholeSequenceModel,
         actor: WholeSequenceModel,
-        critic: WholeSequenceModel,
+        critic: StateModel,
         acps: ActiveCriticPolicySetup = None
     ):
 
@@ -70,6 +73,8 @@ class ActiveCriticPolicy(BaseModel):
 
         self.actor = actor
         self.critic = critic
+        self.emissionNW = emissionNW
+        self.predictionNW = predictionNW
         self.args_obj = acps
         self.register_buffer('gl', th.ones(
             size=[1000, acps.epoch_len, critic.wsms.model_setup.d_output], dtype=th.float, device=acps.device))

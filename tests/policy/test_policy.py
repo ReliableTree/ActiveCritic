@@ -3,8 +3,8 @@ import unittest
 import torch as th
 import numpy as np
 
-from active_critic.model_src.whole_sequence_model import WholeSequenceModel, OptimizeMaximumCritic, OptimizeEndCritic
-from active_critic.policy.active_critic_policy import ActiveCriticPolicy, ACPOptEnd
+from active_critic.model_src.whole_sequence_model import WholeSequenceModel
+from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 from active_critic.utils.test_utils import (make_acps, make_obs_act_space,
                                             make_wsm_setup)
 from active_critic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
@@ -65,7 +65,7 @@ class TestPolicy(unittest.TestCase):
         obs_space, acts_space = make_obs_act_space(
             obs_dim=obs_dim, action_dim=d_output)
         actor = WholeSequenceModel(wsm_actor_setup)
-        critic = OptimizeEndCritic(wsms=wsm_critic_setup)
+        critic = OptimizeEndCritic(wsms=wsm_critic_sedtup)
         ac = ACPOptEnd(observation_space=obs_space, action_space=acts_space,
                                 actor=actor, critic=critic, acps=acps)
         return ac, acps, d_output, obs_dim, batch_size
@@ -308,34 +308,6 @@ class TestPolicy(unittest.TestCase):
         self.assertTrue((expected_success[:,-1] < expected_success_nonstop[:,-1]).sum() > 0)
         self.assertTrue((expected_success[:,-1] < expected_success_nonstop[:,-1]).sum() < len(expected_success))
 
-    def test_opt_end(self):
-        th.manual_seed(1)
-        current_step = 1
-
-        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
-        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-        obs_seq[0] *= 2
-        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_scores = ac.critic.forward(critic_input)
-        actions, expected_success_nonstop = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=False, opt_end=False, opt_last=False)
-
-        th.manual_seed(1)
-        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
-        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-        obs_seq[0] *= 2
-        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_scores = ac.critic.forward(critic_input)
-        actions, expected_success = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=False, opt_end=True, opt_last=False)
-
-        self.assertTrue((max(expected_success[:,-1]) > max(expected_success_nonstop[:,-1])))
 
     def test_clip(self):
         th.manual_seed(1)
@@ -356,34 +328,6 @@ class TestPolicy(unittest.TestCase):
         self.assertTrue(th.all(maxim <= th.tensor(ac.action_space.high, device=maxim.device)))
         self.assertTrue(th.all(minim >= th.tensor(ac.action_space.low, device=maxim.device)))
 
-
-    def test_opt_end(self):
-        th.manual_seed(1)
-        current_step = 1
-
-        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
-        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-        obs_seq[0] *= 2
-        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_scores = ac.critic.forward(critic_input)
-        actions, expected_success_end = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=False, opt_end=True, opt_last=False)
-
-        th.manual_seed(1)
-        ac, acps, act_dim, obs_dim, batch_size =  self.setup_ac()
-        opt_actions = th.zeros([batch_size, acps.epoch_len, act_dim],
-                                device=acps.device, dtype=th.float, requires_grad=True)
-        obs_seq = 2 * th.ones([batch_size, current_step + 1, obs_dim],
-                                device=acps.device, dtype=th.float, requires_grad=False)
-        obs_seq[0] *= 2
-        critic_input = ac.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_scores = ac.critic.forward(critic_input)
-        actions, expected_success = ac.optimize_act_sequence(
-            actions=opt_actions, observations=obs_seq, current_step=current_step, stop_opt=False, opt_end=False, opt_last=True)
-        self.assertTrue(th.all(expected_success[:,-1] > expected_success_end[:,-1]))
 
     def test_opt_max(self):
         th.manual_seed(3)

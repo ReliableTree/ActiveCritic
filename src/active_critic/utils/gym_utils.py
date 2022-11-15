@@ -73,20 +73,6 @@ class ImitationLearningWrapper:
             actions.append(self.policy.get_action(obs))
         return actions
 
-def make_dummy_vec_env(name, seq_len):
-    policy_dict = make_policy_dict()
-
-    env_tag = name
-    max_episode_steps = seq_len
-    env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
-    env._freeze_rand_vec = False
-    reset_env = ResetCounterWrapper(env=env)
-    timelimit = TimeLimit(env=reset_env, max_episode_steps=max_episode_steps)
-    dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(timelimit)])
-    vec_expert = ImitationLearningWrapper(
-        policy=policy_dict[env_tag][0], env=dv1)
-    return dv1, vec_expert
-
 class ResetCounterWrapper(gym.Wrapper):
     def __init__(self, env: Env) -> None:
         super().__init__(env)
@@ -105,21 +91,29 @@ class ResetCounterWrapper(gym.Wrapper):
             rew = rew - 5
         return obsv, rew, done, info
 
-def make_vec_env(env_id, num_cpu, seq_len):
+def make_env(env_id, seq_len):
     policy_dict = make_policy_dict()
+    def _init():
+        max_episode_steps = seq_len
+        env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_id][1]]()
+        env._freeze_rand_vec = False
+        rce = ResetCounterWrapper(env)
+        timelimit = TimeLimit(env=rce, max_episode_steps=max_episode_steps)
+        riw = RolloutInfoWrapper(timelimit)
+        return riw
+    return _init
 
-    def make_env(env_id, rank, seed=0):
-        def _init():
-            max_episode_steps = seq_len
-            env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_id][1]]()
-            env._freeze_rand_vec = False
-            rce = ResetCounterWrapper(env)
-            timelimit = TimeLimit(env=rce, max_episode_steps=max_episode_steps)
-            riw = RolloutInfoWrapper(timelimit)
-            return riw
-        return _init
-        
-    env = SubprocVecEnv([make_env(env_id, i) for i in range(num_cpu)])
+def make_dummy_vec_env(name, seq_len):
+    policy_dict = make_policy_dict()
+    dv1 = DummyVecEnv([lambda: make_env(env_id=name, seq_len=seq_len)()])
+    vec_expert = ImitationLearningWrapper(
+        policy=policy_dict[name][0], env=dv1)
+    return dv1, vec_expert
+
+
+def make_vec_env(env_id, num_cpu, seq_len):
+    policy_dict = make_policy_dict()    
+    env = SubprocVecEnv([make_env(env_id, seq_len) for i in range(num_cpu)])
     vec_expert = ImitationLearningWrapper(
         policy=policy_dict[env_id][0], env=env)
     return env, vec_expert

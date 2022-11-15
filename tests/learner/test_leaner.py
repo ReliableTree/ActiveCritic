@@ -195,8 +195,8 @@ class TestLerner(unittest.TestCase):
         L2_actions_mean = th.tensor([*actions_L2]).mean()
         L2_critic_mean = th.tensor([*rew_L2]).mean()
 
-        self.assertTrue(L2_actions_mean < 0.1 * L2_actions_mean_b, 'The prediction did not converge.')
-        self.assertTrue(L2_critic_mean < 0.1 * L2_critic_mean_b, 'The prediction did not converge.')
+        self.assertTrue(L2_actions_mean < 0.1 * L2_actions_mean_b, 'The actor did not converge.')
+        self.assertTrue(L2_critic_mean < 0.1 * L2_critic_mean_b, 'The critic did not converge.')
 
         lenght_before = 0
         for data in acl.train_loader:
