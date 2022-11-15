@@ -104,6 +104,35 @@ class ActiveCriticLearner(nn.Module):
                 (loss_critic, debug_dict['Loss '].unsqueeze(0)), dim=0)
         return loss_critic
 
+    def causal_step(self, data, loss_causal):
+        obsv, actions, reward = data
+        actor_input = self.policy.get_actor_input(
+            obs=obsv, actions=actions, rew=th.ones_like(reward))
+        optimized_actions = self.policy.actor.forward(actor_input)
+        critic_input = self.policy.get_critic_input(acts=optimized_actions, obs_seq=obsv)
+
+        #morgen angucken
+        mask = th.ones_like(reward)
+        mask[:,-1] = 1
+        mask = mask.squeeze()
+        mask = mask.type(th.bool)
+
+        scores = self.policy.critic.forward(critic_input)
+
+        loss = calcMSE(scores[mask], th.ones_like(scores)[mask])
+        #self.policy.critic.optimizer.zero_grad()
+        self.policy.actor.optimizer.zero_grad()
+        loss.backward()
+        #self.policy.critic.optimizer.step()
+        self.policy.actor.optimizer.step()
+
+        if loss_causal is None:
+            loss_causal = loss.detach().unsqueeze(0)
+        else:
+            loss_causal = th.cat(
+                (loss_causal, loss.detach().unsqueeze(0)), dim=0)
+        return loss_causal
+
     def add_training_data(self):
         h = time.perf_counter()
         actions, observations, rewards, _, _ = sample_new_episode(
@@ -122,14 +151,15 @@ class ActiveCriticLearner(nn.Module):
             rewards=rewards
         )
 
-    def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic):
+    def train_step(self, train_loader, actor_step, critic_step, causal_step, loss_actor, loss_critic, loss_causal):
         for data in train_loader:
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
             loss_actor = actor_step(device_data, loss_actor)
             loss_critic = critic_step(device_data, loss_critic)
-        return loss_actor, loss_critic
+            loss_causal = causal_step(device_data, loss_causal)
+        return loss_actor, loss_critic, loss_causal
 
     def train(self, epochs):
         next_val = self.network_args.val_every
@@ -142,21 +172,25 @@ class ActiveCriticLearner(nn.Module):
             self.policy.eval()
             loss_actor = None
             loss_critic = None
+            loss_causal = None
             mean_actor = float('inf')
             mean_critic = float('inf')
 
             while (mean_actor > self.network_args.actor_threshold) or (mean_critic > self.network_args.critic_threshold):
 
-                loss_actor, loss_critic = self.train_step(
+                loss_actor, loss_critic, loss_causal = self.train_step(
                     train_loader=self.train_loader,
                     actor_step=self.actor_step,
                     critic_step=self.critic_step,
+                    causal_step=self.causal_step,
                     loss_actor=loss_actor,
-                    loss_critic=loss_critic
+                    loss_critic=loss_critic,
+                    loss_causal=loss_causal
                 )
 
                 mean_actor = loss_actor.mean()
                 mean_critic = loss_critic.mean()
+                mean_causal = loss_causal.mean()
 
                 self.scores.update_min_score(
                     self.scores.mean_critic, mean_critic)
@@ -165,7 +199,8 @@ class ActiveCriticLearner(nn.Module):
 
                 debug_dict = {
                     'Loss Actor': mean_actor,
-                    'Loss Critic': mean_critic
+                    'Loss Critic': mean_critic,
+                    'Loss Causal': mean_causal
                 }
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True)
                 self.global_step += len(self.train_data)

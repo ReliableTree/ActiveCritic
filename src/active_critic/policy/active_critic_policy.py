@@ -62,10 +62,8 @@ class ActiveCriticPolicy(BaseModel):
         self,
         observation_space,
         action_space,
-        emissionNW: WholeSequenceModel,
-        predictionNW: WholeSequenceModel,
         actor: WholeSequenceModel,
-        critic: StateModel,
+        critic: WholeSequenceModel,
         acps: ActiveCriticPolicySetup = None
     ):
 
@@ -73,8 +71,6 @@ class ActiveCriticPolicy(BaseModel):
 
         self.actor = actor
         self.critic = critic
-        self.emissionNW = emissionNW
-        self.predictionNW = predictionNW
         self.args_obj = acps
         self.register_buffer('gl', th.ones(
             size=[1000, acps.epoch_len, critic.wsms.model_setup.d_output], dtype=th.float, device=acps.device))
@@ -255,8 +251,10 @@ class ActiveCriticPolicy(BaseModel):
         return critic_input
 
     def get_actor_input(self, obs: th.Tensor, actions: th.Tensor, rew: th.Tensor):
-        max_reward, _ = rew.max(dim=1)
+        #max_reward, _ = rew.max(dim=1)
+        max_reward = rew[:,-1]
         max_reward = max_reward.unsqueeze(1).repeat([1, obs.shape[1], 1])
+        
         actor_inpt = th.cat((obs, max_reward), dim=-1)
         return actor_inpt
 
