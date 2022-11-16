@@ -130,10 +130,12 @@ class ActiveCriticLearner(nn.Module):
 
         pain = self.pain_boundaries(actions=optimized_actions, min_bound=-1, max_bound=1)
         loss = loss + pain
-        #self.policy.critic.optimizer.zero_grad()
+        #careful
+        loss = loss / 10
+        self.policy.critic.optimizer.zero_grad()
         self.policy.actor.optimizer.zero_grad()
         loss.backward()
-        #self.policy.critic.optimizer.step()
+        self.policy.critic.optimizer.step()
         self.policy.actor.optimizer.step()
 
         if loss_causal is None:
