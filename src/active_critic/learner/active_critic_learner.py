@@ -128,8 +128,9 @@ class ActiveCriticLearner(nn.Module):
 
         scores = self.policy.critic.forward(inputs=critic_inpt, offset=0)
         individual_loss = (scores[mask].reshape(-1) - reward[mask].reshape(-1))**2
+        individual_side_loss = (scores.reshape(-1) - reward.reshape(-1))**2
         individual_loss.reshape([1,-1])
-        loss = individual_loss.mean()
+        loss = individual_loss.mean() + individual_side_loss.mean()
         self.policy.critic.optimizer.zero_grad()
         loss.backward()
         self.policy.critic.optimizer.step()
