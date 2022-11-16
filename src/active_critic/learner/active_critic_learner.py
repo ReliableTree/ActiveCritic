@@ -153,7 +153,7 @@ class ActiveCriticLearner(nn.Module):
         print(f'Training Rewards: {rewards.mean()}')
         debug_dict = {
             'Training epoch time': th.tensor(time.perf_counter() - h),
-            'Training Rewards' : rewards.detach()
+            'Training Rewards' : rewards.detach().mean()
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=True)
         self.add_data(
