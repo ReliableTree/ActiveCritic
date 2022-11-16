@@ -27,9 +27,9 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     d_output = d_output
     wsm.model_setup.d_output = d_output
     wsm.model_setup.nhead = 32
-    wsm.model_setup.d_hid = 512
-    wsm.model_setup.d_model = 512
-    wsm.model_setup.nlayers = 4
+    wsm.model_setup.d_hid = 4096
+    wsm.model_setup.d_model = 4096
+    wsm.model_setup.nlayers = 6
     wsm.model_setup.seq_len = seq_len
     wsm.model_setup.dropout = 0
     wsm.lr = 1e-4
@@ -105,6 +105,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'pickplace'
-    logname = 'no inference lookup pickplace'
+    logname = 'no inference lookup pickplace LARGE'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
