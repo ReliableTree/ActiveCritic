@@ -40,21 +40,35 @@ class ActiveCriticPolicyHistory:
 
 
     def reset(self):
-        self.gen_scores = []
-        self.opt_scores = []
-        self.gen_trj = []
+        self.scores = []
+        self.trj = []
+        self.emb = []
+
+        self.goal_scores = []
+        self.pred_emb = []
+        self.act_emb = []
 
 
-    def new_epoch(self, history:list([th.Tensor]), size:list([int, int, int]), device:str):
+    def new_epoch(self, history:list([th.Tensor]), size:list([int, int, int, int]), device:str): #batch size, opt step, seq len, score
         new_field = th.zeros(size=size, device=device)
         if len(history) == 0:
             history.append(new_field)
         else:
-            history[0] = th.cat((history[0], new_field))
+            history[0] = th.cat((history[0], new_field), dim=0)
 
 
-    def add_value(self, history:list([th.Tensor]), value:th.Tensor, current_step:int):
-        history[0][-value.shape[0]:, current_step] = value
+    def add_value(self, history:list([th.Tensor]), value:th.Tensor, opt_step:int=0, step:int=None):
+        if len(history[0].shape) == 4: #including opt step history
+            history[0][-value.shape[0]:, opt_step] = value.detach()
+        elif step is None:
+            history[0][-value.shape[0]:] = value.detach()
+        else:
+            history[0][-value.shape[0]:, step:step+1] = value.detach()
+
+    def add_opt_stp_seq(self, history:list([th.Tensor]), value:th.Tensor, opt_step, step):
+        #value: batch_size, seq_len, dim
+        #history: epochs, opt_step, step, seq_len, dim
+        history[0][-value.shape[0]:, opt_step, step] = value.detach()
 
 
 class ActiveCriticPolicy(BaseModel):
@@ -85,20 +99,9 @@ class ActiveCriticPolicy(BaseModel):
         self.history.reset()
 
     def reset_epoch(self, vec_obsv: th.Tensor):
-        self.current_step = 0
-        self.last_goal = vec_obsv
-        self.current_result = None
-
-        scores_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output]
-        self.history.new_epoch(self.history.gen_scores, size=scores_size, device=self.args_obj.device)
-        self.history.new_epoch(self.history.opt_scores, size=scores_size, device=self.args_obj.device)
-
-        trj_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.action_space.shape[0]]
-        self.history.new_epoch(self.history.gen_trj, size=trj_size, device=self.args_obj.device)
-        
-        self.obs_seq = th.zeros(
-            size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
-            
+        self.history.new_epoch(history=self.history.trj, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 1, self.args_obj.epoch_len, self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
+        self.history.new_epoch(history=self.history.scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 1, self.args_obj.epoch_len, self.args_obj.epoch_len, self.critic.args.arch[-1]], device=self.args_obj.device)
+        self.history.new_epoch(history=self.history.emb, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 1, self.args_obj.epoch_len, self.args_obj.epoch_len, self.emitter.args.arch[-1]], device=self.args_obj.device)
 
     def predict(
         self,
