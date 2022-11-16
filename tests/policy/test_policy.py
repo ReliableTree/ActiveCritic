@@ -11,7 +11,7 @@ from active_critic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
                                            new_epoch_pap,
                                            new_epoch_reach)
 
-from active_critic.utils.gym_utils import make_policy_dict, new_epoch_reach, make_dummy_vec_env, sample_expert_transitions, parse_sampled_transitions
+from active_critic.utils.gym_utils import make_policy_dict, new_epoch_reach, make_dummy_vec_env, sample_transitions, parse_sampled_transitions
 
 class TestPolicy(unittest.TestCase):
 

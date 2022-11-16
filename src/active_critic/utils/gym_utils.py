@@ -1,8 +1,7 @@
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 import numpy as np
 import torch as th
-from metaworld.envs import \
-    ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
+from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
 from metaworld.policies import *
 from gym.wrappers import TimeLimit
 from imitation.data.wrappers import RolloutInfoWrapper
@@ -118,6 +117,8 @@ def make_vec_env(env_id, num_cpu, seq_len):
         policy=policy_dict[env_id][0], env=env)
     return env, vec_expert
 
+
+
 def parse_sampled_transitions_legacy(transitions, new_epoch, extractor, seq_len, device='cuda'):
     observations = []
     actions = []
@@ -194,7 +195,7 @@ def fill_arrays(inpt, seq_len):
             d.append(epoch)
     return np.array(d)
 
-def sample_expert_transitions(policy, env, episodes):
+def sample_transitions(policy, env, episodes):
 
     expert = policy
     print(f"Sampling transitions. {episodes}")
@@ -207,12 +208,24 @@ def sample_expert_transitions(policy, env, episodes):
     )
     return flatten_trajectories(rollouts)
 
+def sample_cont_transitions(policy, env, timesteps):
+    expert = policy
+    print(f"Sampling transitions. {timesteps}")
+    rollouts = rollout(
+        expert,
+        env,
+        make_sample_until(min_timesteps=timesteps, min_episodes=None),
+        unwrap=True,
+        exclude_infos=False
+    )
+    return flatten_trajectories(rollouts)
+
 
 def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:int=1, return_gen_trj = False):
         policy.eval()
         policy.reset()
         seq_len = policy.args_obj.epoch_len
-        transitions = sample_expert_transitions(
+        transitions = sample_transitions(
             policy.predict, env, episodes)
         expected_rewards_after = policy.history.opt_scores[0]
         expected_rewards_before = policy.history.gen_scores[0]

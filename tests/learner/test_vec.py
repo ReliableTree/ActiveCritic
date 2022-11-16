@@ -3,7 +3,7 @@ import torch as th
 from active_critic.learner.active_critic_learner import ActiveCriticLearner, ACLScores
 from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
-from active_critic.utils.gym_utils import make_dummy_vec_env, make_policy_dict, parse_sampled_transitions, sample_expert_transitions \
+from active_critic.utils.gym_utils import make_dummy_vec_env, make_policy_dict, parse_sampled_transitions, sample_transitions \
     ,DummyExtractor, new_epoch_reach, sample_new_episode, make_policy_dict, TimeLimit, RolloutInfoWrapper, ImitationLearningWrapper, \
         make_vec_env
 from active_critic.utils.pytorch_utils import make_part_obs_data, count_parameters

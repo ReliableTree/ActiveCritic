@@ -2,7 +2,7 @@ import torch as th
 from active_critic.learner.active_critic_learner import ActiveCriticLearner, ACLScores
 from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
-from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env, parse_sampled_transitions, sample_expert_transitions, DummyExtractor, new_epoch_reach, sample_new_episode
+from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env, parse_sampled_transitions, sample_transitions, DummyExtractor, new_epoch_reach, sample_new_episode
 from active_critic.utils.pytorch_utils import make_part_obs_data, count_parameters
 from active_critic.utils.dataset import DatasetAC
 from stable_baselines3.common.policies import BasePolicy

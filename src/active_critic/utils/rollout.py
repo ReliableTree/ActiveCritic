@@ -349,7 +349,6 @@ def generate_trajectories(
         # "previous obs" (this matters for, e.g., Atari, where observations are
         # really big).
         trajectories_accum.add_step(dict(obs=ob), env_idx)
-
     # Now, we sample until `sample_until(trajectories)` is true.
     # If we just stopped then this would introduce a bias towards shorter episodes,
     # since longer episodes are more likely to still be active, i.e. in the process
@@ -358,9 +357,11 @@ def generate_trajectories(
     #
     # To start with, all environments are active.
     active = np.ones(venv.num_envs, dtype=bool)
+    episode_start = np.ones(venv.num_envs, dtype=bool)
     while np.any(active):
-        acts = get_actions(obs)
+        acts = get_actions(obs, episode_start=episode_start)
         obs, rews, dones, infos = venv.step(acts)
+        episode_start = dones
 
         # If an environment is inactive, i.e. the episode completed for that
         # environment after `sample_until(trajectories)` was true, then we do
@@ -375,6 +376,7 @@ def generate_trajectories(
             dones,
             infos,
         )
+
         trajectories.extend(new_trajs)
 
         if sample_until(trajectories):

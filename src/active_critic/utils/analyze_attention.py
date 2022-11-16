@@ -6,7 +6,7 @@ from active_critic.utils.dataset import DatasetAC
 from active_critic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
                                            new_epoch_reach,
                                            parse_sampled_transitions,
-                                           sample_expert_transitions,
+                                           sample_transitions,
                                            sample_new_episode)
 from active_critic.utils.pytorch_utils import make_part_obs_data, calcMSE
 from active_critic.utils.test_utils import setup_ac_reach, setup_ac_reach_op

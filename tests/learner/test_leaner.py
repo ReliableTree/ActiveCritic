@@ -7,7 +7,7 @@ from active_critic.utils.dataset import DatasetAC
 from active_critic.utils.gym_utils import (DummyExtractor, make_dummy_vec_env,
                                            new_epoch_reach,
                                            parse_sampled_transitions,
-                                           sample_expert_transitions,
+                                           sample_transitions,
                                            sample_new_episode)
 from active_critic.utils.pytorch_utils import make_part_obs_data, calcMSE
 from active_critic.utils.test_utils import setup_ac_reach, setup_ac_reach_op
@@ -68,7 +68,7 @@ class TestLerner(unittest.TestCase):
 
     def test_make_part_seq_with_td(self):
         acl, env, expert, seq_len, epsiodes, device = self.make_acl()
-        transitions = sample_expert_transitions(
+        transitions = sample_transitions(
             policy=expert.predict, env=env, episodes=epsiodes)
         exp_actions, exp_observations, exp_rewards = parse_sampled_transitions(
             transitions=transitions, extractor=DummyExtractor(), device=device, seq_len=seq_len)
@@ -105,7 +105,7 @@ class TestLerner(unittest.TestCase):
         th.manual_seed(0)
         np.random.seed(0)
         acl, env, expert, seq_len, epsiodes, device = self.make_acl()
-        transitions = sample_expert_transitions(
+        transitions = sample_transitions(
             policy=expert.predict, env=env, episodes=epsiodes)
         exp_actions, exp_observations, exp_rewards = parse_sampled_transitions(
             transitions=transitions, extractor=DummyExtractor(), device=device, seq_len=seq_len)
@@ -232,7 +232,7 @@ class TestLerner(unittest.TestCase):
         epsiodes = 2
         device = 'cuda'
         env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
-        transitions = sample_expert_transitions(policy=expert.predict, env=env, episodes=epsiodes)
+        transitions = sample_transitions(policy=expert.predict, env=env, episodes=epsiodes)
         exp_actions, exp_observations, exp_rewards = parse_sampled_transitions(transitions=transitions, extractor=DummyExtractor(), device=device, seq_len=seq_len)
         part_acts, part_obsv, part_rews = make_part_obs_data(actions=exp_actions, observations=exp_observations, rewards=exp_rewards)
         imitation_data = DatasetAC(device='cuda')
@@ -264,7 +264,7 @@ class TestLerner(unittest.TestCase):
 
     def test_only_positive(self):
         aclop, env, expert, seq_len, epsiodes, device = self.make_acl_op()
-        expert_transitions = sample_expert_transitions(expert.predict, env, 3)
+        expert_transitions = sample_transitions(expert.predict, env, 3)
         actions, observations, rewards = parse_sampled_transitions(expert_transitions, DummyExtractor(), seq_len, 'cuda')
         aclop.add_data(actions, observations, rewards)
         

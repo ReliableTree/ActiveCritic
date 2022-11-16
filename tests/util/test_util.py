@@ -5,7 +5,7 @@ import numpy as np
 import torch as th
 from metaworld.envs import \
     ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
-from active_critic.utils.gym_utils import make_policy_dict, new_epoch_reach, make_dummy_vec_env, sample_expert_transitions, parse_sampled_transitions_legacy, parse_sampled_transitions, make_vec_env
+from active_critic.utils.gym_utils import make_policy_dict, new_epoch_reach, make_dummy_vec_env, sample_transitions, parse_sampled_transitions_legacy, parse_sampled_transitions, make_vec_env
 from active_critic.utils.pytorch_utils import make_partially_observed_seq, make_part_obs_data, make_inf_seq
 from gym.wrappers import TimeLimit
 from imitation.data.wrappers import RolloutInfoWrapper
@@ -85,7 +85,7 @@ class TestUtils(unittest.TestCase):
         episodes = 2
         name = 'reach'
         env, exp = make_dummy_vec_env(name=name, seq_len=seq_len)
-        transitions = sample_expert_transitions(policy=exp.predict, env=env, episodes=episodes)
+        transitions = sample_transitions(policy=exp.predict, env=env, episodes=episodes)
         actions, observations, rewards = parse_sampled_transitions(transitions=transitions, seq_len=seq_len, extractor=DummyExtractor())
         
         
@@ -98,7 +98,7 @@ class TestUtils(unittest.TestCase):
         epsiodes = 2
         seq_len = 5
         env, expert = make_dummy_vec_env(name='reach', seq_len=seq_len)
-        transitions = sample_expert_transitions(policy=expert.predict, env=env, episodes=epsiodes)
+        transitions = sample_transitions(policy=expert.predict, env=env, episodes=epsiodes)
         actions, observations, rewards = parse_sampled_transitions(transitions=transitions, extractor=DummyExtractor(), seq_len=seq_len)
         acts, obsv, rews = make_part_obs_data(actions=actions, observations=observations, rewards=rewards)
         print(f'acts.shape: {acts.shape}')
@@ -190,7 +190,7 @@ class TestUtils(unittest.TestCase):
         episodes = 3
         name = 'reach'
         env, exp = make_vec_env(env_id='reach', num_cpu=1, seq_len=100)
-        transitions = sample_expert_transitions(policy=exp.predict, env=env, episodes=episodes)
+        transitions = sample_transitions(policy=exp.predict, env=env, episodes=episodes)
         actions_leg, observations_leg, rewards_leg = parse_sampled_transitions_legacy(transitions=transitions, new_epoch=new_epoch_reach, seq_len=seq_len, extractor=DummyExtractor())
         actions, observations, rewards = parse_sampled_transitions(transitions=transitions, seq_len=seq_len, extractor=DummyExtractor())
         
