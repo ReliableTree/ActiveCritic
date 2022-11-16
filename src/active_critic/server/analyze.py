@@ -99,6 +99,6 @@ def make_acl(device):
     return acl, env, expert, seq_len, epsiodes, device
 
 
-def run_experiment_init_reach(device):
+def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
     acl.train(epochs=10000)
