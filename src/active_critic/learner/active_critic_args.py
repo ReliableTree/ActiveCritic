@@ -20,3 +20,4 @@ class ActiveCriticLearnerArgs:
         self.critic_threshold:float = None
         self.causal_threshold:float = None
         self.num_cpu:int = None
+        self.buffer_size:int = None

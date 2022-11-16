@@ -11,7 +11,7 @@ from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy, ActiveCriticPolicyHistory
 from active_critic.utils.dataset import DatasetAC
 from active_critic.utils.gym_utils import sample_new_episode
-from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask, make_part_obs_data
+from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask
 from active_critic.utils.tboard_graphs import TBoardGraphs
 from gym.envs.mujoco import MujocoEnv
 from torch.utils.data.dataloader import DataLoader
@@ -60,7 +60,9 @@ class ActiveCriticLearner(nn.Module):
         self.global_step = 0
 
         self.train_data = DatasetAC(device='cpu')
+        self.train_data.size = network_args_obj.buffer_size
         self.train_data.onyl_positiv = False
+        self.train_data.size = self.network_args.buffer_size
 
         self.last_observation = None
         self.last_action = None
@@ -68,6 +70,7 @@ class ActiveCriticLearner(nn.Module):
 
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
+        self.train_data.size = self.network_args.buffer_size
         if len(train_data) > 0:
             self.train_loader = DataLoader(
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
@@ -86,10 +89,8 @@ class ActiveCriticLearner(nn.Module):
                 self.createGraphs([pred_gen_rew, pred_opt_rew, gt_rewards], ['Pred Gen Rewards', 'Pred Opt Rewards', 'GT Rewards'], plot_name=f'{prefix} Rewards Epoch {epoch} Step {time_step}')
                 
     def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor):
-        acts, obsv, rews = make_part_obs_data(
-            actions=actions, observations=observations, rewards=rewards)
-        self.train_data.add_data(obsv=obsv.to(
-            'cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
+        self.train_data.add_data(obsv=observations.to(
+            'cpu'), actions=actions.to('cpu'), reward=rewards.to('cpu'))
         self.train_loader = DataLoader(
             dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
@@ -263,14 +264,12 @@ class ActiveCriticLearner(nn.Module):
             max_critic = float('inf')
 
             while (max_causal > self.network_args.causal_threshold) or (max_critic > self.network_args.critic_threshold):
-
                 loss_actor, loss_critic, loss_causal = self.train_step(
                     train_loader=self.train_loader,
                     actor_step=self.actor_step,
                     critic_step=self.critic_step,
                     causal_step=self.causal_step
                 )
-
                 max_critic = loss_critic.max()
                 max_causal = loss_causal.max()
 
