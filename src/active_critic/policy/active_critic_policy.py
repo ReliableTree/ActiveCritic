@@ -98,10 +98,18 @@ class ActiveCriticPolicy(BaseModel):
         self.current_step = 0
         self.history.reset()
 
-    def reset_epoch(self, vec_obsv: th.Tensor):
-        self.history.new_epoch(history=self.history.trj, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 1, self.args_obj.epoch_len, self.args_obj.epoch_len, self.actor.args.arch[-1]], device=self.args_obj.device)
-        self.history.new_epoch(history=self.history.scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 1, self.args_obj.epoch_len, self.args_obj.epoch_len, self.critic.args.arch[-1]], device=self.args_obj.device)
-        self.history.new_epoch(history=self.history.emb, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 1, self.args_obj.epoch_len, self.args_obj.epoch_len, self.emitter.args.arch[-1]], device=self.args_obj.device)
+    def reset_epoch(self, vec_obsv:th.Tensor):
+        self.current_step = 0
+        self.last_goal = vec_obsv[:,0,-3:]
+
+        self.actor.model        
+
+        self.history.new_epoch(history=self.history.trj, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 2, self.args_obj.epoch_len, self.args_obj.epoch_len, self.actor.wsms.model_setup.d_output], device=self.args_obj.device)
+        self.history.new_epoch(history=self.history.scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 2, self.args_obj.epoch_len, self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output], device=self.args_obj.device)
+
+        self.obs_seq = th.zeros(
+            size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
+            
 
     def predict(
         self,
@@ -121,20 +129,13 @@ class ActiveCriticPolicy(BaseModel):
 
         self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
 
-        self.current_result = self.forward(
-            observation_seq=self.obs_seq, action_seq=action_seq, 
-            optimize=self.args_obj.optimize, 
-            current_step=self.current_step,
-            stop_opt=self.args_obj.stop_opt
-            )
-
-        if self.args_obj.optimize:
-            self.history.add_value(
-                history=self.history.opt_scores, 
-                value=self.current_result.expected_succes_after[:, self.current_step].detach(), 
-                current_step=self.current_step
-            )
-        self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, self.current_step].detach(), current_step=self.current_step)
+        if action_seq is None:
+            self.current_result = self.forward(
+                observation_seq=self.obs_seq, action_seq=action_seq, 
+                optimize=self.args_obj.optimize, 
+                current_step=self.current_step,
+                stop_opt=self.args_obj.stop_opt
+                )
 
         return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
 
@@ -157,13 +158,14 @@ class ActiveCriticPolicy(BaseModel):
             actions = self.proj_actions(
                 action_seq, actions, current_step)
 
-        self.history.add_value(self.history.gen_trj, actions[:, self.current_step].detach(), current_step=self.current_step)
 
         critic_input = self.get_critic_input(
             acts=actions, obs_seq=observation_seq)
-
         expected_success = self.critic.forward(
             inputs=critic_input, offset=0)  # batch_size, seq_len, 1
+
+        self.history.add_opt_stp_seq(self.history.trj, actions, 0, self.current_step)
+        self.history.add_opt_stp_seq(self.history.scores, expected_success, 0, self.current_step)
 
         if not optimize:
             result = ACPOptResult(
@@ -221,6 +223,9 @@ class ActiveCriticPolicy(BaseModel):
                 final_actions = optimized_actions
                 final_exp_success = expected_success
 
+            self.history.add_opt_stp_seq(self.history.trj, optimized_actions, step, self.current_step)
+            self.history.add_opt_stp_seq(self.history.scores, expected_success, step, self.current_step)
+
         if self.args_obj.clip:
             with th.no_grad():
                 th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
@@ -249,7 +254,6 @@ class ActiveCriticPolicy(BaseModel):
         return actions, critic_result
 
     def get_critic_input(self, acts, obs_seq):
-        acts = None
         critic_input = make_partially_observed_seq(
             obs=obs_seq, acts=acts, seq_len=self.args_obj.epoch_len, act_space=self.action_space)
         return critic_input

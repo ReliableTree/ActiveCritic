@@ -8,7 +8,7 @@ import tensorflow as tf
 import torch as th
 import torch.nn as nn
 from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
-from active_critic.policy.active_critic_policy import ActiveCriticPolicy
+from active_critic.policy.active_critic_policy import ActiveCriticPolicy, ActiveCriticPolicyHistory
 from active_critic.utils.dataset import DatasetAC
 from active_critic.utils.gym_utils import sample_new_episode
 from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask, make_part_obs_data
@@ -62,12 +62,29 @@ class ActiveCriticLearner(nn.Module):
         self.train_data = DatasetAC(device='cpu')
         self.train_data.onyl_positiv = False
 
+        self.last_observation = None
+        self.last_action = None
+        self.last_reward = None
+
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
         if len(train_data) > 0:
             self.train_loader = DataLoader(
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
+    def plot_history(self, history:ActiveCriticPolicyHistory, rewards:th.Tensor, prefix:str, num_timesteps:int = 3):
+        for epoch in range(min(history.trj[0].shape[0], 4)):
+            for time_step in range(0, history.trj[0].shape[2], int(history.trj[0].shape[2]/num_timesteps)):
+                #history: [epochs, opt_step, act_step, pred_step, dim]
+                gen_actions = history.trj[0][epoch, 0, time_step]
+                opt_actions = history.trj[0][epoch, -1, time_step]
+                self.createGraphs([gen_actions, opt_actions], ['Generated Actions', 'Opimized Actions'], plot_name=f'{prefix} Trajectories Epoch {epoch} Step {time_step}')
+                
+                pred_gen_rew = history.scores[0][epoch, 0, time_step]
+                pred_opt_rew = history.scores[0][epoch, -1, time_step]
+                gt_rewards = rewards[epoch]
+                self.createGraphs([pred_gen_rew, pred_opt_rew, gt_rewards], ['Pred Gen Rewards', 'Pred Opt Rewards', 'GT Rewards'], plot_name=f'{prefix} Rewards Epoch {epoch} Step {time_step}')
+                
     def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor):
         acts, obsv, rews = make_part_obs_data(
             actions=actions, observations=observations, rewards=rewards)
@@ -102,53 +119,79 @@ class ActiveCriticLearner(nn.Module):
         critic_inpt = self.policy.get_critic_input(acts=actions, obs_seq=obsv)
         mask = get_rew_mask(reward)
 
-        debug_dict = self.policy.critic.optimizer_step(
-            inputs=critic_inpt, label=reward, mask=mask, offset=offset)
+        #morgen?
+        mask = th.zeros_like(reward, dtype=th.bool)
+        mask[:,-1] = 1
+        #mask = mask.squeeze()
+        assert mask.sum() == reward.shape[0], 'mask wrong calculated'
+
+        scores = self.policy.critic.forward(inputs=critic_inpt, offset=0)
+        individual_loss = (scores[mask].reshape(-1) - reward[mask].reshape(-1))**2
+        individual_loss.reshape([1,-1])
+        loss = individual_loss.mean()
+        self.policy.critic.optimizer.zero_grad()
+        loss.backward()
+        self.policy.critic.optimizer.step()
+
         if loss_critic is None:
-            loss_critic = debug_dict['Loss '].unsqueeze(0)
+            loss_critic = individual_loss.detach()
         else:
             loss_critic = th.cat(
-                (loss_critic, debug_dict['Loss '].unsqueeze(0)), dim=0)
+                (loss_critic, individual_loss.detach()), dim=0)
         return loss_critic
 
     def causal_step(self, data, loss_causal, offset):
         obsv, actions, reward = data
-        print(th.all(obsv[:,1:] == 0, dim=[1,2]))
-        actor_input = self.policy.get_actor_input(
-            obs=obsv, actions=actions, rew=th.ones_like(reward))
-        optimized_actions = self.policy.actor.forward(actor_input, offset=offset)
-        critic_input = self.policy.get_critic_input(acts=optimized_actions, obs_seq=obsv)
 
-        #morgen angucken
-        mask = th.ones_like(reward)
-        mask[:,-1] = 1
-        mask = mask.squeeze()
-        mask = mask.type(th.bool)
+        initial_sequence_mask = th.all(th.all(obsv[:, 1:] == 0, dim=-1), dim=-1)
+        obsv = obsv[initial_sequence_mask]
 
-        scores = self.policy.critic.forward(critic_input, offset=offset)
-
-        loss = calcMSE(scores[mask], th.ones_like(scores)[mask])
-
-        pain = self.pain_boundaries(actions=optimized_actions, min_bound=-1, max_bound=1)
-        loss = loss + pain
-        #careful
-        loss = loss / 10
-        self.policy.critic.optimizer.zero_grad()
-        self.policy.actor.optimizer.zero_grad()
-        loss.backward()
-        self.policy.critic.optimizer.step()
-        self.policy.actor.optimizer.step()
-
-        if loss_causal is None:
-            loss_causal = loss.detach().unsqueeze(0)
+        actions = actions[initial_sequence_mask]
+        reward = reward[initial_sequence_mask]
+        if initial_sequence_mask.sum() == 0:
+            return loss_causal
         else:
-            loss_causal = th.cat(
-                (loss_causal, loss.detach().unsqueeze(0)), dim=0)
-        return loss_causal
+            actor_input = self.policy.get_actor_input(
+                obs=obsv, actions=actions, rew=th.ones_like(reward))
+            optimized_actions = self.policy.actor.forward(actor_input, offset=offset)
+            critic_input = self.policy.get_critic_input(acts=optimized_actions, obs_seq=obsv)
+
+            #morgen angucken
+            mask = th.zeros_like(reward)
+            mask[:,-1] = 1
+            mask = mask.type(th.bool)
+
+            scores = self.policy.critic.forward(critic_input, offset=offset)
+            assert mask.sum() == reward.shape[0], 'mask wrong calculated'
+            assert scores[mask].numel() == mask.sum(), 'mask wrong applied'
+
+            individual_loss = (scores[mask].reshape(-1) - th.ones_like(scores[mask].reshape(-1)))**2
+            individual_loss.reshape([1,-1])
+            loss = individual_loss.mean()
+
+            pain = self.pain_boundaries(actions=optimized_actions, min_bound=-1, max_bound=1)
+            loss = loss + pain
+            #careful
+            self.policy.critic.optimizer.zero_grad()
+            self.policy.actor.optimizer.zero_grad()
+            loss.backward()
+
+            self.policy.critic.optimizer.step()
+            self.policy.actor.optimizer.step()
+
+            if loss_causal is None:
+                loss_causal = individual_loss.detach()
+            else:
+                loss_causal = th.cat(
+                    (loss_causal, individual_loss.detach()), dim=0)
+            
+
+            return loss_causal
+
 
     def add_training_data(self):
         h = time.perf_counter()
-        actions, observations, rewards, _, _ = sample_new_episode(
+        actions, observations, rewards = sample_new_episode(
             policy=self.policy,
             env=self.env,
             device=self.network_args.device,
@@ -165,7 +208,34 @@ class ActiveCriticLearner(nn.Module):
             rewards=rewards
         )
 
-    def train_step(self, train_loader, actor_step, critic_step, causal_step, loss_actor, loss_critic, loss_causal):
+        if self.last_observation is None:
+            self.last_observation = observations
+            self.last_observation[:,1:] = 0
+            self.last_action = actions
+            self.last_reward = rewards
+        else:
+            with th.no_grad():
+                new_actions_inputs = self.policy.get_actor_input(self.last_observation, None, th.ones_like(rewards))
+                new_actions = self.policy.actor.forward(inputs=new_actions_inputs, offset=0)
+                new_score_inputs = self.policy.get_critic_input(acts=new_actions, obs_seq=self.last_observation)
+                new_scores = self.policy.critic.forward(inputs=new_score_inputs, offset=0)
+                new_old_scores_input = self.policy.get_critic_input(self.last_action, self.last_observation)
+                new_old_scores = self.policy.critic.forward(inputs=new_old_scores_input, offset=0)
+
+            self.createGraphs(trjs=[self.last_reward[0], new_scores[0], new_old_scores[0]], trj_names=['GT Reward', 'New Trj Score', 'Old Trj Score'], plot_name='Trajectory Scores Improvement')
+            self.createGraphs(trjs=[self.last_action[0], new_actions[0]], trj_names=['Old Actions', 'New Actions'], plot_name='Trajectory Improvement')
+            self.last_observation = observations
+            self.last_observation[:,1:] = 0
+            self.last_action = actions
+            self.last_reward = rewards
+
+        self.plot_history(self.policy.history, rewards=rewards, prefix='Train ', num_timesteps=1)
+
+    def train_step(self, train_loader, actor_step, critic_step, causal_step):
+        loss_actor = None
+        loss_critic = None
+        loss_causal = None
+        
         for data in train_loader:
             device_data = []
             for dat in data:
@@ -189,37 +259,29 @@ class ActiveCriticLearner(nn.Module):
             loss_actor = None
             loss_critic = None
             loss_causal = None
-            mean_actor = float('inf')
-            mean_critic = float('inf')
+            max_causal = float('inf')
+            max_critic = float('inf')
 
-            while (mean_actor > self.network_args.actor_threshold) or (mean_critic > self.network_args.critic_threshold):
+            while (max_causal > self.network_args.causal_threshold) or (max_critic > self.network_args.critic_threshold):
 
                 loss_actor, loss_critic, loss_causal = self.train_step(
                     train_loader=self.train_loader,
                     actor_step=self.actor_step,
                     critic_step=self.critic_step,
-                    causal_step=self.causal_step,
-                    loss_actor=loss_actor,
-                    loss_critic=loss_critic,
-                    loss_causal=loss_causal
+                    causal_step=self.causal_step
                 )
 
-                mean_actor = loss_actor.mean()
-                mean_critic = loss_critic.mean()
-                mean_causal = loss_causal.mean()
-
-                self.scores.update_min_score(
-                    self.scores.mean_critic, mean_critic)
-                self.scores.update_min_score(
-                    self.scores.mean_actor, mean_actor)
+                max_critic = loss_critic.max()
+                max_causal = loss_causal.max()
 
                 debug_dict = {
-                    'Loss Actor': mean_actor,
-                    'Loss Critic': mean_critic,
-                    'Loss Causal': mean_causal
+                    'Loss Actor': loss_actor.mean(),
+                    'Loss Critic': max_critic,
+                    'Loss Causal': max_causal
                 }
-                self.write_tboard_scalar(debug_dict=debug_dict, train=True)
+                self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
                 self.global_step += len(self.train_data)
+
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every
                 if self.network_args.tboard:
@@ -227,8 +289,7 @@ class ActiveCriticLearner(nn.Module):
 
     def write_tboard_scalar(self, debug_dict, train, step=None):
         if step is None:
-            step = self.global_step
-        step = int(len(self.train_data) / self.policy.args_obj.epoch_len)
+            step = int(len(self.train_data) / self.policy.args_obj.epoch_len)
 
         if self.network_args.tboard:
             for para, value in debug_dict.items():
@@ -240,7 +301,7 @@ class ActiveCriticLearner(nn.Module):
 
     def run_validation(self):
         h = time.perf_counter()
-        opt_actions, gen_actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
+        opt_actions, observations, rewards = sample_new_episode(
             policy=self.policy,
             env=self.eval_env,
             device=self.network_args.device,
@@ -251,23 +312,10 @@ class ActiveCriticLearner(nn.Module):
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
-        for i in range(min(opt_actions.shape[0], 4)):
-            self.createGraphs([gen_actions[i], opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i))
-            self.createGraphs([rewards[i], self.policy.history.opt_scores[0][i], self.policy.history.gen_scores[0][i]], 
-                                ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i))
+        self.plot_history(self.policy.history, rewards=rewards, prefix='Validation ', num_timesteps=1)
 
         last_reward, _ = rewards.max(dim=1)
-        best_model = self.scores.update_max_score(
-            self.scores.mean_reward, last_reward.mean())
-        if best_model:
-            self.saveNetworkToFile(add='best_validation', data_path=os.path.join(
-                self.network_args.data_path, self.logname))
-        last_expected_rewards_before, _ = expected_rewards_before.max(dim=1)
-        last_expected_reward_after, _ = expected_rewards_after.max(dim=1)
-        self.analyze_critic_scores(
-            last_reward, last_expected_rewards_before, '')
-        self.analyze_critic_scores(
-            last_reward, last_expected_reward_after, ' optimized')
+
         success = (last_reward == 1)
         success = success.type(th.float)
         debug_dict = {

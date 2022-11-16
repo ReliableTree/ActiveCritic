@@ -18,4 +18,5 @@ class ActiveCriticLearnerArgs:
         self.add_data_every:int = None
         self.actor_threshold:float = None
         self.critic_threshold:float = None
+        self.causal_threshold:float = None
         self.num_cpu:int = None

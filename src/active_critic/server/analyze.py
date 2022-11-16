@@ -50,7 +50,6 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.inference_opt_lr = 5e-2
     acps.optimize = True
     acps.batch_size = 32
-    acps.opt_end = True
     acps.stop_opt = True
     acps.clip = False
     return acps
@@ -77,6 +76,8 @@ def make_acl(device, env_tag, logname):
     device = device
     acla = ActiveCriticLearnerArgs()
     acla.data_path = '/data/bing/hendrik/'
+    #acla.data_path = '/home/hendrik/Documents/master_project/LokalData/'
+
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
@@ -87,11 +88,13 @@ def make_acl(device, env_tag, logname):
     acla.add_data_every = 1
     acla.validation_episodes = 32
     acla.training_epsiodes = 1
-    acla.actor_threshold = 5e-1
-    acla.critic_threshold = 5e-1
-    acla.num_cpu = 32
+    acla.actor_threshold = 1e-2
+    acla.critic_threshold = 1e-2
+    acla.causal_threshold = 1e-2
 
-    seq_len = 60
+    acla.num_cpu = acla.validation_episodes
+
+    seq_len = 100
     epsiodes = 30
     ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.training_epsiodes, acla.num_cpu), env_tag=env_tag, device=device)
     eval_env, expert = make_vec_env(env_tag, num_cpu=acla.num_cpu, seq_len=seq_len)
@@ -100,7 +103,7 @@ def make_acl(device, env_tag, logname):
 
 
 def run_experiment_analyze(device):
-    env_tag = 'push'
-    logname = 'push first test'
+    env_tag = 'reach'
+    logname = 'no inference lookup'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
