@@ -43,7 +43,7 @@ class TransformerModel(nn.Module):
         self.lazy_init = True
 
 
-    def forward(self, src: Tensor, mask = None, return_attention=False) -> Tensor:
+    def forward(self, src: Tensor, offset:Tensor, mask = None, return_attention=False) -> Tensor:
         """
         Args:
             src: Tensor, shape [seq_len, batch_size]
@@ -55,7 +55,7 @@ class TransformerModel(nn.Module):
         if not self.lazy_init:
             self._lazy_init(src)
         src = self.encoder(src) * math.sqrt(self.model_setup.d_model)
-        src = self.pos_encoder(src)
+        src = self.pos_encoder(src, offset=offset)
         if return_attention:
             output, attention = self.transformer_encoder.forward(src=src, mask=mask, return_attention=return_attention)
         else:
@@ -86,10 +86,10 @@ class PositionalEncoding(nn.Module):
         pe[0, :, 1::2] = torch.cos(position * div_term)
         self.register_buffer('pe', pe)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, offset: Tensor) -> Tensor:
         """
         Args:
             x: Tensor, shape [batch_size, seq_len, embedding_dim]
         """
-        x = x + self.pe[:, :x.size(1)]
+        x = x + self.pe[:, offset:x.size(1) + offset]
         return self.dropout(x)

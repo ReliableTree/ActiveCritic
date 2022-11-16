@@ -145,7 +145,7 @@ class ActiveCriticPolicy(BaseModel):
         # In inference, we want the maximum eventual reward.
         actor_input = self.get_actor_input(
             obs=observation_seq, actions=action_seq, rew=self.gl[:observation_seq.shape[0]])
-        actions = self.actor.forward(actor_input)
+        actions = self.actor.forward(actor_input, offset=0)
 
         if self.args_obj.clip:
             actions = th.clamp(actions, min=self.clip_min, max=self.clip_max)
@@ -160,7 +160,7 @@ class ActiveCriticPolicy(BaseModel):
             acts=actions, obs_seq=observation_seq)
 
         expected_success = self.critic.forward(
-            inputs=critic_input)  # batch_size, seq_len, 1
+            inputs=critic_input, offset=0)  # batch_size, seq_len, 1
 
         if not optimize:
             result = ACPOptResult(
@@ -232,7 +232,7 @@ class ActiveCriticPolicy(BaseModel):
             current_step: int
             ):
         critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_result = self.critic.forward(inputs=critic_inpt)
+        critic_result = self.critic.forward(inputs=critic_inpt, offset=0)
 
         mask = get_seq_end_mask(critic_result, current_step)
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label, mask=mask)
@@ -246,6 +246,7 @@ class ActiveCriticPolicy(BaseModel):
         return actions, critic_result
 
     def get_critic_input(self, acts, obs_seq):
+        acts = None
         critic_input = make_partially_observed_seq(
             obs=obs_seq, acts=acts, seq_len=self.args_obj.epoch_len, act_space=self.action_space)
         return critic_input

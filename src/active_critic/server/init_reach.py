@@ -45,13 +45,14 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.epoch_len = seq_len
     acps.extractor = extractor
     acps.new_epoch = new_epoch
-    acps.opt_steps = 1
+    acps.opt_steps = 0
     acps.optimisation_threshold = 0.95
     acps.inference_opt_lr = 5e-2
     acps.optimize = True
     acps.batch_size = 32
     acps.opt_end = True
     acps.stop_opt = True
+    acps.clip = False
     return acps
 
 
@@ -79,10 +80,10 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'optmize everything last reward 32 heads causal'
+    acla.logname = 'exponential pain'
     acla.tboard = True
     acla.batch_size = 32
-    acla.val_every = 10
+    acla.val_every = 1
     acla.add_data_every = 1
     acla.validation_episodes = 10
     acla.training_epsiodes = 1

@@ -76,13 +76,13 @@ class ActiveCriticLearner(nn.Module):
         self.train_loader = DataLoader(
             dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
-    def actor_step(self, data, loss_actor):
+    def actor_step(self, data, loss_actor, offset):
         obsv, actions, reward = data
         actor_input = self.policy.get_actor_input(
             obs=obsv, actions=actions, rew=reward)
         mask = get_rew_mask(reward)
         debug_dict = self.policy.actor.optimizer_step(
-            inputs=actor_input, label=actions, mask=mask)
+            inputs=actor_input, label=actions, mask=mask, offset=offset)
         if loss_actor is None:
             loss_actor = debug_dict['Loss '].unsqueeze(0)
         else:
@@ -90,13 +90,20 @@ class ActiveCriticLearner(nn.Module):
                 (loss_actor, debug_dict['Loss '].unsqueeze(0)), dim=0)
         return loss_actor
 
-    def critic_step(self, data, loss_critic):
+    def pain_boundaries(self, actions:th.Tensor, min_bound:float, max_bound:float):
+        pain = (th.exp((actions[actions < min_bound] - min_bound)**2)).sum().nan_to_num()
+        pain += (th.exp((actions[actions > max_bound] - max_bound)**2)).sum().nan_to_num()
+        pain = pain / actions.numel()
+        pain = pain * self.policy.args_obj.epoch_len
+        return pain
+
+    def critic_step(self, data, loss_critic, offset):
         obsv, actions, reward = data
         critic_inpt = self.policy.get_critic_input(acts=actions, obs_seq=obsv)
         mask = get_rew_mask(reward)
 
         debug_dict = self.policy.critic.optimizer_step(
-            inputs=critic_inpt, label=reward, mask=mask)
+            inputs=critic_inpt, label=reward, mask=mask, offset=offset)
         if loss_critic is None:
             loss_critic = debug_dict['Loss '].unsqueeze(0)
         else:
@@ -104,11 +111,11 @@ class ActiveCriticLearner(nn.Module):
                 (loss_critic, debug_dict['Loss '].unsqueeze(0)), dim=0)
         return loss_critic
 
-    def causal_step(self, data, loss_causal):
+    def causal_step(self, data, loss_causal, offset):
         obsv, actions, reward = data
         actor_input = self.policy.get_actor_input(
             obs=obsv, actions=actions, rew=th.ones_like(reward))
-        optimized_actions = self.policy.actor.forward(actor_input)
+        optimized_actions = self.policy.actor.forward(actor_input, offset=offset)
         critic_input = self.policy.get_critic_input(acts=optimized_actions, obs_seq=obsv)
 
         #morgen angucken
@@ -117,9 +124,12 @@ class ActiveCriticLearner(nn.Module):
         mask = mask.squeeze()
         mask = mask.type(th.bool)
 
-        scores = self.policy.critic.forward(critic_input)
+        scores = self.policy.critic.forward(critic_input, offset=offset)
 
         loss = calcMSE(scores[mask], th.ones_like(scores)[mask])
+
+        pain = self.pain_boundaries(actions=optimized_actions, min_bound=-1, max_bound=1)
+        loss = loss + pain
         #self.policy.critic.optimizer.zero_grad()
         self.policy.actor.optimizer.zero_grad()
         loss.backward()
@@ -140,9 +150,10 @@ class ActiveCriticLearner(nn.Module):
             env=self.env,
             device=self.network_args.device,
             episodes=self.network_args.training_epsiodes)
-
+        print(f'Training Rewards: {rewards.mean()}')
         debug_dict = {
-            'Training epoch time': th.tensor(time.perf_counter() - h)
+            'Training epoch time': th.tensor(time.perf_counter() - h),
+            'Training Rewards' : rewards.detach()
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=True)
         self.add_data(
@@ -156,9 +167,11 @@ class ActiveCriticLearner(nn.Module):
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
-            loss_actor = actor_step(device_data, loss_actor)
-            loss_critic = critic_step(device_data, loss_critic)
-            loss_causal = causal_step(device_data, loss_causal)
+            #for offset in range(self.policy.args_obj.epoch_len):
+            offset = 0
+            loss_actor = actor_step(device_data, loss_actor, offset=offset)
+            loss_critic = critic_step(device_data, loss_critic, offset=offset)
+            loss_causal = causal_step(device_data, loss_causal, offset=offset)
         return loss_actor, loss_critic, loss_causal
 
     def train(self, epochs):
