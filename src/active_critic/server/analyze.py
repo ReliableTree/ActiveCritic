@@ -56,9 +56,9 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     return acps
 
 
-def setup_ac_reach(seq_len, num_cpu, device):
+def setup_ac_reach(seq_len, num_cpu, env_tag, device):
     seq_len = seq_len
-    env, expert = make_vec_env('pickplace', num_cpu, seq_len=seq_len)
+    env, expert = make_vec_env(env_tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
     wsm_actor_setup = make_wsm_setup(
         seq_len=seq_len, d_output=d_output, device=device)
@@ -73,14 +73,14 @@ def setup_ac_reach(seq_len, num_cpu, device):
     return ac, acps, env, expert
 
 
-def make_acl(device):
+def make_acl(device, env_tag, logname):
     device = device
     acla = ActiveCriticLearnerArgs()
     acla.data_path = '/data/bing/hendrik/'
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'carefully optimistic'
+    acla.logname = logname
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 1
@@ -91,14 +91,16 @@ def make_acl(device):
     acla.critic_threshold = 5e-1
     acla.num_cpu = 32
 
-    seq_len = 100
+    seq_len = 60
     epsiodes = 30
-    ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.training_epsiodes, acla.num_cpu), device=device)
-    eval_env, expert = make_vec_env('pickplace', num_cpu=acla.num_cpu, seq_len=seq_len)
+    ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.training_epsiodes, acla.num_cpu), env_tag=env_tag, device=device)
+    eval_env, expert = make_vec_env(env_tag, num_cpu=acla.num_cpu, seq_len=seq_len)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
     return acl, env, expert, seq_len, epsiodes, device
 
 
 def run_experiment_analyze(device):
-    acl, env, expert, seq_len, epsiodes, device = make_acl(device)
+    env_tag = 'push'
+    logname = 'push first test'
+    acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
