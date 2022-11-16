@@ -229,8 +229,11 @@ class ActiveCriticLearner(nn.Module):
             self.last_observation[:,1:] = 0
             self.last_action = actions
             self.last_reward = rewards
+        try:
+            self.plot_history(self.policy.history, rewards=rewards, prefix='Train ', num_timesteps=1)
+        except:
+            print('Training FAIL')
 
-        self.plot_history(self.policy.history, rewards=rewards, prefix='Train ', num_timesteps=1)
 
     def train_step(self, train_loader, actor_step, critic_step, causal_step):
         loss_actor = None
@@ -311,7 +314,10 @@ class ActiveCriticLearner(nn.Module):
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
-        self.plot_history(self.policy.history, rewards=rewards, prefix='Validation ', num_timesteps=1)
+        try:
+            self.plot_history(self.policy.history, rewards=rewards, prefix='Validation ', num_timesteps=1)
+        except:
+            'Validation FAIL'
 
         last_reward, _ = rewards.max(dim=1)
 
