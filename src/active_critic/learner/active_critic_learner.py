@@ -113,6 +113,7 @@ class ActiveCriticLearner(nn.Module):
 
     def causal_step(self, data, loss_causal, offset):
         obsv, actions, reward = data
+        print(th.all(obsv[:,1:] == 0, dim=[1,2]))
         actor_input = self.policy.get_actor_input(
             obs=obsv, actions=actions, rew=th.ones_like(reward))
         optimized_actions = self.policy.actor.forward(actor_input, offset=offset)

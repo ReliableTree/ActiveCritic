@@ -85,13 +85,13 @@ def make_acl(device):
     acla.batch_size = 32
     acla.val_every = 1
     acla.add_data_every = 1
-    acla.validation_episodes = 10
+    acla.validation_episodes = 1
     acla.training_epsiodes = 1
     acla.actor_threshold = 5e-1
     acla.critic_threshold = 5e-1
-    acla.num_cpu = 8
+    acla.num_cpu = 1
 
-    seq_len = 100
+    seq_len = 10
     epsiodes = 30
     ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.training_epsiodes, acla.num_cpu), device=device)
     eval_env, expert = make_vec_env('reach', num_cpu=acla.num_cpu, seq_len=seq_len)
