@@ -36,6 +36,7 @@ class DatasetAC(torch.utils.data.Dataset):
         observations = observations.reshape([obsv.shape[0], -1, obsv.shape[1], obsv.shape[2]])
         rewards = rewards.reshape([reward.shape[0], -1, reward.shape[1], reward.shape[2]])
 
+        seq_len = obsv.shape[1]
         
         if self.obsv is None:
             self.set_data(observations, actions, rewards)

@@ -252,10 +252,10 @@ class ActiveCriticLearner(nn.Module):
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
-            for offset in range(self.policy.args_obj.epoch_len):
-                loss_actor = actor_step(device_data, loss_actor, offset=offset)
-                loss_critic = critic_step(device_data, loss_critic, offset=offset)
-                loss_causal = causal_step(device_data, loss_causal, offset=offset)
+            offset = th.randint(low=0, high=device_data[0].shape[1], device=self.network_args.device)
+            loss_actor = actor_step(device_data, loss_actor, offset=offset)
+            loss_critic = critic_step(device_data, loss_critic, offset=offset)
+            loss_causal = causal_step(device_data, loss_causal, offset=offset)
         return loss_actor, loss_critic, loss_causal
 
     def train(self, epochs):
