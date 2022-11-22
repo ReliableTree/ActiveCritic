@@ -68,6 +68,8 @@ class ActiveCriticLearner(nn.Module):
         self.last_action = None
         self.last_reward = None
 
+        self.num_sampled_episodes = 0
+
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
         self.train_data.size = self.network_args.buffer_size
@@ -204,6 +206,7 @@ class ActiveCriticLearner(nn.Module):
     def add_training_data(self):
         h = time.perf_counter()
         self.policy.inference = False
+        self.num_sampled_episodes += self.network_args.training_epsiodes
         actions, observations, rewards = sample_new_episode(
             policy=self.policy,
             env=self.env,

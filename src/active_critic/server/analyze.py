@@ -106,6 +106,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'reach'
-    logname = 'no training lookup with random offset'
+    logname = 'no training lookup with random offset correct num epsiodes'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
