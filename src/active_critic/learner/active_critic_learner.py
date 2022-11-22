@@ -96,6 +96,7 @@ class ActiveCriticLearner(nn.Module):
 
     def actor_step(self, data, loss_actor, offset):
         obsv, actions, reward = data
+        actions = th.clamp(actions, min=-1, max=1)
         actor_input = self.policy.get_actor_input(
             obs=obsv, actions=actions, rew=reward)
         mask = get_rew_mask(reward)
@@ -252,7 +253,7 @@ class ActiveCriticLearner(nn.Module):
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
-            offset = th.randint(low=0, high=device_data[0].shape[1], device=self.network_args.device)
+            offset = th.randint(low=0, high=device_data[0].shape[1], size=[1], device=self.network_args.device)
             loss_actor = actor_step(device_data, loss_actor, offset=offset)
             loss_critic = critic_step(device_data, loss_critic, offset=offset)
             loss_causal = causal_step(device_data, loss_causal, offset=offset)
