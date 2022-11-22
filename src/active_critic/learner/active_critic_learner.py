@@ -182,8 +182,7 @@ class ActiveCriticLearner(nn.Module):
         loss = individual_loss.mean()
 
         pain = self.pain_boundaries(actions=optimized_actions, min_bound=-1, max_bound=1)
-        #loss = loss + pain
-        loss = pain
+        loss = loss + pain
         #careful
         self.policy.critic.optimizer.zero_grad()
         self.policy.actor.optimizer.zero_grad()
