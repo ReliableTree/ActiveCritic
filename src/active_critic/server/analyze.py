@@ -92,7 +92,7 @@ def make_acl(device, env_tag, logname):
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
     acla.causal_threshold = 1e-2
-    acla.buffer_size = 5000
+    acla.buffer_size = 10000
 
     acla.num_cpu = acla.validation_episodes
 
@@ -106,6 +106,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'reach'
-    logname = 'no inference lookup with random offset'
+    logname = 'no training lookup with random offset'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)

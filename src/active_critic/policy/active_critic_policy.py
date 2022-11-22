@@ -92,6 +92,7 @@ class ActiveCriticPolicy(BaseModel):
         self.history = ActiveCriticPolicyHistory()
         self.clip_min = th.tensor(self.action_space.low, device=acps.device)
         self.clip_max = th.tensor(self.action_space.high, device=acps.device)
+        self.inference = False
         self.reset()
 
     def reset(self):
@@ -130,7 +131,7 @@ class ActiveCriticPolicy(BaseModel):
 
         self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
 
-        if action_seq is None:
+        if (action_seq is None) or (self.inference):
             self.current_result = self.forward(
                 observation_seq=self.obs_seq, action_seq=action_seq, 
                 optimize=self.args_obj.optimize,
