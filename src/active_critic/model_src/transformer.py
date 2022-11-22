@@ -90,8 +90,6 @@ class PositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [batch_size, seq_len, embedding_dim]
         """
-        if offset == 50:
-            print('offset works.')
         x = torch.cat((x, self.pe[:, offset:x.size(1) + offset].repeat([x.shape[0], 1, 1])), dim=-1)
         #x = x + self.pe[:, offset:x.size(1) + offset]
         return self.dropout(x)
