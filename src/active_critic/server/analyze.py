@@ -27,12 +27,12 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     d_output = d_output
     wsm.model_setup.d_output = d_output
     wsm.model_setup.nhead = 32
-    wsm.model_setup.d_hid = 2048
-    wsm.model_setup.d_model = 2048
-    wsm.model_setup.nlayers = 6
+    wsm.model_setup.d_hid = 512
+    wsm.model_setup.d_model = 512
+    wsm.model_setup.nlayers = 4
     wsm.model_setup.seq_len = seq_len
     wsm.model_setup.dropout = 0
-    wsm.lr = 1e-6
+    wsm.lr = 1e-5
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.Adam
     wsm.optimizer_kwargs = {}
@@ -48,10 +48,11 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.opt_steps = 0
     acps.optimisation_threshold = 0.95
     acps.inference_opt_lr = 5e-2
-    acps.optimize = True
+    acps.optimize = False
     acps.batch_size = 32
     acps.stop_opt = True
     acps.clip = False
+    acps.take_predicted_action = True
     return acps
 
 
@@ -91,7 +92,7 @@ def make_acl(device, env_tag, logname):
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
     acla.causal_threshold = 1e-2
-    acla.buffer_size = 50000
+    acla.buffer_size = 5000
 
     acla.num_cpu = acla.validation_episodes
 
@@ -104,7 +105,7 @@ def make_acl(device, env_tag, logname):
 
 
 def run_experiment_analyze(device):
-    env_tag = 'pickplace'
-    logname = 'no inference lookup pickplace LARGE dense'
+    env_tag = 'reach'
+    logname = 'no inference lookup with offset'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)

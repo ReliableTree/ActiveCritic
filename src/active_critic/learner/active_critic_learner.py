@@ -126,7 +126,7 @@ class ActiveCriticLearner(nn.Module):
         #mask = mask.squeeze()
         assert mask.sum() == reward.shape[0], 'mask wrong calculated'
 
-        scores = self.policy.critic.forward(inputs=critic_inpt, offset=0)
+        scores = self.policy.critic.forward(inputs=critic_inpt, offset=offset)
         individual_loss = (scores[mask].reshape(-1) - reward[mask].reshape(-1))**2
         individual_side_loss = (scores.reshape(-1) - reward.reshape(-1))**2
         individual_loss.reshape([1,-1])
@@ -146,49 +146,56 @@ class ActiveCriticLearner(nn.Module):
         obsv, actions, reward = data
 
         initial_sequence_mask = th.all(th.all(obsv[:, 1:] == 0, dim=-1), dim=-1)
-        obsv = obsv[initial_sequence_mask]
+        steps = obsv.shape[1] - th.all(obsv[:, 1:] == 0, dim=-1).sum(dim=-1)
+        weights = 1 / (steps+1)
+        '''obsv = obsv[initial_sequence_mask]
 
         actions = actions[initial_sequence_mask]
         reward = reward[initial_sequence_mask]
         if initial_sequence_mask.sum() == 0:
             return loss_causal
+        else:'''
+        actor_input = self.policy.get_actor_input(
+            obs=obsv, actions=actions, rew=th.ones_like(reward))
+        optimized_actions = self.policy.actor.forward(actor_input, offset=offset)
+        optimized_actions = self.policy.proj_actions(org_actions=actions, new_actions=optimized_actions, steps=steps-1)
+        critic_input = self.policy.get_critic_input(acts=optimized_actions, obs_seq=obsv)
+
+        #morgen angucken
+        mask = th.zeros_like(reward)
+        mask[:,-1] = 1
+        mask = mask.type(th.bool)
+
+        scores = self.policy.critic.forward(critic_input, offset=offset)
+        assert mask.sum() == reward.shape[0], 'mask wrong calculated'
+        assert scores[mask].numel() == mask.sum(), 'mask wrong applied'
+
+        individual_loss = (scores[mask].reshape(-1) - th.ones_like(scores[mask].reshape(-1)))**2
+        scores_shape_before = list(individual_loss.shape)
+
+        individual_loss = individual_loss * weights
+        assert list(individual_loss.shape) == scores_shape_before, 'scores weights wrong.'
+        individual_loss.reshape([1,-1])
+        loss = individual_loss.mean()
+
+        pain = self.pain_boundaries(actions=optimized_actions, min_bound=-1, max_bound=1)
+        loss = loss + pain
+        #careful
+        self.policy.critic.optimizer.zero_grad()
+        self.policy.actor.optimizer.zero_grad()
+        loss.backward()
+
+        self.policy.critic.optimizer.step()
+        self.policy.actor.optimizer.step()
+
+        if loss_causal is None:
+            loss_causal = individual_loss.detach()[initial_sequence_mask]
         else:
-            actor_input = self.policy.get_actor_input(
-                obs=obsv, actions=actions, rew=th.ones_like(reward))
-            optimized_actions = self.policy.actor.forward(actor_input, offset=offset)
-            critic_input = self.policy.get_critic_input(acts=optimized_actions, obs_seq=obsv)
+            loss_causal = th.cat(
+                (loss_causal, individual_loss.detach()[initial_sequence_mask]), dim=0)
+        
 
-            #morgen angucken
-            mask = th.zeros_like(reward)
-            mask[:,-1] = 1
-            mask = mask.type(th.bool)
-
-            scores = self.policy.critic.forward(critic_input, offset=offset)
-            assert mask.sum() == reward.shape[0], 'mask wrong calculated'
-            assert scores[mask].numel() == mask.sum(), 'mask wrong applied'
-
-            individual_loss = (scores[mask].reshape(-1) - th.ones_like(scores[mask].reshape(-1)))**2
-            individual_loss.reshape([1,-1])
-            loss = individual_loss.mean()
-
-            pain = self.pain_boundaries(actions=optimized_actions, min_bound=-1, max_bound=1)
-            loss = loss + pain
-            #careful
-            self.policy.critic.optimizer.zero_grad()
-            self.policy.actor.optimizer.zero_grad()
-            loss.backward()
-
-            self.policy.critic.optimizer.step()
-            self.policy.actor.optimizer.step()
-
-            if loss_causal is None:
-                loss_causal = individual_loss.detach()
-            else:
-                loss_causal = th.cat(
-                    (loss_causal, individual_loss.detach()), dim=0)
-            
-
-            return loss_causal
+        return loss_causal
 
 
     def add_training_data(self):
@@ -231,7 +238,7 @@ class ActiveCriticLearner(nn.Module):
             self.last_action = actions
             self.last_reward = rewards
         try:
-            self.plot_history(self.policy.history, rewards=rewards, prefix='Train ', num_timesteps=1)
+            self.plot_history(self.policy.history, rewards=rewards, prefix='Train ', num_timesteps=10)
         except:
             print('Training FAIL')
 
@@ -245,11 +252,10 @@ class ActiveCriticLearner(nn.Module):
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
-            #for offset in range(self.policy.args_obj.epoch_len):
-            offset = 0
-            loss_actor = actor_step(device_data, loss_actor, offset=offset)
-            loss_critic = critic_step(device_data, loss_critic, offset=offset)
-            loss_causal = causal_step(device_data, loss_causal, offset=offset)
+            for offset in range(self.policy.args_obj.epoch_len):
+                loss_actor = actor_step(device_data, loss_actor, offset=offset)
+                loss_critic = critic_step(device_data, loss_critic, offset=offset)
+                loss_causal = causal_step(device_data, loss_causal, offset=offset)
         return loss_actor, loss_critic, loss_causal
 
     def train(self, epochs):
@@ -316,7 +322,7 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
         try:
-            self.plot_history(self.policy.history, rewards=rewards, prefix='Validation ', num_timesteps=1)
+            self.plot_history(self.policy.history, rewards=rewards, prefix='Validation ', num_timesteps=10)
         except:
             'Validation FAIL'
 

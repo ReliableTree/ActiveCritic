@@ -34,10 +34,10 @@ class TransformerModel(nn.Module):
         d_hid = self.model_setup.d_hid
         nlayers = self.model_setup.nlayers
         dropout = self.model_setup.dropout
-        self.pos_encoder = PositionalEncoding(d_model, dropout)
+        self.pos_encoder = PositionalEncoding(int(d_model/2), dropout)
         encoder_layers = DebugTEL(d_model, nhead, d_hid, dropout, batch_first=True)
         self.transformer_encoder = DebugTE(encoder_layers, nlayers)
-        self.encoder = nn.Linear(ntoken, d_model)
+        self.encoder = nn.Linear(ntoken, int(d_model/2))
         self.decoder = nn.Linear(d_model, d_output)
         self.to(self.model_setup.device)
         self.lazy_init = True
@@ -72,7 +72,6 @@ def generate_square_subsequent_mask(sz: int) -> Tensor:
     return torch.triu(torch.ones(sz, sz) * float('-inf'), diagonal=1)
 
 
-
 class PositionalEncoding(nn.Module):
 
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
@@ -86,10 +85,13 @@ class PositionalEncoding(nn.Module):
         pe[0, :, 1::2] = torch.cos(position * div_term)
         self.register_buffer('pe', pe)
 
-    def forward(self, x: Tensor, offset: Tensor) -> Tensor:
+    def forward(self, x: torch.Tensor, offset: torch.Tensor) -> torch.Tensor:
         """
         Args:
             x: Tensor, shape [batch_size, seq_len, embedding_dim]
         """
-        x = x + self.pe[:, offset:x.size(1) + offset]
+        if offset == 50:
+            print('offset works.')
+        x = torch.cat((x, self.pe[:, offset:x.size(1) + offset].repeat([x.shape[0], 1, 1])), dim=-1)
+        #x = x + self.pe[:, offset:x.size(1) + offset]
         return self.dropout(x)
