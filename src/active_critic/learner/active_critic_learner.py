@@ -159,7 +159,9 @@ class ActiveCriticLearner(nn.Module):
         actor_input = self.policy.get_actor_input(
             obs=obsv, actions=actions, rew=th.ones_like(reward))
         optimized_actions = self.policy.actor.forward(actor_input, offset=offset)
-        optimized_actions = self.policy.proj_actions(org_actions=actions, new_actions=optimized_actions, steps=steps-1)
+        optimized_actions.retain_grad()
+
+        #optimized_actions = self.policy.proj_actions(org_actions=actions, new_actions=optimized_actions, steps=steps-1)
         critic_input = self.policy.get_critic_input(acts=optimized_actions, obs_seq=obsv)
 
         #morgen angucken
@@ -180,11 +182,12 @@ class ActiveCriticLearner(nn.Module):
         loss = individual_loss.mean()
 
         pain = self.pain_boundaries(actions=optimized_actions, min_bound=-1, max_bound=1)
-        loss = loss + pain
+        #loss = loss + pain
+        loss = pain
         #careful
         self.policy.critic.optimizer.zero_grad()
         self.policy.actor.optimizer.zero_grad()
-        loss.backward()
+        loss.backward(retain_graph=True)
 
         self.policy.critic.optimizer.step()
         self.policy.actor.optimizer.step()
