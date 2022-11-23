@@ -105,7 +105,7 @@ def make_acl(device, env_tag, logname):
 
 
 def run_experiment_analyze(device):
-    env_tag = 'pickplace'
-    logname = 'no training lookup with random offset correct num epsiodes pickplace'
+    env_tag = 'push'
+    logname = 'no training lookup with random offset push'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
