@@ -305,7 +305,7 @@ class ActiveCriticLearner(nn.Module):
 
     def write_tboard_scalar(self, debug_dict, train, step=None):
         if step is None:
-            step = int(len(self.train_data) / self.policy.args_obj.epoch_len)
+            step = self.num_sampled_episodes
 
         if self.network_args.tboard:
             for para, value in debug_dict.items():
@@ -346,7 +346,7 @@ class ActiveCriticLearner(nn.Module):
         print(f'Success Rate: {success.mean()}')
         print(f'Reward: {last_reward.mean()}')
         print(
-            f'training samples: {int(len(self.train_data) / self.policy.args_obj.epoch_len)}')
+            f'training samples: {self.num_sampled_episodes}')
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
 
