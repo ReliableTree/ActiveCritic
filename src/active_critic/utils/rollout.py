@@ -358,8 +358,9 @@ def generate_trajectories(
     #
     # To start with, all environments are active.
     active = np.ones(venv.num_envs, dtype=bool)
+    dones = active.copy()
     while np.any(active):
-        acts = get_actions(obs)
+        acts = get_actions(obs, episode_start=dones)
         obs, rews, dones, infos = venv.step(acts)
 
         # If an environment is inactive, i.e. the episode completed for that

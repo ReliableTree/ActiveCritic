@@ -70,6 +70,8 @@ class ActiveCriticLearner(nn.Module):
 
         self.num_sampled_episodes = 0
 
+        self.current_patients = network_args_obj.patients
+
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
         self.train_data.size = self.network_args.buffer_size
@@ -101,7 +103,9 @@ class ActiveCriticLearner(nn.Module):
         actions = th.clamp(actions, min=-1, max=1)
         actor_input = self.policy.get_actor_input(
             obs=obsv, actions=actions, rew=reward)
-        mask = get_rew_mask(reward)
+        #morgen?
+        mask = th.ones_like(reward, dtype=th.bool).squeeze(-1)
+        mask[:,-1] = 1
         debug_dict = self.policy.actor.optimizer_step(
             inputs=actor_input, label=actions, mask=mask, offset=offset)
         if loss_actor is None:
@@ -124,7 +128,7 @@ class ActiveCriticLearner(nn.Module):
         mask = get_rew_mask(reward)
 
         #morgen?
-        mask = th.zeros_like(reward, dtype=th.bool)
+        mask = th.zeros_like(reward, dtype=th.bool).squeeze(-1)
         mask[:,-1] = 1
         #mask = mask.squeeze()
         assert mask.sum() == reward.shape[0], 'mask wrong calculated'
@@ -297,6 +301,19 @@ class ActiveCriticLearner(nn.Module):
                 }
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
                 self.global_step += len(self.train_data)
+                self.current_patients -= len(self.train_data)
+                if self.current_patients <= 0:
+                    self.network_args.patients *= 2
+                    self.current_patients = self.network_args.patients
+                    self.policy.reset_models()
+
+                    loss_actor = None
+                    loss_critic = None
+                    loss_causal = None
+                    max_causal = float('inf')
+                    max_critic = float('inf')
+
+            self.current_patients = self.network_args.patients
 
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every

@@ -93,6 +93,7 @@ def make_acl(device, env_tag, logname):
     acla.critic_threshold = 1e-2
     acla.causal_threshold = 1e-2
     acla.buffer_size = 1000000
+    acla.patients = 5000
 
     acla.num_cpu = acla.validation_episodes
 
@@ -106,6 +107,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'push'
-    logname = 'no lookup, inf buffer, learned pos embed.'
+    logname = 'inf buffer No lookup Reset'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)

@@ -95,6 +95,10 @@ class ActiveCriticPolicy(BaseModel):
         self.inference = False
         self.reset()
 
+    def reset_models(self):
+        self.critic.init_model()
+        self.actor.init_model()
+
     def reset(self):
         self.last_goal = None
         self.current_step = 0
