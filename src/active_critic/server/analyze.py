@@ -106,6 +106,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'push'
-    logname = 'no lookup, inf buffer, only optimize whole sequence.'
+    logname = 'no lookup, inf buffer, learned pos embed.'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)

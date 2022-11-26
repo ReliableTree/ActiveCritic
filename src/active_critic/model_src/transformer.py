@@ -34,7 +34,8 @@ class TransformerModel(nn.Module):
         d_hid = self.model_setup.d_hid
         nlayers = self.model_setup.nlayers
         dropout = self.model_setup.dropout
-        self.pos_encoder = PositionalEncoding(int(d_model/2), dropout)
+        self.pos_encoder = LearnedPositionalencoding(d_model=int(d_model/2), dropout=dropout, max_batch_size=100, device=src.device, max_len=2*src.shape[1])
+        #self.pos_encoder = PositionalEncoding(d_model=int(d_model/2), dropout=dropout)
         encoder_layers = DebugTEL(d_model, nhead, d_hid, dropout, batch_first=True)
         self.transformer_encoder = DebugTE(encoder_layers, nlayers)
         self.encoder = nn.Linear(ntoken, int(d_model/2))
@@ -93,3 +94,17 @@ class PositionalEncoding(nn.Module):
         x = torch.cat((x, self.pe[:, offset:x.size(1) + offset].repeat([x.shape[0], 1, 1])), dim=-1)
         #x = x + self.pe[:, offset:x.size(1) + offset]
         return self.dropout(x)
+
+class LearnedPositionalencoding(nn.Module):
+    def __init__(self, d_model: int, device:str, max_batch_size:int, dropout: float = 0.1, max_len: int = 5000):
+        super().__init__()
+        self.pos_enc = nn.Embedding(num_embeddings=max_len, embedding_dim=d_model)
+        self.positions = torch.arange(max_len, dtype=torch.long, device=device).unsqueeze(0).repeat([max_batch_size, 1])
+
+
+    def forward(self, x:torch.Tensor, offset:torch.Tensor):
+        positions = self.positions[:x.shape[0], offset:offset+x.shape[1]]
+        embeddings = self.pos_enc.forward(input=positions)
+        x = torch.cat((x, embeddings), dim=-1)
+        return x
+
