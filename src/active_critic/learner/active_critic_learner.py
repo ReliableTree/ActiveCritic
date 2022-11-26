@@ -194,10 +194,10 @@ class ActiveCriticLearner(nn.Module):
             self.policy.actor.optimizer.step()
 
             if loss_causal is None:
-                loss_causal = individual_loss.detach()[initial_sequence_mask]
+                loss_causal = individual_loss.detach()#[initial_sequence_mask]
             else:
                 loss_causal = th.cat(
-                    (loss_causal, individual_loss.detach()[initial_sequence_mask]), dim=0)
+                    (loss_causal, individual_loss.detach()), dim=0)#[initial_sequence_mask]), dim=0)
             
 
             return loss_causal
