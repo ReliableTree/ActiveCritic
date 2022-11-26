@@ -88,11 +88,11 @@ def make_acl(device, env_tag, logname):
     acla.val_every = 1
     acla.add_data_every = 1
     acla.validation_episodes = 32
-    acla.training_epsiodes = 1
+    acla.training_epsiodes = 10
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
     acla.causal_threshold = 1e-2
-    acla.buffer_size = 10000
+    acla.buffer_size = 1000000
 
     acla.num_cpu = acla.validation_episodes
 
@@ -106,6 +106,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'push'
-    logname = 'no training lookup with random offset push'
+    logname = 'no lookup, inf buffer, only optimize whole sequence.'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
