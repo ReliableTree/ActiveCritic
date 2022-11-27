@@ -26,13 +26,13 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     seq_len = seq_len
     d_output = d_output
     wsm.model_setup.d_output = d_output
-    wsm.model_setup.nhead = 4
-    wsm.model_setup.d_hid = 64
-    wsm.model_setup.d_model = 64
-    wsm.model_setup.nlayers = 3
+    wsm.model_setup.nhead = 16
+    wsm.model_setup.d_hid = 256
+    wsm.model_setup.d_model = 256
+    wsm.model_setup.nlayers = 4
     wsm.model_setup.seq_len = seq_len
     wsm.model_setup.dropout = 0
-    wsm.lr = 1e-4
+    wsm.lr = 5e-5
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.Adam
     wsm.optimizer_kwargs = {}
@@ -90,7 +90,7 @@ def make_acl(device, env_tag, logname):
     acla.validation_episodes = 20
     acla.training_epsiodes = 10
     acla.actor_threshold = 1e-2
-    acla.critic_threshold = 1e-2
+    acla.critic_threshold = 1e-3
     acla.causal_threshold = 1e-2
     acla.buffer_size = 1000000
     acla.patients = 5000
@@ -107,6 +107,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'push'
-    logname = 'panic hack lookup'
+    logname = 'panic hack lookup tight critic'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
