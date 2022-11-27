@@ -135,13 +135,13 @@ class ActiveCriticPolicy(BaseModel):
 
         self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
 
-        if (action_seq is None) or (self.inference):
-            self.current_result = self.forward(
-                observation_seq=self.obs_seq, action_seq=action_seq, 
-                optimize=self.args_obj.optimize,
-                current_step=self.current_step,
-                stop_opt=self.args_obj.stop_opt
-                )
+        #if (action_seq is None) or (self.inference):
+        self.current_result = self.forward(
+            observation_seq=self.obs_seq, action_seq=action_seq, 
+            optimize=self.args_obj.optimize,
+            current_step=self.current_step,
+            stop_opt=self.args_obj.stop_opt
+            )
 
         return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
 
