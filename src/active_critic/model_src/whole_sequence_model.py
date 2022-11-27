@@ -27,7 +27,7 @@ class WholeSequenceModel(nn.Module, ABC):
 
     def forward(self, inputs: th.Tensor, offset:th.Tensor, tf_mask:th.Tensor=None) -> th.Tensor:
         if tf_mask is None:
-            tf_mask = generate_square_subsequent_mask(sz = inputs.shape[1])
+            tf_mask = generate_square_subsequent_mask(sz = inputs.shape[1]).to(inputs.device)
         if (self.model is None):
             self.wsms.model_setup.ntoken = inputs.size(-1)
             self.model = TransformerModel(
