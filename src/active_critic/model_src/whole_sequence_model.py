@@ -2,7 +2,7 @@ from abc import ABC, abstractstaticmethod
 import typing
 import torch as th
 import torch.nn as nn
-from active_critic.model_src.transformer import TransformerModel, ModelSetup
+from active_critic.model_src.transformer import TransformerModel, ModelSetup, generate_square_subsequent_mask
 from active_critic.utils.pytorch_utils import calcMSE
 
 
@@ -26,6 +26,8 @@ class WholeSequenceModel(nn.Module, ABC):
         self.optimizer = None
 
     def forward(self, inputs: th.Tensor, offset:th.Tensor, tf_mask:th.Tensor=None) -> th.Tensor:
+        if tf_mask is None:
+            tf_mask = generate_square_subsequent_mask(sz = inputs.shape[1])
         if (self.model is None):
             self.wsms.model_setup.ntoken = inputs.size(-1)
             self.model = TransformerModel(

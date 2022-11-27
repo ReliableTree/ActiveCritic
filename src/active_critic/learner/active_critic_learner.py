@@ -128,31 +128,36 @@ class ActiveCriticLearner(nn.Module):
         mask = get_rew_mask(reward)
 
         #morgen?
-        mask = th.zeros_like(reward, dtype=th.bool).squeeze(-1)
+        mask = th.ones_like(reward, dtype=th.bool).squeeze(-1)
         mask[:,-1] = 1
         #mask = mask.squeeze()
-        assert mask.sum() == reward.shape[0], 'mask wrong calculated'
+        #assert mask.sum() == reward.shape[0], 'mask wrong calculated'
 
         scores = self.policy.critic.forward(inputs=critic_inpt, offset=offset)
-        individual_loss = (scores[mask].reshape(-1) - reward[mask].reshape(-1))**2
+        #individual_loss = (scores[mask].reshape(-1) - reward[mask].reshape(-1))**2
+        batch_size = obsv.shape[0]
         individual_side_loss = (scores.reshape(-1) - reward.reshape(-1))**2
-        individual_loss.reshape([1,-1])
-        loss = individual_loss.mean() + individual_side_loss.mean()
+        individual_side_loss = individual_side_loss.reshape([batch_size, -1])
+        #individual_loss.reshape([1,-1])
+        #loss = individual_loss.mean() + individual_side_loss.mean()
+        loss = individual_side_loss.mean()
         self.policy.critic.optimizer.zero_grad()
         loss.backward()
         self.policy.critic.optimizer.step()
 
+        min_loss = th.min(individual_side_loss.detach(), dim=-1)[0]
+
         if loss_critic is None:
-            loss_critic = individual_loss.detach()
+            loss_critic = min_loss
         else:
             loss_critic = th.cat(
-                (loss_critic, individual_loss.detach()), dim=0)
+                (loss_critic, min_loss), dim=0)
         return loss_critic
 
     def causal_step(self, data, loss_causal, offset):
         obsv, actions, reward = data
 
-        initial_sequence_mask = th.all(th.all(obsv[:, 1:] == 0, dim=-1), dim=-1)
+        '''initial_sequence_mask = th.all(th.all(obsv[:, 1:] == 0, dim=-1), dim=-1)
         steps = obsv.shape[1] - th.all(obsv[:, 1:] == 0, dim=-1).sum(dim=-1)
         weights = 1 / (steps)
         obsv = obsv[initial_sequence_mask]
@@ -161,50 +166,52 @@ class ActiveCriticLearner(nn.Module):
         reward = reward[initial_sequence_mask]
         if initial_sequence_mask.sum() == 0:
             return loss_causal
+        else:'''
+        actor_input = self.policy.get_actor_input(
+            obs=obsv, actions=actions, rew=th.ones_like(reward))
+        optimized_actions = self.policy.actor.forward(actor_input, offset=offset)
+        #optimized_actions.retain_grad()
+
+        #optimized_actions = self.policy.proj_actions(org_actions=actions, new_actions=optimized_actions, steps=steps-1)
+        critic_input = self.policy.get_critic_input(acts=optimized_actions, obs_seq=obsv)
+
+        #morgen angucken
+        mask = th.ones_like(reward)
+        mask[:,-1] = 1
+        mask = mask.type(th.bool)
+
+        scores = self.policy.critic.forward(critic_input, offset=offset)
+        #assert mask.sum() == reward.shape[0], 'mask wrong calculated'
+        #assert scores[mask].numel() == mask.sum(), 'mask wrong applied'
+
+        batch_size = obsv.shape[0]
+        seq_len = obsv.shape[1]
+        individual_loss = (scores[mask].reshape(-1) - th.ones_like(scores[mask].reshape(-1)))**2
+        individual_loss = individual_loss.reshape([batch_size, seq_len])
+
+        #individual_loss = individual_loss * weights
+        loss = individual_loss.mean()
+
+        pain = self.pain_boundaries(actions=optimized_actions, min_bound=-1, max_bound=1)
+        loss = loss + pain
+        #careful
+        self.policy.critic.optimizer.zero_grad()
+        self.policy.actor.optimizer.zero_grad()
+        loss.backward(retain_graph=True)
+
+        self.policy.critic.optimizer.step()
+        self.policy.actor.optimizer.step()
+
+        min_loss = th.min(individual_loss.detach(), dim=-1)[0]
+
+        if loss_causal is None:
+            loss_causal = min_loss
         else:
-            actor_input = self.policy.get_actor_input(
-                obs=obsv, actions=actions, rew=th.ones_like(reward))
-            optimized_actions = self.policy.actor.forward(actor_input, offset=offset)
-            #optimized_actions.retain_grad()
+            loss_causal = th.cat(
+                (loss_causal, min_loss), dim=0)#[initial_sequence_mask]), dim=0)
+        
 
-            #optimized_actions = self.policy.proj_actions(org_actions=actions, new_actions=optimized_actions, steps=steps-1)
-            critic_input = self.policy.get_critic_input(acts=optimized_actions, obs_seq=obsv)
-
-            #morgen angucken
-            mask = th.zeros_like(reward)
-            mask[:,-1] = 1
-            mask = mask.type(th.bool)
-
-            scores = self.policy.critic.forward(critic_input, offset=offset)
-            assert mask.sum() == reward.shape[0], 'mask wrong calculated'
-            assert scores[mask].numel() == mask.sum(), 'mask wrong applied'
-
-            individual_loss = (scores[mask].reshape(-1) - th.ones_like(scores[mask].reshape(-1)))**2
-            scores_shape_before = list(individual_loss.shape)
-
-            #individual_loss = individual_loss * weights
-            assert list(individual_loss.shape) == scores_shape_before, 'scores weights wrong.'
-            individual_loss.reshape([1,-1])
-            loss = individual_loss.mean()
-
-            pain = self.pain_boundaries(actions=optimized_actions, min_bound=-1, max_bound=1)
-            loss = loss + pain
-            #careful
-            self.policy.critic.optimizer.zero_grad()
-            self.policy.actor.optimizer.zero_grad()
-            loss.backward(retain_graph=True)
-
-            self.policy.critic.optimizer.step()
-            self.policy.actor.optimizer.step()
-
-            if loss_causal is None:
-                loss_causal = individual_loss.detach()#[initial_sequence_mask]
-            else:
-                loss_causal = th.cat(
-                    (loss_causal, individual_loss.detach()), dim=0)#[initial_sequence_mask]), dim=0)
-            
-
-            return loss_causal
+        return loss_causal
 
 
     def add_training_data(self):
