@@ -34,7 +34,7 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     wsm.model_setup.dropout = 0
     wsm.lr = 5e-5
     wsm.model_setup.device = device
-    wsm.optimizer_class = th.optim.Adam
+    wsm.optimizer_class = th.optim.AdamW
     wsm.optimizer_kwargs = {}
     return wsm
 
@@ -67,7 +67,6 @@ def setup_ac_reach(seq_len, num_cpu, env_tag, device):
         seq_len=seq_len, d_output=1, device=device)
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
-    wsm_critic_setup.lr = 2e-5
     critic = WholeSequenceModel(wsm_critic_setup)
     ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
                             actor=actor, critic=critic, acps=acps)
