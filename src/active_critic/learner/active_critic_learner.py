@@ -180,7 +180,7 @@ class ActiveCriticLearner(nn.Module):
             #assert mask.sum() == reward.shape[0], 'mask wrong calculated'
             assert scores[mask].numel() == mask.sum(), 'mask wrong applied'
 
-            individual_loss = (scores[mask].reshape(-1) - 100*th.ones_like(scores[mask].reshape(-1)))**2
+            individual_loss = (scores[mask] - 100*th.ones_like(scores[mask]))**2
             scores_shape_before = list(individual_loss.shape)
 
             individual_loss = individual_loss * weights
