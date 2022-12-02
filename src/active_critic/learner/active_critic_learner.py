@@ -81,16 +81,17 @@ class ActiveCriticLearner(nn.Module):
 
     def plot_history(self, history:ActiveCriticPolicyHistory, rewards:th.Tensor, prefix:str, num_timesteps:int = 3):
         for epoch in range(min(history.trj[0].shape[0], 4)):
-            for time_step in range(0, history.trj[0].shape[2], int(history.trj[0].shape[2]/num_timesteps)):
+            time_step = 0
+            #for time_step in range(0, history.trj[0].shape[2], int(history.trj[0].shape[2]/num_timesteps)):
                 #history: [epochs, opt_step, act_step, pred_step, dim]
-                gen_actions = history.trj[0][epoch, 0, time_step]
-                opt_actions = history.trj[0][epoch, -1, time_step]
-                self.createGraphs([gen_actions, opt_actions], ['Generated Actions', 'Opimized Actions'], plot_name=f'{prefix} Trajectories Epoch {epoch} Step {time_step}')
-                
-                pred_gen_rew = history.scores[0][epoch, 0, time_step]
-                pred_opt_rew = history.scores[0][epoch, -1, time_step]
-                gt_rewards = rewards[epoch]
-                self.createGraphs([pred_gen_rew, pred_opt_rew, gt_rewards], ['Pred Gen Rewards', 'Pred Opt Rewards', 'GT Rewards'], plot_name=f'{prefix} Rewards Epoch {epoch} Step {time_step}')
+            gen_actions = history.trj[0][epoch, 0, time_step]
+            opt_actions = history.trj[0][epoch, -1, time_step]
+            self.createGraphs([gen_actions, opt_actions], ['Generated Actions', 'Opimized Actions'], plot_name=f'{prefix} Trajectories Epoch {epoch} Step {time_step}')
+            
+            pred_gen_rew = history.scores[0][epoch, 0, time_step]
+            pred_opt_rew = history.scores[0][epoch, -1, time_step]
+            gt_rewards = rewards[epoch]
+            self.createGraphs([pred_gen_rew, pred_opt_rew, gt_rewards], ['Pred Gen Rewards', 'Pred Opt Rewards', 'GT Rewards'], plot_name=f'{prefix} Rewards Epoch {epoch} Step {time_step}')
                 
     def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor):
         self.train_data.add_data(obsv=observations.to(
