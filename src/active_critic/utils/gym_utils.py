@@ -221,4 +221,4 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:
             device_data.append(data[:episodes].to(policy.args_obj.device))
         actions, observations, rewards = device_data
 
-        return actions, observations, rewards
+        return actions, observations, rewards * 100

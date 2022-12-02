@@ -212,6 +212,7 @@ class ActiveCriticLearner(nn.Module):
         h = time.perf_counter()
         self.policy.inference = False
         self.num_sampled_episodes += self.network_args.training_epsiodes
+        self.policy.eval()
         actions, observations, rewards = sample_new_episode(
             policy=self.policy,
             env=self.env,
@@ -357,6 +358,7 @@ class ActiveCriticLearner(nn.Module):
     def run_validation(self):
         h = time.perf_counter()
         self.policy.inference = False
+        self.policy.eval()
         opt_actions, observations, rewards = sample_new_episode(
             policy=self.policy,
             env=self.eval_env,
