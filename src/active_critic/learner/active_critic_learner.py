@@ -154,9 +154,9 @@ class ActiveCriticLearner(nn.Module):
         obsv, actions, reward = data
 
         initial_sequence_mask = th.all(th.all(obsv[:, 1:] == 0, dim=-1), dim=-1)
+        obsv = obsv[initial_sequence_mask]
         steps = obsv.shape[1] - th.all(obsv[:, 1:] == 0, dim=-1).sum(dim=-1)
         weights = 1 / (steps)
-        obsv = obsv[initial_sequence_mask]
 
         actions = actions[initial_sequence_mask]
         reward = reward[initial_sequence_mask]
