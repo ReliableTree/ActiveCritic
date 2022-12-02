@@ -229,10 +229,15 @@ class ActiveCriticLearner(nn.Module):
         )
 
         if self.last_observation is None:
-            self.last_observation = observations
+            self.last_observation = observations.clone()
             self.last_observation[:,1:] = 0
-            self.last_action = actions
-            self.last_reward = rewards
+            self.last_action = actions.clone()
+            self.last_reward = rewards.clone()
+
+            self.first_observation  = self.last_observation.clone()
+            self.fist_action = actions.clone()
+            self.first_reward = rewards.clone()
+
         else:
             with th.no_grad():
                 new_actions_inputs = self.policy.get_actor_input(self.last_observation, None, th.ones_like(rewards))
@@ -242,8 +247,19 @@ class ActiveCriticLearner(nn.Module):
                 new_old_scores_input = self.policy.get_critic_input(self.last_action, self.last_observation)
                 new_old_scores = self.policy.critic.forward(inputs=new_old_scores_input, offset=0)
 
+                new_first_actions_inputs = self.policy.get_actor_input(self.first_observation, None, th.ones_like(rewards))
+                new_first_actions = self.policy.actor.forward(inputs=new_first_actions_inputs, offset=0)
+                new_first_score_inputs = self.policy.get_critic_input(acts=new_first_actions, obs_seq=self.first_observation)
+                new_first_scores = self.policy.critic.forward(inputs=new_first_score_inputs, offset=0)
+                new_first_old_scores_input = self.policy.get_critic_input(self.fist_action, self.first_observation)
+                new_first_old_scores = self.policy.critic.forward(inputs=new_first_old_scores_input, offset=0)
+
+
+
             self.createGraphs(trjs=[self.last_reward[0], new_scores[0], new_old_scores[0]], trj_names=['GT Reward', 'New Trj Score', 'Old Trj Score'], plot_name='Trajectory Scores Improvement')
             self.createGraphs(trjs=[self.last_action[0], new_actions[0]], trj_names=['Old Actions', 'New Actions'], plot_name='Trajectory Improvement')
+            self.createGraphs(trjs=[self.first_reward[0], new_first_scores[0], new_first_old_scores[0]], trj_names=['GT Reward First', 'New Trj Score First', 'Old Trj Score First'], plot_name='Trajectory Scores Improvement First')
+            self.createGraphs(trjs=[self.fist_action[0], new_first_actions[0]], trj_names=['Old First Actions', 'New First Actions'], plot_name='First Trajectory Improvement')
             self.last_observation = observations
             self.last_observation[:,1:] = 0
             self.last_action = actions
@@ -277,7 +293,7 @@ class ActiveCriticLearner(nn.Module):
                 next_add += self.network_args.add_data_every
                 self.add_training_data()
 
-            self.policy.eval()
+            self.policy.train()
             loss_actor = None
             loss_critic = None
             loss_causal = None
