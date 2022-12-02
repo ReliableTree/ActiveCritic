@@ -256,11 +256,16 @@ class ActiveCriticLearner(nn.Module):
                 new_first_old_scores = self.policy.critic.forward(inputs=new_first_old_scores_input, offset=0)
 
 
-
+            debug_dict = {
+                'Current Trj Score Error': ((new_old_scores[0]-self.last_reward[0])**2).mean()
+            }
+            self.write_tboard_scalar(debug_dict=debug_dict, train=False)
             self.createGraphs(trjs=[self.last_reward[0], new_scores[0], new_old_scores[0]], trj_names=['GT Reward', 'New Trj Score', 'Old Trj Score'], plot_name='Trajectory Scores Improvement')
+            self.createGraphs(trjs=[self.last_reward[0], new_old_scores[0]], trj_names=['GT Reward', 'Predicted Trj Score'], plot_name='Predicted Trajectory Scores')
             self.createGraphs(trjs=[self.last_action[0], new_actions[0]], trj_names=['Old Actions', 'New Actions'], plot_name='Trajectory Improvement')
             self.createGraphs(trjs=[self.first_reward[0], new_first_scores[0], new_first_old_scores[0]], trj_names=['GT Reward First', 'New Trj Score First', 'Old Trj Score First'], plot_name='Trajectory Scores Improvement First')
             self.createGraphs(trjs=[self.fist_action[0], new_first_actions[0]], trj_names=['Old First Actions', 'New First Actions'], plot_name='First Trajectory Improvement')
+            
             self.last_observation = observations
             self.last_observation[:,1:] = 0
             self.last_action = actions

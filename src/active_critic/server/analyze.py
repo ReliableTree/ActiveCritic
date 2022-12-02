@@ -27,12 +27,12 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     d_output = d_output
     wsm.model_setup.d_output = d_output
     wsm.model_setup.nhead = seq_len
-    wsm.model_setup.d_hid = 2*seq_len
-    wsm.model_setup.d_model = 2*seq_len
-    wsm.model_setup.nlayers = 3
+    wsm.model_setup.d_hid = 10*seq_len
+    wsm.model_setup.d_model = 10*seq_len
+    wsm.model_setup.nlayers = 4
     wsm.model_setup.seq_len = seq_len
     wsm.model_setup.dropout = 0
-    wsm.lr = 1e-4
+    wsm.lr = 5e-5
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.Adam
     wsm.optimizer_kwargs = {}
@@ -89,11 +89,11 @@ def make_acl(device, env_tag, logname):
     acla.add_data_every = 1
     acla.validation_episodes = 10
     acla.training_epsiodes = 1
-    acla.actor_threshold = 1e-2
-    acla.critic_threshold = 1e-2
-    acla.causal_threshold = 1e-2
+    acla.actor_threshold = 1e-5
+    acla.critic_threshold = 1e-5
+    acla.causal_threshold = 1e-3
     acla.buffer_size = 1000000
-    acla.patients = 50000
+    acla.patients = 5000000
 
     acla.num_cpu = acla.validation_episodes
 
@@ -107,6 +107,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'push'
-    logname = 'inf buffer No lookup Reset'
+    logname = 'inf buffer No lookup Reset 1e-5 treshold 5e-5'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
