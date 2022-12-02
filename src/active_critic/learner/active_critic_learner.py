@@ -177,7 +177,7 @@ class ActiveCriticLearner(nn.Module):
             mask = mask.type(th.bool)
 
             scores = self.policy.critic.forward(critic_input, offset=offset)
-            assert mask.sum() == reward.shape[0], 'mask wrong calculated'
+            #assert mask.sum() == reward.shape[0], 'mask wrong calculated'
             assert scores[mask].numel() == mask.sum(), 'mask wrong applied'
 
             individual_loss = (scores[mask].reshape(-1) - 100*th.ones_like(scores[mask].reshape(-1)))**2
