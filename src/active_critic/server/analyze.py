@@ -91,7 +91,7 @@ def make_acl(device, env_tag, logname):
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-5
     acla.critic_threshold = 1e-4
-    acla.causal_threshold = 1e-3
+    acla.causal_threshold = 100 * 1e-2
     acla.buffer_size = 1000000
     acla.patients = 5000000
 

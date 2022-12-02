@@ -194,7 +194,6 @@ class ActiveCriticLearner(nn.Module):
             #self.policy.critic.optimizer.zero_grad()
             self.policy.actor.optimizer.zero_grad()
             loss.backward(retain_graph=True)
-            self.policy.critic.optimizer.zero_grad()
 
             #self.policy.critic.optimizer.step()
             self.policy.actor.optimizer.step()
