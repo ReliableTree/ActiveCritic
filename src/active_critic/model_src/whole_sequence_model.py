@@ -38,13 +38,14 @@ class WholeSequenceModel(nn.Module, ABC):
                 self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
         return result
 
-    def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, offset, prefix='', mask:th.Tensor=None, tf_mask:th.Tensor=None) -> typing.Dict:
+    def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, offset, prefix='', mask:th.Tensor=None, tf_mask:th.Tensor=None, lr:float=1) -> typing.Dict:
         result = self.forward(inputs=inputs, tf_mask=tf_mask, offset=offset)
         if mask is not None:
             loss = self.loss_fct(result=result[mask], label=label[mask])
         else:
             loss = self.loss_fct(result=result, label=label)
         self.optimizer.zero_grad()
+        loss = loss * lr
         loss.backward()
         self.optimizer.step()
 

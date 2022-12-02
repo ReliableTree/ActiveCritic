@@ -65,6 +65,7 @@ def setup_ac_reach(seq_len, num_cpu, env_tag, device):
     actor = WholeSequenceModel(wsm_actor_setup)
     wsm_critic_setup = make_wsm_setup(
         seq_len=seq_len, d_output=1, device=device)
+    wsm_critic_setup.lr = 1e-5
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
     critic = WholeSequenceModel(wsm_critic_setup)
@@ -89,11 +90,15 @@ def make_acl(device, env_tag, logname):
     acla.add_data_every = 1
     acla.validation_episodes = 10
     acla.training_epsiodes = 1
-    acla.actor_threshold = 1e-2
-    acla.critic_threshold = 1e-4
-    acla.causal_threshold = 100 * 1e-2
+    acla.actor_threshold = 1e-0
+    acla.critic_threshold = 1e-0
+    acla.causal_threshold = 100 * 1e-0
     acla.buffer_size = 1000000
     acla.patients = 5000000
+
+    acla.causal_lr = 1e-3
+    acla.critic_lr = 1
+    acla.actor_lr = 1
 
     acla.num_cpu = acla.validation_episodes
 

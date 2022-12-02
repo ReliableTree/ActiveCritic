@@ -108,7 +108,7 @@ class ActiveCriticLearner(nn.Module):
         mask = th.ones_like(reward, dtype=th.bool).squeeze(-1)
         mask[:,-1] = 1
         debug_dict = self.policy.actor.optimizer_step(
-            inputs=actor_input, label=actions, mask=mask, offset=offset)
+            inputs=actor_input, label=actions, mask=mask, offset=offset, lr=self.network_args.actor_lr)
         if loss_actor is None:
             loss_actor = debug_dict['Loss '].unsqueeze(0)
         else:
@@ -139,6 +139,7 @@ class ActiveCriticLearner(nn.Module):
         individual_side_loss = (scores.reshape(-1) - reward.reshape(-1))**2
         individual_loss.reshape([1,-1])
         loss = individual_loss.mean() + individual_side_loss.mean()
+        loss = loss * self.network_args.critic_lr
         self.policy.critic.optimizer.zero_grad()
         loss.backward()
         self.policy.critic.optimizer.step()
@@ -186,11 +187,13 @@ class ActiveCriticLearner(nn.Module):
             seq_weights = th.arange(1, scores.shape[1] + 1, device=scores.device).unsqueeze(0)
             seq_weights = 1/scores.shape[1] * seq_weights
 
-            individual_loss = individual_loss * weights * seq_weights
+            individual_loss = individual_loss * seq_weights
 
             assert individual_loss.numel() == scores_shape_before, 'scores weights wrong.'
             individual_loss.reshape([1,-1])
             loss = individual_loss.mean()
+
+            loss = loss * self.network_args.causal_lr
 
             pain = self.pain_boundaries(actions=optimized_actions, min_bound=-1, max_bound=1)
             loss = loss + pain
