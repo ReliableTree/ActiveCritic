@@ -187,7 +187,10 @@ class ActiveCriticLearner(nn.Module):
             seq_weights = th.arange(1, scores.shape[1] + 1, device=scores.device).unsqueeze(0)
             seq_weights = 1/scores.shape[1] * seq_weights
 
+            individual_loss = individual_loss.reshape([obsv.shape[0], obsv.shape[1]])
+
             individual_loss = individual_loss * seq_weights
+
 
             assert individual_loss.numel() == scores_shape_before, 'scores weights wrong.'
             individual_loss.reshape([1,-1])
