@@ -172,7 +172,7 @@ class ActiveCriticLearner(nn.Module):
             critic_input = self.policy.get_critic_input(acts=optimized_actions, obs_seq=obsv)
 
             #morgen angucken
-            mask = th.zeros_like(reward)
+            mask = th.ones_like(reward)
             mask[:,-1] = 1
             mask = mask.type(th.bool)
 
@@ -180,10 +180,10 @@ class ActiveCriticLearner(nn.Module):
             assert mask.sum() == reward.shape[0], 'mask wrong calculated'
             assert scores[mask].numel() == mask.sum(), 'mask wrong applied'
 
-            individual_loss = (scores[mask].reshape(-1) - th.ones_like(scores[mask].reshape(-1)))**2
+            individual_loss = (scores[mask].reshape(-1) - 100*th.ones_like(scores[mask].reshape(-1)))**2
             scores_shape_before = list(individual_loss.shape)
 
-            #individual_loss = individual_loss * weights
+            individual_loss = individual_loss * weights
             assert list(individual_loss.shape) == scores_shape_before, 'scores weights wrong.'
             individual_loss.reshape([1,-1])
             loss = individual_loss.mean()
@@ -191,11 +191,11 @@ class ActiveCriticLearner(nn.Module):
             pain = self.pain_boundaries(actions=optimized_actions, min_bound=-1, max_bound=1)
             loss = loss + pain
             #careful
-            #self.policy.critic.optimizer.zero_grad()
+            self.policy.critic.optimizer.zero_grad()
             self.policy.actor.optimizer.zero_grad()
             loss.backward(retain_graph=True)
 
-            #self.policy.critic.optimizer.step()
+            self.policy.critic.optimizer.step()
             self.policy.actor.optimizer.step()
 
             if loss_causal is None:

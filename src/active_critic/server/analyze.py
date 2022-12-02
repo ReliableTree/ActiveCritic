@@ -89,7 +89,7 @@ def make_acl(device, env_tag, logname):
     acla.add_data_every = 1
     acla.validation_episodes = 10
     acla.training_epsiodes = 1
-    acla.actor_threshold = 5e-4
+    acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-4
     acla.causal_threshold = 100 * 1e-2
     acla.buffer_size = 1000000
@@ -107,6 +107,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'push'
-    logname = 'reward 100 non optimistic'
+    logname = 'reward 100 optimistic opt ws'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
