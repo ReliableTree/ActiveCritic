@@ -154,10 +154,10 @@ class ActiveCriticLearner(nn.Module):
         obsv, actions, reward = data
 
         initial_sequence_mask = th.all(th.all(obsv[:, 1:] == 0, dim=-1), dim=-1)
-        obsv = obsv[initial_sequence_mask]
         steps = obsv.shape[1] - th.all(obsv[:, 1:] == 0, dim=-1).sum(dim=-1)
         weights = 1 / (steps)
-
+        obsv = obsv[initial_sequence_mask]
+        weights = weights[initial_sequence_mask]
         actions = actions[initial_sequence_mask]
         reward = reward[initial_sequence_mask]
         if initial_sequence_mask.sum() == 0:
@@ -181,10 +181,14 @@ class ActiveCriticLearner(nn.Module):
             assert scores[mask].numel() == mask.sum(), 'mask wrong applied'
 
             individual_loss = (scores[mask] - 100*th.ones_like(scores[mask]))**2
-            scores_shape_before = list(individual_loss.shape)
+            scores_shape_before = individual_loss.numel()
 
-            individual_loss = individual_loss * weights
-            assert list(individual_loss.shape) == scores_shape_before, 'scores weights wrong.'
+            seq_weights = th.arange(1, scores.shape[1] + 1, device=scores.device).unsqueeze(0)
+            seq_weights = 1/scores.shape[1] * seq_weights
+
+            individual_loss = individual_loss * weights * seq_weights
+
+            assert individual_loss.numel() == scores_shape_before, 'scores weights wrong.'
             individual_loss.reshape([1,-1])
             loss = individual_loss.mean()
 
