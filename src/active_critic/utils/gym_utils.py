@@ -1,8 +1,7 @@
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 import numpy as np
 import torch as th
-from metaworld.envs import \
-    ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
+from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
 from metaworld.policies import *
 from gym.wrappers import TimeLimit
 from imitation.data.wrappers import RolloutInfoWrapper
