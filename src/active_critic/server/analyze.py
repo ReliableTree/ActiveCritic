@@ -62,11 +62,12 @@ def setup_ac_reach(seq_len, num_cpu, env_tag, device):
     d_output = env.action_space.shape[0]
     wsm_actor_setup = make_wsm_setup(
         seq_len=seq_len, d_output=d_output, device=device)
+    actor = WholeSequenceModel(wsm_actor_setup)
     wsm_critic_setup = make_wsm_setup(
         seq_len=seq_len, d_output=1, device=device)
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
-    actor = WholeSequenceModel(wsm_actor_setup)
+    wsm_critic_setup.lr = 2e-5
     critic = WholeSequenceModel(wsm_critic_setup)
     ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
                             actor=actor, critic=critic, acps=acps)
@@ -90,7 +91,7 @@ def make_acl(device, env_tag, logname):
     acla.validation_episodes = 10
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-5
-    acla.critic_threshold = 1e-5
+    acla.critic_threshold = 1e-6
     acla.causal_threshold = 1e-3
     acla.buffer_size = 1000000
     acla.patients = 5000000
@@ -107,6 +108,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'push'
-    logname = 'inf buffer No lookup Reset 1e-5 treshold 5e-5'
+    logname = 'inf buffer No lookup Reset 1e-6 treshold 5e-6'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
