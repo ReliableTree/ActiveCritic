@@ -26,9 +26,9 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     seq_len = seq_len
     d_output = d_output
     wsm.model_setup.d_output = d_output
-    wsm.model_setup.nhead = 16
-    wsm.model_setup.d_hid = 256
-    wsm.model_setup.d_model = 256
+    wsm.model_setup.nhead = 1
+    wsm.model_setup.d_hid = 10
+    wsm.model_setup.d_model = 10
     wsm.model_setup.nlayers = 4
     wsm.model_setup.seq_len = seq_len
     wsm.model_setup.dropout = 0
@@ -58,14 +58,17 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
 
 def setup_ac_reach(seq_len, num_cpu, env_tag, device):
     seq_len = seq_len
+    ntokens = 20
     env, expert = make_vec_env(env_tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
     wsm_actor_setup = make_wsm_setup(
-        seq_len=seq_len, d_output=d_output, device=device)
+        seq_len=seq_len, d_output=d_output*ntokens, device=device)
     wsm_critic_setup = make_wsm_setup(
         seq_len=seq_len, d_output=1, device=device)
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
+    acps.ntokens = ntokens
+    acps.tokenize = True
     actor = WholeSequenceModel(wsm_actor_setup)
     critic = WholeSequenceModel(wsm_critic_setup)
     ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
@@ -76,8 +79,8 @@ def setup_ac_reach(seq_len, num_cpu, env_tag, device):
 def make_acl(device, env_tag, logname):
     device = device
     acla = ActiveCriticLearnerArgs()
-    acla.data_path = '/data/bing/hendrik/'
-    #acla.data_path = '/home/hendrik/Documents/master_project/LokalData/'
+    #acla.data_path = '/data/bing/hendrik/'
+    acla.data_path = '/home/hendrik/Documents/master_project/LokalData/'
 
     acla.device = device
     acla.extractor = DummyExtractor()
@@ -87,8 +90,8 @@ def make_acl(device, env_tag, logname):
     acla.batch_size = 32
     acla.val_every = 1
     acla.add_data_every = 1
-    acla.validation_episodes = 20
-    acla.training_epsiodes = 10
+    acla.validation_episodes = 1
+    acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-3
     acla.causal_threshold = 1e-2
@@ -97,7 +100,7 @@ def make_acl(device, env_tag, logname):
 
     acla.num_cpu = acla.validation_episodes
 
-    seq_len = 100
+    seq_len = 10
     epsiodes = 30
     ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.training_epsiodes, acla.num_cpu), env_tag=env_tag, device=device)
     eval_env, expert = make_vec_env(env_tag, num_cpu=acla.num_cpu, seq_len=seq_len)
@@ -107,6 +110,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'push'
-    logname = 'panic hack lookup tight critic'
+    logname = 'discrete actions, obsvs'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)

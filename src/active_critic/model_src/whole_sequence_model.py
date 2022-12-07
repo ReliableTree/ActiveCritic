@@ -40,12 +40,19 @@ class WholeSequenceModel(nn.Module, ABC):
                 self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
         return result
 
-    def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, offset, prefix='', mask:th.Tensor=None, tf_mask:th.Tensor=None) -> typing.Dict:
+    def optimizer_step(
+        self, 
+        inputs:th.Tensor, 
+        label:th.Tensor, 
+        offset, prefix='', 
+        mask:th.Tensor=None, 
+        tf_mask:th.Tensor=None,
+        tokenized:bool=None) -> typing.Dict:
         result = self.forward(inputs=inputs, tf_mask=tf_mask, offset=offset)
         if mask is not None:
-            loss = self.loss_fct(result=result[mask], label=label[mask])
+            loss = self.loss_fct(result=result[mask], label=label[mask], tokenized=tokenized)
         else:
-            loss = self.loss_fct(result=result, label=label)
+            loss = self.loss_fct(result=result, label=label, tokenized=tokenized)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -56,9 +63,16 @@ class WholeSequenceModel(nn.Module, ABC):
 
         return debug_dict
 
-    def loss_fct(self, result:th.Tensor, label:th.Tensor, mask:th.Tensor = None) -> th.Tensor:
-        if mask is not None:
-            loss = calcMSE(result[mask], label[mask])
-        else:
-            loss = calcMSE(result, label)
-        return loss
+    def loss_fct(self, result:th.Tensor, label:th.Tensor, mask:th.Tensor = None, tokenized:bool=None) -> th.Tensor:
+            if tokenized:
+                result = result.reshape([-1, result.shape[-1]])
+                label = th.max(label.reshape([-1, label.shape[-1]]), dim=-1)[1]
+                label = th.nn.functional.one_hot(input=label, num_classes=result.shape[-1]).type(th.float)
+                loss_fc = th.nn.CrossEntropyLoss()
+                loss = loss_fc.forward(input=result, target=label)
+            else:
+                if mask is not None:
+                    loss = calcMSE(result[mask], label[mask])
+                else:
+                    loss = calcMSE(result, label)
+            return loss

@@ -5,7 +5,7 @@ import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel
 from active_critic.model_src.state_model import StateModel
-from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq
+from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq, tokenize, detokenize
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -31,8 +31,11 @@ class ActiveCriticPolicySetup:
         self.optimize: bool = None
         self.batch_size: int = None
         self.stop_opt: bool = None
-        self.clip:bool = True
+        self.clip:bool = None
         self.take_predicted_action = None
+        self.tokenize:bool = None
+        self.ntokens:int = 1
+
 
 
 class ActiveCriticPolicyHistory:
@@ -110,11 +113,15 @@ class ActiveCriticPolicy(BaseModel):
 
         self.actor.model        
 
-        self.history.new_epoch(history=self.history.trj, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 2, self.args_obj.epoch_len, self.args_obj.epoch_len, self.actor.wsms.model_setup.d_output], device=self.args_obj.device)
+        self.history.new_epoch(history=self.history.trj, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 2, self.args_obj.epoch_len, self.args_obj.epoch_len, int(self.actor.wsms.model_setup.d_output/self.args_obj.ntokens)], device=self.args_obj.device)
         self.history.new_epoch(history=self.history.scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 2, self.args_obj.epoch_len, self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output], device=self.args_obj.device)
 
-        self.obs_seq = th.zeros(
-            size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
+        if self.args_obj.tokenize:
+            self.obs_seq = th.zeros(
+                size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]*self.args_obj.ntokens], device=self.args_obj.device)
+        else:
+            self.obs_seq = th.zeros(
+                size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
             
 
     def predict(
@@ -133,6 +140,9 @@ class ActiveCriticPolicy(BaseModel):
             self.current_step += 1
             action_seq = self.current_result.gen_trj
 
+        if self.args_obj.tokenize:
+            vec_obsv = tokenize(inpt=vec_obsv, minimum=-1, maximum=1, ntokens=self.args_obj.ntokens)
+
         self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
 
         #if (action_seq is None) or (self.inference):
@@ -143,7 +153,9 @@ class ActiveCriticPolicy(BaseModel):
             stop_opt=self.args_obj.stop_opt
             )
 
-        return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
+        tokenized_actions = self.current_result.gen_trj[:, self.current_step:self.current_step+1]
+        actions = detokenize(inpt=tokenized_actions, minimum=-1, maximum=1, ntokens=self.args_obj.ntokens)
+        return actions[:,0].detach().cpu().numpy()
 
     def forward(self, 
             observation_seq: th.Tensor, 
@@ -174,7 +186,10 @@ class ActiveCriticPolicy(BaseModel):
         expected_success = self.critic.forward(
             inputs=critic_input, offset=0)  # batch_size, seq_len, 1
 
-        self.history.add_opt_stp_seq(self.history.trj, actions, 0, self.current_step)
+        if self.args_obj.tokenize:
+            self.history.add_opt_stp_seq(self.history.trj, detokenize(actions, minimum=-1, maximum=1, ntokens=self.args_obj.ntokens), 0, self.current_step)
+        else:
+            self.history.add_opt_stp_seq(self.history.trj, actions, 0, self.current_step)
         self.history.add_opt_stp_seq(self.history.scores, expected_success, 0, self.current_step)
 
         if not optimize:
@@ -233,7 +248,10 @@ class ActiveCriticPolicy(BaseModel):
                 final_actions = optimized_actions
                 final_exp_success = expected_success
 
-            self.history.add_opt_stp_seq(self.history.trj, optimized_actions, step, self.current_step)
+            if self.args_obj.tokenize:
+                self.history.add_opt_stp_seq(self.history.trj, detokenize(optimized_actions, minimum=-1, maximum=1, ntokens=self.args_obj.ntokens), step, self.current_step)
+            else:
+                self.history.add_opt_stp_seq(self.history.trj, optimized_actions, step, self.current_step)
             self.history.add_opt_stp_seq(self.history.scores, expected_success, step, self.current_step)
 
         if self.args_obj.clip:
@@ -269,7 +287,7 @@ class ActiveCriticPolicy(BaseModel):
 
     def get_critic_input(self, acts, obs_seq):
         critic_input = make_partially_observed_seq(
-            obs=obs_seq, acts=acts, seq_len=self.args_obj.epoch_len, act_space=self.action_space)
+            obs=obs_seq, acts=acts, seq_len=self.args_obj.epoch_len, act_space=self.action_space, tokenize=self.args_obj.tokenize, ntokens=self.args_obj.ntokens)
         return critic_input
 
     def get_actor_input(self, obs: th.Tensor, actions: th.Tensor, rew: th.Tensor):

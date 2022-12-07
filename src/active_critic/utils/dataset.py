@@ -28,10 +28,10 @@ class DatasetAC(torch.utils.data.Dataset):
         self.actions = actions.to(self.device)
         self.success = self.reward[:,:, -1] == 1
 
-    def add_data(self, obsv: torch.Tensor, actions: torch.Tensor, reward: torch.Tensor):
+    def add_data(self, obsv: torch.Tensor, actions: torch.Tensor, reward: torch.Tensor, empty_token:float):
 
         acts, observations, rewards = make_part_obs_data(
-            actions=actions, observations=obsv, rewards=reward)
+            actions=actions, observations=obsv, rewards=reward, empty_token=empty_token)
         actions = acts.reshape([actions.shape[0], -1, actions.shape[1], actions.shape[2]])
         observations = observations.reshape([obsv.shape[0], -1, obsv.shape[1], obsv.shape[2]])
         rewards = rewards.reshape([reward.shape[0], -1, reward.shape[1], reward.shape[2]])

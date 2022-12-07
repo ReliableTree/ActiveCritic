@@ -33,9 +33,13 @@ def get_num_bits(interger):
     return int(th.ceil(th.log2(th.tensor(interger))))
 
 
-def make_partially_observed_seq(obs: th.Tensor, acts: th.Tensor, seq_len: int, act_space):
-    result = th.zeros(size=[obs.shape[0], seq_len,
-                      obs.shape[-1] + act_space.shape[0]], device=obs.device)
+def make_partially_observed_seq(obs: th.Tensor, acts: th.Tensor, seq_len: int, act_space, tokenize:bool=False, ntokens:int=1):
+    if tokenize:
+        result = -2*th.ones(size=[obs.shape[0], seq_len,
+                        obs.shape[-1] + act_space.shape[0]*ntokens], device=obs.device)
+    else:
+        result = th.zeros(size=[obs.shape[0], seq_len,
+                        obs.shape[-1] + act_space.shape[0]], device=obs.device)
     # obs: batch, seq, dim
     result = fill_tensor(result, obs, start_dim=0)
     if acts is not None:
@@ -62,7 +66,7 @@ def calcMSE(a:th.Tensor, b:th.Tensor) -> th.Tensor:
     return ((a.squeeze() - b.squeeze())**2).mean()
 
 
-def apply_triu(inpt:th.Tensor, diagonal:th.Tensor):
+def apply_triu(inpt:th.Tensor, diagonal:th.Tensor, empty_token:float):
     exp_inpt = inpt.unsqueeze(1)
     shape = exp_inpt.shape
     # shape = batch, 1, seq, dims...
@@ -70,14 +74,16 @@ def apply_triu(inpt:th.Tensor, diagonal:th.Tensor):
     mask = th.triu(th.ones(
         [shape[2], shape[2]], device=inpt.device), diagonal=diagonal).T
     # batch, seq, seq, dims...
-    exp_out = exp_inpt * mask[None, :, :, None]
+    mask = mask.reshape([1, mask.shape[0], mask.shape[1], 1]).repeat([exp_inpt.shape[0], 1, 1, exp_inpt.shape[-1]])
+    exp_out = exp_inpt * mask
+    exp_out[mask==0] = empty_token
     return exp_out
 
 
-def make_part_obs_data(actions:th.Tensor, observations:th.Tensor, rewards:th.Tensor):
+def make_part_obs_data(actions:th.Tensor, observations:th.Tensor, rewards:th.Tensor, empty_token:float):
     acts = actions.repeat([1, actions.shape[1], 1]).reshape([-1, actions.shape[1], actions.shape[2]])
     rews = rewards.repeat([1, rewards.shape[1], 1]).reshape([-1, actions.shape[1], 1])
-    obsv = apply_triu(observations, diagonal=0).reshape([-1, observations.shape[-2], observations.shape[-1]])
+    obsv = apply_triu(observations, diagonal=0, empty_token=empty_token).reshape([-1, observations.shape[-2], observations.shape[-1]])
     return acts, obsv, rews
 
 def make_inf_seq(obs:th.Tensor, seq_len:th.Tensor):
@@ -95,3 +101,31 @@ def get_seq_end_mask(inpt, current_step):
 
 def get_rew_mask(reward):
     return (reward.squeeze()>=0)
+
+def make_indices(num, repeats):
+    indices = th.arange(num).reshape([1,-1]).repeat([repeats,1]).T.reshape([-1])
+    return indices
+
+def tokenize(inpt, minimum, maximum, ntokens):
+    batch_size = inpt.shape[0]
+    seq_len = inpt.shape[1]
+    dim = inpt.shape[2]
+    scale = maximum - minimum
+    rec_inpt = ((inpt - minimum) / scale)*(ntokens-1)
+    rounded = th.round(rec_inpt).type(th.long).reshape([-1])
+    batch_indices = make_indices(batch_size, seq_len*dim).to(inpt.device)
+    seq_indices = make_indices(seq_len, dim).repeat(batch_size).to(inpt.device)
+    dim_indices = make_indices(dim, 1).repeat(batch_size*seq_len).to(inpt.device)
+    result = th.zeros([inpt.shape[0], inpt.shape[1], inpt.shape[2], ntokens], dtype=float, device=inpt.device)
+    result[tuple((batch_indices, seq_indices, dim_indices, rounded))] = 1
+    result = result.reshape([inpt.shape[0], inpt.shape[1], -1])
+    return result
+    
+def detokenize(inpt:th.Tensor, minimum, maximum, ntokens):
+    exp_inpt = inpt.reshape([inpt.shape[0], inpt.shape[0], -1, ntokens])
+    values = exp_inpt.argmax(dim=-1)
+    scale = maximum - minimum
+    values = values/(ntokens-1) * scale
+    values = values.reshape([inpt.shape[0], inpt.shape[1], -1])
+    values = values + minimum
+    return values

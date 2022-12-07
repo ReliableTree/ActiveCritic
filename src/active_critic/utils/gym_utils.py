@@ -8,6 +8,7 @@ from imitation.data.wrappers import RolloutInfoWrapper
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from active_critic.utils.rollout import rollout, make_sample_until, flatten_trajectories
 from stable_baselines3.common.type_aliases import GymEnv
+from active_critic.utils.pytorch_utils import tokenize
 from gym import Env
 import gym
 
@@ -207,7 +208,7 @@ def sample_expert_transitions(policy, env, episodes):
     return flatten_trajectories(rollouts)
 
 
-def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:int=1, return_gen_trj = False):
+def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, do_tokenize:bool, n_tokens:int=1, episodes:int=1):
         policy.eval()
         policy.reset()
         seq_len = policy.args_obj.epoch_len
@@ -220,5 +221,8 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:
         for data in datas:
             device_data.append(data[:episodes].to(policy.args_obj.device))
         actions, observations, rewards = device_data
+        if do_tokenize:
+            actions = tokenize(inpt=actions, minimum=-1, maximum=1, ntokens=n_tokens).type(th.float)
+            observations = tokenize(inpt=observations, minimum=-1, maximum=1, ntokens=n_tokens).type(th.float)
 
         return actions, observations, rewards

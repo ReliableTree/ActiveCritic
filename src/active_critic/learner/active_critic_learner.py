@@ -11,7 +11,7 @@ from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy, ActiveCriticPolicyHistory
 from active_critic.utils.dataset import DatasetAC
 from active_critic.utils.gym_utils import sample_new_episode
-from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask
+from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask, detokenize
 from active_critic.utils.tboard_graphs import TBoardGraphs
 from gym.envs.mujoco import MujocoEnv
 from torch.utils.data.dataloader import DataLoader
@@ -93,21 +93,20 @@ class ActiveCriticLearner(nn.Module):
                 self.createGraphs([pred_gen_rew, pred_opt_rew, gt_rewards], ['Pred Gen Rewards', 'Pred Opt Rewards', 'GT Rewards'], plot_name=f'{prefix} Rewards Epoch {epoch} Step {time_step}')
                 
     def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor):
+        empty_token = -2
         self.train_data.add_data(obsv=observations.to(
-            'cpu'), actions=actions.to('cpu'), reward=rewards.to('cpu'))
+            'cpu'), actions=actions.to('cpu'), reward=rewards.to('cpu'), empty_token=empty_token)
         self.train_loader = DataLoader(
             dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
     def actor_step(self, data, loss_actor, offset):
         obsv, actions, reward = data
-        actions = th.clamp(actions, min=-1, max=1)
         actor_input = self.policy.get_actor_input(
             obs=obsv, actions=actions, rew=reward)
         #morgen?
-        mask = th.ones_like(reward, dtype=th.bool).squeeze(-1)
-        mask[:,-1] = 1
+
         debug_dict = self.policy.actor.optimizer_step(
-            inputs=actor_input, label=actions, mask=mask, offset=offset)
+            inputs=actor_input, label=actions, offset=offset, tokenized=self.policy.args_obj.tokenize)
         if loss_actor is None:
             loss_actor = debug_dict['Loss '].unsqueeze(0)
         else:
@@ -125,13 +124,6 @@ class ActiveCriticLearner(nn.Module):
     def critic_step(self, data, loss_critic, offset):
         obsv, actions, reward = data
         critic_inpt = self.policy.get_critic_input(acts=actions, obs_seq=obsv)
-        mask = get_rew_mask(reward)
-
-        #morgen?
-        mask = th.ones_like(reward, dtype=th.bool).squeeze(-1)
-        mask[:,-1] = 1
-        #mask = mask.squeeze()
-        #assert mask.sum() == reward.shape[0], 'mask wrong calculated'
 
         scores = self.policy.critic.forward(inputs=critic_inpt, offset=offset)
         #individual_loss = (scores[mask].reshape(-1) - reward[mask].reshape(-1))**2
@@ -170,6 +162,7 @@ class ActiveCriticLearner(nn.Module):
         actor_input = self.policy.get_actor_input(
             obs=obsv, actions=actions, rew=th.ones_like(reward))
         optimized_actions = self.policy.actor.forward(actor_input, offset=offset)
+
         #optimized_actions.retain_grad()
 
         #optimized_actions = self.policy.proj_actions(org_actions=actions, new_actions=optimized_actions, steps=steps-1)
@@ -222,7 +215,9 @@ class ActiveCriticLearner(nn.Module):
             policy=self.policy,
             env=self.env,
             device=self.network_args.device,
-            episodes=self.network_args.training_epsiodes)
+            episodes=self.network_args.training_epsiodes,
+            do_tokenize=self.policy.args_obj.tokenize,
+            n_tokens=self.policy.args_obj.ntokens)
         print(f'Training Rewards: {rewards.mean()}')
         debug_dict = {
             'Training epoch time': th.tensor(time.perf_counter() - h),
@@ -250,7 +245,15 @@ class ActiveCriticLearner(nn.Module):
                 new_old_scores = self.policy.critic.forward(inputs=new_old_scores_input, offset=0)
 
             self.createGraphs(trjs=[self.last_reward[0], new_scores[0], new_old_scores[0]], trj_names=['GT Reward', 'New Trj Score', 'Old Trj Score'], plot_name='Trajectory Scores Improvement')
-            self.createGraphs(trjs=[self.last_action[0], new_actions[0]], trj_names=['Old Actions', 'New Actions'], plot_name='Trajectory Improvement')
+
+            last_action = self.last_action
+            new_action = new_actions
+            if self.policy.args_obj.tokenize:
+                last_action = detokenize(last_action, minimum=-1, maximum=1, ntokens=self.policy.args_obj.ntokens)
+                new_action = detokenize(new_action, minimum=-1, maximum=1, ntokens=self.policy.args_obj.ntokens)
+
+
+            self.createGraphs(trjs=[last_action[0], new_action[0]], trj_names=['Old Actions', 'New Actions'], plot_name='Trajectory Improvement')
             self.last_observation = observations
             self.last_observation[:,1:] = 0
             self.last_action = actions
@@ -347,7 +350,8 @@ class ActiveCriticLearner(nn.Module):
             env=self.eval_env,
             device=self.network_args.device,
             episodes=self.network_args.validation_episodes,
-            return_gen_trj=True)
+            do_tokenize=self.policy.args_obj.tokenize,
+            n_tokens=self.policy.args_obj.ntokens)
         debug_dict = {
             'Validation epoch time': th.tensor(time.perf_counter() - h)
         }
