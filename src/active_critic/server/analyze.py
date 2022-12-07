@@ -27,8 +27,8 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     d_output = d_output
     wsm.model_setup.d_output = d_output
     wsm.model_setup.nhead = 1
-    wsm.model_setup.d_hid = 10
-    wsm.model_setup.d_model = 10
+    wsm.model_setup.d_hid = 512
+    wsm.model_setup.d_model = 512
     wsm.model_setup.nlayers = 4
     wsm.model_setup.seq_len = seq_len
     wsm.model_setup.dropout = 0
@@ -79,8 +79,8 @@ def setup_ac_reach(seq_len, num_cpu, env_tag, device):
 def make_acl(device, env_tag, logname):
     device = device
     acla = ActiveCriticLearnerArgs()
-    #acla.data_path = '/data/bing/hendrik/'
-    acla.data_path = '/home/hendrik/Documents/master_project/LokalData/'
+    acla.data_path = '/data/bing/hendrik/'
+    #acla.data_path = '/home/hendrik/Documents/master_project/LokalData/'
 
     acla.device = device
     acla.extractor = DummyExtractor()
@@ -90,7 +90,7 @@ def make_acl(device, env_tag, logname):
     acla.batch_size = 32
     acla.val_every = 1
     acla.add_data_every = 1
-    acla.validation_episodes = 1
+    acla.validation_episodes = 20
     acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-3
