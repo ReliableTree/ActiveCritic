@@ -122,7 +122,7 @@ def tokenize(inpt, minimum, maximum, ntokens):
     return result
     
 def detokenize(inpt:th.Tensor, minimum, maximum, ntokens):
-    exp_inpt = inpt.reshape([inpt.shape[0], inpt.shape[0], -1, ntokens])
+    exp_inpt = inpt.reshape([inpt.shape[0], inpt.shape[1], -1, ntokens])
     values = exp_inpt.argmax(dim=-1)
     scale = maximum - minimum
     values = values/(ntokens-1) * scale
