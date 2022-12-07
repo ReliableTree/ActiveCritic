@@ -26,9 +26,9 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     seq_len = seq_len
     d_output = d_output
     wsm.model_setup.d_output = d_output
-    wsm.model_setup.nhead = 1
-    wsm.model_setup.d_hid = 64
-    wsm.model_setup.d_model = 64
+    wsm.model_setup.nhead = 16
+    wsm.model_setup.d_hid = 512
+    wsm.model_setup.d_model = 512
     wsm.model_setup.nlayers = 4
     wsm.model_setup.seq_len = seq_len
     wsm.model_setup.dropout = 0
@@ -110,6 +110,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'push'
-    logname = 'discrete actions, obsvs small'
+    logname = 'discrete actions, obsvs'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
