@@ -26,9 +26,9 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     seq_len = seq_len
     d_output = d_output
     wsm.model_setup.d_output = d_output
-    wsm.model_setup.nhead = 16
-    wsm.model_setup.d_hid = 512
-    wsm.model_setup.d_model = 512
+    wsm.model_setup.nhead = 4
+    wsm.model_setup.d_hid = 64
+    wsm.model_setup.d_model = 64
     wsm.model_setup.nlayers = 4
     wsm.model_setup.seq_len = seq_len
     wsm.model_setup.dropout = 0
@@ -59,15 +59,17 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
 def setup_ac_reach(seq_len, num_cpu, env_tag, device):
     seq_len = seq_len
     ntokens = 20
+    ntokens_reward = 100
     env, expert = make_vec_env(env_tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
     wsm_actor_setup = make_wsm_setup(
         seq_len=seq_len, d_output=d_output*ntokens, device=device)
     wsm_critic_setup = make_wsm_setup(
-        seq_len=seq_len, d_output=1, device=device)
+        seq_len=seq_len, d_output=1*ntokens_reward, device=device)
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
     acps.ntokens = ntokens
+    acps.ntokens_reward = ntokens_reward
     acps.tokenize = True
     actor = WholeSequenceModel(wsm_actor_setup)
     critic = WholeSequenceModel(wsm_critic_setup)
@@ -90,17 +92,17 @@ def make_acl(device, env_tag, logname):
     acla.batch_size = 32
     acla.val_every = 1
     acla.add_data_every = 1
-    acla.validation_episodes = 20
+    acla.validation_episodes = 1
     acla.training_epsiodes = 1
-    acla.actor_threshold = 1e-2
-    acla.critic_threshold = 1e-3
-    acla.causal_threshold = 1e-2
+    acla.actor_threshold = 1e-0
+    acla.critic_threshold = 1e-0
+    acla.causal_threshold = 1e-0
     acla.buffer_size = 1000000
     acla.patients = 500000
 
     acla.num_cpu = acla.validation_episodes
 
-    seq_len = 100
+    seq_len = 20
     epsiodes = 30
     ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.training_epsiodes, acla.num_cpu), env_tag=env_tag, device=device)
     eval_env, expert = make_vec_env(env_tag, num_cpu=acla.num_cpu, seq_len=seq_len)
@@ -110,6 +112,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'push'
-    logname = 'discrete actions, obsvs'
+    logname = 'discrete actions, obsvs, rewards'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)

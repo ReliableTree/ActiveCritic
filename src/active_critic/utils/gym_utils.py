@@ -208,7 +208,7 @@ def sample_expert_transitions(policy, env, episodes):
     return flatten_trajectories(rollouts)
 
 
-def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, do_tokenize:bool, n_tokens:int=1, episodes:int=1):
+def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, do_tokenize:bool, ntokens:int, ntokens_reward:int, episodes:int):
         policy.eval()
         policy.reset()
         seq_len = policy.args_obj.epoch_len
@@ -222,7 +222,7 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, do_tokeni
             device_data.append(data[:episodes].to(policy.args_obj.device))
         actions, observations, rewards = device_data
         if do_tokenize:
-            actions = tokenize(inpt=actions, minimum=-1, maximum=1, ntokens=n_tokens).type(th.float)
-            observations = tokenize(inpt=observations, minimum=-1, maximum=1, ntokens=n_tokens).type(th.float)
-
+            actions = tokenize(inpt=actions, minimum=-1, maximum=1, ntokens=ntokens).type(th.float)
+            observations = tokenize(inpt=observations, minimum=-1, maximum=1, ntokens=ntokens).type(th.float)
+            rewards = tokenize(inpt=rewards, minimum=0, maximum=1, ntokens=ntokens_reward).type(th.float)
         return actions, observations, rewards
