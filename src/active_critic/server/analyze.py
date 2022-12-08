@@ -81,8 +81,8 @@ def setup_ac_reach(seq_len, num_cpu, env_tag, device):
 def make_acl(device, env_tag, logname):
     device = device
     acla = ActiveCriticLearnerArgs()
-    #acla.data_path = '/data/bing/hendrik/'
-    acla.data_path = '/home/hendrik/Documents/master_project/LokalData/'
+    acla.data_path = '/data/bing/hendrik/'
+    #acla.data_path = '/home/hendrik/Documents/master_project/LokalData/'
 
     acla.device = device
     acla.extractor = DummyExtractor()
@@ -102,7 +102,7 @@ def make_acl(device, env_tag, logname):
 
     acla.num_cpu = acla.validation_episodes
 
-    seq_len = 20
+    seq_len = 40
     epsiodes = 30
     ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.training_epsiodes, acla.num_cpu), env_tag=env_tag, device=device)
     eval_env, expert = make_vec_env(env_tag, num_cpu=acla.num_cpu, seq_len=seq_len)
