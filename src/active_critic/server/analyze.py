@@ -81,8 +81,8 @@ def setup_ac_reach(seq_len, num_cpu, env_tag, device):
 def make_acl(device, env_tag, logname):
     device = device
     acla = ActiveCriticLearnerArgs()
-    #acla.data_path = '/data/bing/hendrik/'
-    acla.data_path = '/home/hendrik/Documents/master_project/LokalData/'
+    acla.data_path = '/data/bing/hendrik/'
+    #acla.data_path = '/home/hendrik/Documents/master_project/LokalData/'
 
     acla.device = device
     acla.extractor = DummyExtractor()
@@ -112,6 +112,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'reach'
-    logname = 'discrete actions, obsvs, rewards 512 reach'
+    logname = 'discrete actions, obsvs, rewards 64 reach'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
