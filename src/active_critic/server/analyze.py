@@ -92,11 +92,11 @@ def make_acl(device, env_tag, logname):
     acla.batch_size = 32
     acla.val_every = 1
     acla.add_data_every = 1
-    acla.validation_episodes = 5
+    acla.validation_episodes = 20
     acla.training_epsiodes = 1
-    acla.actor_threshold = 1e-0
-    acla.critic_threshold = 1e-0
-    acla.causal_threshold = 1e-0
+    acla.actor_threshold = 1e-1
+    acla.critic_threshold = 1e-1
+    acla.causal_threshold = 1e-1
     acla.buffer_size = 1000000
     acla.patients = 500000
 
@@ -111,7 +111,7 @@ def make_acl(device, env_tag, logname):
 
 
 def run_experiment_analyze(device):
-    env_tag = 'push'
-    logname = 'discrete actions, obsvs, rewards 512 60'
+    env_tag = 'reach'
+    logname = 'discrete actions, obsvs, rewards 512 reach'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
