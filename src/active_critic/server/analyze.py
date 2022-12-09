@@ -102,7 +102,7 @@ def make_acl(device, env_tag, logname):
 
     acla.num_cpu = acla.validation_episodes
 
-    seq_len = 40
+    seq_len = 60
     epsiodes = 30
     ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.training_epsiodes, acla.num_cpu), env_tag=env_tag, device=device)
     eval_env, expert = make_vec_env(env_tag, num_cpu=acla.num_cpu, seq_len=seq_len)
@@ -112,6 +112,6 @@ def make_acl(device, env_tag, logname):
 
 def run_experiment_analyze(device):
     env_tag = 'push'
-    logname = 'discrete actions, obsvs, rewards 512 6'
+    logname = 'discrete actions, obsvs, rewards 512 60'
     acl, env, expert, seq_len, epsiodes, device = make_acl(device, env_tag, logname)
     acl.train(epochs=10000)
