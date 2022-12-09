@@ -176,11 +176,11 @@ class ActiveCriticLearner(nn.Module):
         loss = individual_loss.mean()
 
         #careful
-        #self.policy.critic.optimizer.zero_grad()
+        self.policy.critic.optimizer.zero_grad()
         self.policy.actor.optimizer.zero_grad()
         loss.backward()
 
-        #self.policy.critic.optimizer.step()
+        self.policy.critic.optimizer.step()
         self.policy.actor.optimizer.step()
 
         #min_loss = th.min(individual_loss.detach(), dim=-1)[0]
