@@ -22,3 +22,6 @@ class ActiveCriticLearnerArgs:
         self.num_cpu:int = None
         self.buffer_size:int = None
         self.patients:int = None
+        self.actor_lr:float = None
+        self.critic_lr:float=None
+        self.causal_lr:float=None

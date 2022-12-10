@@ -200,6 +200,7 @@ class ActiveCriticLearner(nn.Module):
         h = time.perf_counter()
         self.policy.inference = False
         self.num_sampled_episodes += self.network_args.training_epsiodes
+        self.policy.eval()
         actions, observations, rewards = sample_new_episode(
             policy=self.policy,
             env=self.env,
@@ -222,10 +223,15 @@ class ActiveCriticLearner(nn.Module):
         )
 
         if self.last_observation is None:
-            self.last_observation = observations
+            self.last_observation = observations.clone()
             self.last_observation[:,1:] = 0
-            self.last_action = actions
-            self.last_reward = rewards
+            self.last_action = actions.clone()
+            self.last_reward = rewards.clone()
+
+            self.first_observation  = self.last_observation.clone()
+            self.fist_action = actions.clone()
+            self.first_reward = rewards.clone()
+
         else:
             with th.no_grad():
                 new_actions_inputs = self.policy.get_actor_input(self.last_observation, None, th.ones_like(rewards))
@@ -291,7 +297,7 @@ class ActiveCriticLearner(nn.Module):
                 next_add += self.network_args.add_data_every
                 self.add_training_data()
 
-            self.policy.eval()
+            self.policy.train()
             loss_actor = None
             loss_critic = None
             loss_causal = None
@@ -352,6 +358,7 @@ class ActiveCriticLearner(nn.Module):
     def run_validation(self):
         h = time.perf_counter()
         self.policy.inference = False
+        self.policy.eval()
         opt_actions, observations, rewards = sample_new_episode(
             policy=self.policy,
             env=self.eval_env,

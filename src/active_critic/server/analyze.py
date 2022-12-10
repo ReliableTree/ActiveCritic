@@ -34,7 +34,7 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     wsm.model_setup.dropout = 0
     wsm.lr = 5e-4
     wsm.model_setup.device = device
-    wsm.optimizer_class = th.optim.Adam
+    wsm.optimizer_class = th.optim.AdamW
     wsm.optimizer_kwargs = {}
     return wsm
 
