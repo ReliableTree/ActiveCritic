@@ -59,7 +59,7 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
 def setup_ac_reach(seq_len, num_cpu, env_tag, device):
     seq_len = seq_len
     ntokens = 20
-    ntokens_reward = 1000
+    ntokens_reward = 1
     env, expert = make_vec_env(env_tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
     wsm_actor_setup = make_wsm_setup(
@@ -71,6 +71,7 @@ def setup_ac_reach(seq_len, num_cpu, env_tag, device):
     acps.ntokens = ntokens
     acps.ntokens_reward = ntokens_reward
     acps.tokenize = True
+    acps.tokenize_reward = False
     actor = WholeSequenceModel(wsm_actor_setup)
     critic = WholeSequenceModel(wsm_critic_setup)
     ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
@@ -95,7 +96,7 @@ def make_acl(device, env_tag, logname):
     acla.validation_episodes = 20
     acla.training_epsiodes = 1
     acla.actor_threshold = 5e-1
-    acla.critic_threshold = 5e-1
+    acla.critic_threshold = 5e-4
     acla.causal_threshold = 5e-1
     acla.buffer_size = 1000000
     acla.patients = 500000

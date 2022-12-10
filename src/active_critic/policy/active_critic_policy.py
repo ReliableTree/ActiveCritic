@@ -34,6 +34,7 @@ class ActiveCriticPolicySetup:
         self.clip:bool = None
         self.take_predicted_action = None
         self.tokenize:bool = None
+        self.tokenize_reward:bool = None
         self.ntokens:int = 1
         self.ntokens_reward:int = 1
 
@@ -114,10 +115,9 @@ class ActiveCriticPolicy(BaseModel):
 
         self.actor.model        
 
-        #TODO: quantisation as parameter
 
-        self.history.new_epoch(history=self.history.trj, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 2, self.args_obj.epoch_len, self.args_obj.epoch_len, int(self.actor.wsms.model_setup.d_output/self.args_obj.ntokens)], device=self.args_obj.device)
-        self.history.new_epoch(history=self.history.scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 2, self.args_obj.epoch_len, self.args_obj.epoch_len, int(self.critic.wsms.model_setup.d_output/self.args_obj.ntokens_reward)], device=self.args_obj.device)
+        self.history.new_epoch(history=self.history.trj, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 2, self.args_obj.epoch_len, self.args_obj.epoch_len, self.action_space.shape[0]], device=self.args_obj.device)
+        self.history.new_epoch(history=self.history.scores, size=[vec_obsv.shape[0], self.args_obj.opt_steps + 2, self.args_obj.epoch_len, self.args_obj.epoch_len, 1], device=self.args_obj.device)
 
         if self.args_obj.tokenize:
             self.obs_seq = th.zeros(
@@ -191,11 +191,14 @@ class ActiveCriticPolicy(BaseModel):
             inputs=critic_input, offset=0)  # batch_size, seq_len, 1
 
         if self.args_obj.tokenize:
-            det_exp_succ = detokenize(expected_success, minimum=0, maximum=1, ntokens=self.args_obj.ntokens_reward)
-            self.history.add_opt_stp_seq(self.history.scores, det_exp_succ , 0, self.current_step)
             self.history.add_opt_stp_seq(self.history.trj, detokenize(actions, minimum=-1, maximum=1, ntokens=self.args_obj.ntokens), 0, self.current_step)
         else:
             self.history.add_opt_stp_seq(self.history.trj, actions, 0, self.current_step)
+        
+        if self.args_obj.tokenize_reward:
+            det_exp_succ = detokenize(expected_success, minimum=0, maximum=1, ntokens=self.args_obj.ntokens_reward)
+            self.history.add_opt_stp_seq(self.history.scores, det_exp_succ , 0, self.current_step)
+        else:
             self.history.add_opt_stp_seq(self.history.scores, expected_success, 0, self.current_step)
 
         if not optimize:

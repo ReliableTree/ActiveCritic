@@ -142,7 +142,7 @@ class ActiveCriticLearner(nn.Module):
             inputs=critic_inpt,
             label=reward, 
             offset=offset,
-            tokenized=self.policy.args_obj.tokenize)
+            tokenized=self.policy.args_obj.tokenize_reward)
 
         min_loss = debug_dict['Loss '].unsqueeze(0)
 
@@ -156,7 +156,7 @@ class ActiveCriticLearner(nn.Module):
     def causal_step(self, data, loss_causal, offset):
         obsv, actions, reward = data
 
-        if self.policy.args_obj.tokenize:
+        if self.policy.args_obj.tokenize_reward:
             label = th.zeros_like(reward)
             label[:, :, -1] = 1
         else:
@@ -171,7 +171,7 @@ class ActiveCriticLearner(nn.Module):
 
         scores = self.policy.critic.forward(critic_input, offset=offset)
 
-        individual_loss = self.policy.actor.loss_fct(result=scores[:, -1:], label=label[:, -1:], tokenized=self.policy.args_obj.tokenize)
+        individual_loss = self.policy.actor.loss_fct(result=scores[:, -1:], label=label[:, -1:], tokenized=self.policy.args_obj.tokenize_reward)
 
         loss = individual_loss.mean()
 
@@ -206,6 +206,7 @@ class ActiveCriticLearner(nn.Module):
             device=self.network_args.device,
             episodes=self.network_args.training_epsiodes,
             do_tokenize=self.policy.args_obj.tokenize,
+            do_tokenize_reward=self.policy.args_obj.tokenize_reward,
             ntokens=self.policy.args_obj.ntokens,
             ntokens_reward=self.policy.args_obj.ntokens_reward)
         print(f'Training Rewards: {rewards.mean()}')
@@ -235,19 +236,30 @@ class ActiveCriticLearner(nn.Module):
                 new_old_scores = self.policy.critic.forward(inputs=new_old_scores_input, offset=0)
 
 
-            last_action = self.last_action
-            new_action = new_actions
             if self.policy.args_obj.tokenize:
-                last_action = detokenize(last_action, minimum=-1, maximum=1, ntokens=self.policy.args_obj.ntokens)
-                new_action = detokenize(new_action, minimum=-1, maximum=1, ntokens=self.policy.args_obj.ntokens)
-                
-                self.last_reward = detokenize(self.last_reward, minimum=0, maximum=1, ntokens=self.policy.args_obj.ntokens_reward)
+                new_actions = detokenize(new_actions, minimum=-1, maximum=1, ntokens=self.policy.args_obj.ntokens)
+                last_action = detokenize(self.last_action, minimum=-1, maximum=1, ntokens=self.policy.args_obj.ntokens)
+
+            if self.policy.args_obj.tokenize_reward:
+                last_reward = detokenize(self.last_reward, minimum=0, maximum=1, ntokens=self.policy.args_obj.ntokens_reward)
                 new_scores = detokenize(new_scores, minimum=0, maximum=1, ntokens=self.policy.args_obj.ntokens_reward)
                 new_old_scores = detokenize(new_old_scores, minimum=0, maximum=1, ntokens=self.policy.args_obj.ntokens_reward)
+            else:
+                last_reward = self.last_reward
 
-            self.createGraphs(trjs=[self.last_reward[0], new_scores[0], new_old_scores[0]], trj_names=['GT Reward', 'New Trj Score', 'Old Trj Score'], plot_name='Trajectory Scores Improvement')
-            self.createGraphs(trjs=[last_action[0], new_action[0]], trj_names=['Old Actions', 'New Actions'], plot_name='Trajectory Improvement')
+            self.createGraphs(trjs=[last_reward[0], new_scores[0], new_old_scores[0]], trj_names=['GT Reward', 'New Trj Score', 'Old Trj Score'], plot_name='Trajectory Scores Improvement')
+            self.createGraphs(trjs=[last_action[0], new_actions[0]], trj_names=['Old Actions', 'New Actions'], plot_name='Trajectory Improvement')
             
+            self.createGraphs(trjs=[last_reward[0], new_scores[0], new_old_scores[0]], trj_names=['GT Reward', 'New Trj Score', 'Old Trj Score'], plot_name='Trajectory Scores Improvement')
+            self.createGraphs(trjs=[last_reward[0], new_old_scores[0]], trj_names=['GT Reward', 'Predicted Trj Score'], plot_name='Predicted Trajectory Scores')
+            self.createGraphs(trjs=[last_action[0], new_actions[0]], trj_names=['Old Actions', 'New Actions'], plot_name='Trajectory Improvement')
+            
+            self.last_observation = observations
+            self.last_observation[:,1:] = 0
+            self.last_action = actions
+            self.last_reward = rewards
+
+
             self.last_observation = observations
             self.last_observation[:,1:] = 0
             self.last_action = actions
@@ -263,12 +275,12 @@ class ActiveCriticLearner(nn.Module):
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
             offset = th.randint(low=0, high=device_data[0].shape[1], size=[1], device=self.network_args.device)
-            if (loss_actor is None) or (loss_actor > self.network_args.actor_threshold):
-                loss_actor = actor_step(device_data, loss_actor=None, offset=offset)
-            if (loss_critic is None) or (loss_critic > self.network_args.actor_threshold):
-                loss_critic = critic_step(device_data, loss_critic=None, offset=offset)
-            if (loss_causal is None) or (loss_causal > self.network_args.causal_threshold):
-                loss_causal = causal_step(device_data, loss_causal=None, offset=offset)
+            #if (loss_actor is None) or (loss_actor > self.network_args.actor_threshold):
+            loss_actor = actor_step(device_data, loss_actor=None, offset=offset)
+            #if (loss_critic is None) or (loss_critic > self.network_args.actor_threshold):
+            loss_critic = critic_step(device_data, loss_critic=None, offset=offset)
+            #if (loss_causal is None) or (loss_causal > self.network_args.causal_threshold):
+            loss_causal = causal_step(device_data, loss_causal=None, offset=offset)
         return loss_actor, loss_critic, loss_causal
 
     def train(self, epochs):
@@ -346,6 +358,7 @@ class ActiveCriticLearner(nn.Module):
             device=self.network_args.device,
             episodes=self.network_args.validation_episodes,
             do_tokenize=self.policy.args_obj.tokenize,
+            do_tokenize_reward = self.policy.args_obj.tokenize_reward,
             ntokens=self.policy.args_obj.ntokens,
             ntokens_reward=self.policy.args_obj.ntokens_reward)
         debug_dict = {
@@ -355,7 +368,8 @@ class ActiveCriticLearner(nn.Module):
 
         self.plot_history(self.policy.history, rewards=rewards, prefix='Validation ', num_timesteps=10)
         
-        rewards = detokenize(inpt=rewards, minimum=0, maximum=1, ntokens=self.policy.args_obj.ntokens_reward)
+        if self.policy.args_obj.tokenize_reward:
+            rewards = detokenize(inpt=rewards, minimum=0, maximum=1, ntokens=self.policy.args_obj.ntokens_reward)
 
         last_reward, _ = rewards.max(dim=1)
 
