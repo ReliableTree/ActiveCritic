@@ -54,7 +54,6 @@ class WholeSequenceModel(nn.Module, ABC):
         else:
             loss = self.loss_fct(result=result, label=label, tokenized=tokenized)
         self.optimizer.zero_grad()
-        loss = loss * lr
         loss.backward()
         self.optimizer.step()
 
