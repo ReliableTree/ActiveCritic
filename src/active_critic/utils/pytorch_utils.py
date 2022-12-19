@@ -118,7 +118,7 @@ def tokenize(inpt, minimum, maximum, ntokens):
     dim_indices = make_indices(dim, 1).repeat(batch_size*seq_len).to(inpt.device)
     result = th.zeros([inpt.shape[0], inpt.shape[1], inpt.shape[2], ntokens], dtype=float, device=inpt.device)
     result[tuple((batch_indices, seq_indices, dim_indices, rounded))] = 1
-    result = result.reshape([inpt.shape[0], inpt.shape[1], -1])
+    #result = result.reshape([inpt.shape[0], inpt.shape[1], -1])
     return result
     
 def detokenize(inpt:th.Tensor, minimum, maximum, ntokens):
