@@ -7,7 +7,7 @@ from active_critic.server.continuous import run_reach_learn_mdp
 
 if __name__ == '__main__':
     path = '/data/bing/hendrik/'
-    path = '/home/hendrik/Documents/master_project/LokalData/'
+    #path = '/home/hendrik/Documents/master_project/LokalData/'
     parser = argparse.ArgumentParser()
     parser.add_argument('device', type=str,
                     help='Choose free GPU')

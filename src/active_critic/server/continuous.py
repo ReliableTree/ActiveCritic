@@ -87,8 +87,8 @@ class MDPData(th.utils.data.Dataset):
     def __getitem__(self, index):
         done = self.done[index]
 
-        if done:
-            return self.obsv[index], th.zeros_like(self.obsv[index]), self.action[index], th.zeros_like(self.action[index]), self.reward[index], th.zeros_like(self.reward[index]), done
+        if done or (index == len(self.obsv)):
+            return self.obsv[index], th.zeros_like(self.obsv[index]), self.action[index], th.zeros_like(self.action[index]), self.reward[index], th.zeros_like(self.reward[index]), th.ones_like(done)
         else:
             return self.obsv[index], self.obsv[index+1], self.action[index], self.action[index+1], self.reward[index], self.reward[index+1], done
 
@@ -684,7 +684,7 @@ def run_reach_learn_mdp(path, device):
     qenv= QuantzedMDP(env=env, ntokens_obsv=1000, ntokens_act=1000, obsv_low=-1, obsv_high=1, action_low=-1, action_high=1, device=device, mdpLearner=mdp_learner)
     qenv_eval= QuantzedMDP(env=env, ntokens_obsv=1000, ntokens_act=1000, obsv_low=-1, obsv_high=1, action_low=-1, action_high=1, device=device, mdpLearner=mdp_learner)
 
-    model = test_SAC(env=qenv, eval_env=qenv_eval, eval_epochs=50, iterations=10, logname='reach 1000', path=path, model=None, device=device, lf=100)
+    model = test_SAC(env=qenv, eval_env=qenv_eval, eval_epochs=20, iterations=10, logname='reach 1000', path=path, model=None, device=device, lf=100)
     dataloader = th.utils.data.DataLoader(dataset=qenv.replay_data, batch_size=32)
 
     tb = TBoardGraphs(logname='mdp learn reach 1000', data_path=path)
