@@ -612,7 +612,7 @@ def test_SAC(env, eval_env, eval_epochs, iterations, path, logname, device, mode
     if model is None:
         pkwarg = dict(net_arch=[512, 512, 512])
         pkwarg = dict(features_extractor_class=TestExtractor)
-        model = SAC("MlpPolicy", env=env, verbose=1, policy_kwargs=pkwarg, device=device)
+        model = SAC("MlpPolicy", env=env, verbose=1, policy_kwargs=pkwarg, device=device, buffer_size=1000)
 
     #env.set_predictive_mode(predict=False, sac=model)
 
@@ -631,7 +631,7 @@ def test_SAC(env, eval_env, eval_epochs, iterations, path, logname, device, mode
         tb.addValidationScalar(name='Average Reward', value=th.tensor(rews_np.mean()), stepid=iteration)
         #env.set_predictive_mode(predict=pmdp, sac=model)
 
-        model.learn(total_timesteps=100*lf, log_interval=100000)
+        model.learn(total_timesteps=100*lf, log_interval=100000000)
         model.save(logname)
     return model
 
@@ -688,7 +688,7 @@ def run_reach_learn_mdp(path, device):
     dataloader = th.utils.data.DataLoader(dataset=qenv.replay_data, batch_size=32)
 
     tb = TBoardGraphs(logname='mdp learn reach 1000', data_path=path)
-    mdp_learner.learn(max_steps=5e7, rew1_thr=1, rew2_thr=1, embedd_thr=0, tboard=tb, dataloader=dataloader)
+    mdp_learner.learn(max_steps=1e3, rew1_thr=1, rew2_thr=1, embedd_thr=0, tboard=tb, dataloader=dataloader)
     th.save(mdp_learner, path+'mdp_learner_1000')
     th.save(qenv.replay_data, path+'replaydata_reach_1000')
     th.save(qenv.first_observations, path+'first_observations_reach_1000')
