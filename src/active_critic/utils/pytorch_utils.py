@@ -129,3 +129,44 @@ def detokenize(inpt:th.Tensor, minimum, maximum, ntokens):
     values = values.reshape([inpt.shape[0], inpt.shape[1], -1])
     values = values + minimum
     return values
+
+class MDPData(th.utils.data.Dataset):
+    def __init__(self, device) -> None:
+        super().__init__()
+        self.obsv = None
+        self.action = None
+        self.reward = None
+        self.done = None
+        self.device = device
+
+    def add_step(self, obsv:th.Tensor, action:th.Tensor, reward:th.Tensor, done:th.Tensor):
+        if self.obsv is None:
+            self.obsv = obsv.reshape([1, -1]).to(self.device)
+        else:
+            self.obsv = th.cat((self.obsv, obsv.to(self.device).reshape([1, -1])), dim=0)
+
+        if self.action is None:
+            self.action = action.to(self.device).reshape([1, -1])
+        else:
+            self.action = th.cat((self.action, action.to(self.device).reshape([1, -1])), dim=0)
+
+        if self.reward is None:
+            self.reward = reward.to(self.device).reshape([1, -1])
+        else:
+            self.reward = th.cat((self.reward, reward.to(self.device).reshape([1, -1])), dim=0)
+
+        if self.done is None:
+            self.done = done.to(self.device).reshape([1])
+        else:
+            self.done = th.cat((self.done, done.to(self.device).reshape([-1])), dim=0)
+
+    def __len__(self):
+        return len(self.obsv)
+
+    def __getitem__(self, index):
+        done = self.done[index]
+
+        if done or (index == (len(self.obsv)-1)):
+            return self.obsv[index], th.zeros_like(self.obsv[index]), self.action[index], th.zeros_like(self.action[index]), self.reward[index], th.zeros_like(self.reward[index]), th.ones_like(done)
+        else:
+            return self.obsv[index], self.obsv[index+1], self.action[index], self.action[index+1], self.reward[index], self.reward[index+1], done

@@ -18,8 +18,9 @@ from active_critic.utils.tboard_graphs import TBoardGraphs
 import stable_baselines3
 import random
 import copy
-
+from active_critic.utils.pytorch_utils import MDPData
 from stable_baselines3.common.torch_layers import FlattenExtractor
+
 class TestExtractor(FlattenExtractor):
     def __init__(self, observation_space) -> None:
         super().__init__(observation_space)
@@ -49,48 +50,6 @@ def quantize(inpt, minimum, maximum, nquants):
     rounded = th.round(rec_inpt)
     result = (rounded / (nquants - 1))*scale
     return result'''
-
-
-class MDPData(th.utils.data.Dataset):
-    def __init__(self, device) -> None:
-        super().__init__()
-        self.obsv = None
-        self.action = None
-        self.reward = None
-        self.done = None
-        self.device = device
-
-    def add_step(self, obsv:th.Tensor, action:th.Tensor, reward:th.Tensor, done:th.Tensor):
-        if self.obsv is None:
-            self.obsv = obsv.reshape([1, -1]).to(self.device)
-        else:
-            self.obsv = th.cat((self.obsv, obsv.to(self.device).reshape([1, -1])), dim=0)
-
-        if self.action is None:
-            self.action = action.to(self.device).reshape([1, -1])
-        else:
-            self.action = th.cat((self.action, action.to(self.device).reshape([1, -1])), dim=0)
-
-        if self.reward is None:
-            self.reward = reward.to(self.device).reshape([1, -1])
-        else:
-            self.reward = th.cat((self.reward, reward.to(self.device).reshape([1, -1])), dim=0)
-
-        if self.done is None:
-            self.done = done.to(self.device).reshape([1])
-        else:
-            self.done = th.cat((self.done, done.to(self.device).reshape([-1])), dim=0)
-
-    def __len__(self):
-        return len(self.obsv)
-
-    def __getitem__(self, index):
-        done = self.done[index]
-
-        if done or (index == len(self.obsv)):
-            return self.obsv[index], th.zeros_like(self.obsv[index]), self.action[index], th.zeros_like(self.action[index]), self.reward[index], th.zeros_like(self.reward[index]), th.ones_like(done)
-        else:
-            return self.obsv[index], self.obsv[index+1], self.action[index], self.action[index+1], self.reward[index], self.reward[index+1], done
 
 class MLP(nn.Module):
     def __init__(self, input_size, hidden_sizes, output_size, quantisation=0, activation=nn.ReLU(), dropout=0, use_batch_norm=False):
@@ -353,6 +312,7 @@ class MDPLearner(nn.Module):
 
                 nee = (q_embeddings2 != q_pred_embeddings2).sum()
                 nem = nem + nee
+            print(f'step: {steps}')
                 
 
             l2_rew1 = r1l / iteration_counter
@@ -642,7 +602,7 @@ def createGraphs(tboard, trjs:list([th.tensor]), trj_names:list([str]), plot_nam
         np_trjs.append(trj.detach().cpu().numpy())
     tboard.plot_graph(trjs=np_trjs, trj_names=trj_names, trj_colors=trj_colors, plot_name=plot_name, step=step)
 
-def run_reach_learn_mdp(path, device):
+def run_reach_learn_mdp(path, device, logname, load_path=None):
     seq_len = 100
     env_id = 'reach'
     policy_dict = make_policy_dict()
@@ -683,12 +643,18 @@ def run_reach_learn_mdp(path, device):
 
     qenv= QuantzedMDP(env=env, ntokens_obsv=1000, ntokens_act=1000, obsv_low=-1, obsv_high=1, action_low=-1, action_high=1, device=device, mdpLearner=mdp_learner)
     qenv_eval= QuantzedMDP(env=env, ntokens_obsv=1000, ntokens_act=1000, obsv_low=-1, obsv_high=1, action_low=-1, action_high=1, device=device, mdpLearner=mdp_learner)
-
-    model = test_SAC(env=qenv, eval_env=qenv_eval, eval_epochs=20, iterations=10, logname='reach 1000', path=path, model=None, device=device, lf=100)
+    if load_path is None:
+        model = test_SAC(env=qenv, eval_env=qenv_eval, eval_epochs=40, iterations=10, logname=logname, path=path, model=None, device=device, lf=100)
+        th.save(qenv.replay_data, path+'replaydata')
+        th.save(qenv.first_observations, path+'first_observations')
+        model.save(path=path + 'model')
+        model.save_replay_buffer(path=path + 'model_replaybuffer')
+    else:
+        qenv.replay_data = th.load(load_path + 'replaydata')
+        qenv.first_observations = th.load(load_path + 'first_observations')
     dataloader = th.utils.data.DataLoader(dataset=qenv.replay_data, batch_size=32)
 
-    tb = TBoardGraphs(logname='mdp learn reach 1000', data_path=path)
-    mdp_learner.learn(max_steps=1e3, rew1_thr=1, rew2_thr=1, embedd_thr=0, tboard=tb, dataloader=dataloader)
-    th.save(mdp_learner, path+'mdp_learner_1000')
-    th.save(qenv.replay_data, path+'replaydata_reach_1000')
-    th.save(qenv.first_observations, path+'first_observations_reach_1000')
+    tb = TBoardGraphs(logname=logname, data_path=path)
+    mdp_learner.learn(max_steps=3e7, rew1_thr=1, rew2_thr=1, embedd_thr=0, tboard=tb, dataloader=dataloader)
+    th.save(mdp_learner, path+'mdp_learner')
+
