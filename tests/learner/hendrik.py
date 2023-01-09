@@ -7,7 +7,7 @@ from active_critic.server.continuous import run_reach_learn_mdp
 from active_critic.utils.pytorch_utils import MDPData
 
 if __name__ == '__main__':
-    path = '/data/bing/hendrik/reach1/'
+    path = '/data/bing/hendrik/reach1000/'
     #path = '/home/hendrik/Documents/master_project/LokalData/'
     parser = argparse.ArgumentParser()
     parser.add_argument('device', type=str,
