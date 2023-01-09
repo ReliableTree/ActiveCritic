@@ -13,4 +13,4 @@ if __name__ == '__main__':
     parser.add_argument('device', type=str,
                     help='Choose free GPU')
     args = parser.parse_args()
-    run_reach_learn_mdp(path=path, device=args.device, logname='reach 1000', load_path=None)
+    run_reach_learn_mdp(path=path, device=args.device, logname='reach 1000', load_path=path)
