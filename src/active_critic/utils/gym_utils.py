@@ -174,6 +174,7 @@ def parse_sampled_transitions(transitions, extractor, seq_len, device='cuda'):
         epch_actions.append(transitions[i]['acts'])
         epch_rewards.append([transitions[i]['infos']['unscaled_reward']/10])
 
+
         if transitions[i]['dones']:
             rewards.append(np.array(epch_rewards))
             observations.append(np.array(epch_observations))

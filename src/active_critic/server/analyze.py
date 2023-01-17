@@ -26,7 +26,7 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     seq_len = seq_len
     d_output = d_output
     wsm.model_setup.d_output = d_output
-    wsm.model_setup.nhead = 1
+    wsm.model_setup.nhead = 16
     wsm.model_setup.d_hid = 512
     wsm.model_setup.d_model = 512
     wsm.model_setup.nlayers = 4
@@ -80,7 +80,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'optlr5e-2_optstep20_full_epsiodes'
+    acla.logname = 'revert pickplace 16 heads'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 10
@@ -94,7 +94,7 @@ def make_acl(device):
     seq_len = 100
     epsiodes = 30
     ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device)
-    eval_env, expert = make_vec_env('reach', num_cpu=acla.num_cpu, seq_len=seq_len)
+    eval_env, expert = make_vec_env('pickplace', num_cpu=acla.num_cpu, seq_len=seq_len)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
     return acl, env, expert, seq_len, epsiodes, device
 
