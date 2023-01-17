@@ -7,10 +7,12 @@ from active_critic.server.continuous import run_reach_learn_mdp
 from active_critic.utils.pytorch_utils import MDPData
 
 if __name__ == '__main__':
-    path = '/data/bing/hendrik/reach1000/'
+    path = '/data/bing/hendrik/reach1000_2/'
+    load_path = '/data/bing/hendrik/reach1000/'
+
     #path = '/home/hendrik/Documents/master_project/LokalData/'
     parser = argparse.ArgumentParser()
     parser.add_argument('device', type=str,
                     help='Choose free GPU')
     args = parser.parse_args()
-    run_reach_learn_mdp(path=path, device=args.device, logname='reach 1000', load_path=path)
+    run_reach_learn_mdp(path=path, device=args.device, logname='reach 1000', load_path=load_path)
