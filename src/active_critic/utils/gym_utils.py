@@ -216,20 +216,31 @@ def sample_expert_transitions(policy, env, episodes):
 
 
 def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:int=1, return_gen_trj = False):
-        policy.eval()
-        policy.reset()
-        seq_len = policy.args_obj.epoch_len
+        try:
+            policy.eval()
+            policy.reset()
+            seq_len = policy.args_obj.epoch_len
+
+        except:
+            seq_len = 100
         transitions = sample_expert_transitions(
             policy.predict, env, episodes)
-        expected_rewards_after = policy.history.opt_scores[0]
-        expected_rewards_before = policy.history.gen_scores[0]
+        try:
+            expected_rewards_after = policy.history.opt_scores[0]
+            expected_rewards_before = policy.history.gen_scores[0]
+        except:
+            expected_rewards_after = None
         datas = parse_sampled_transitions(
-            transitions=transitions, seq_len=seq_len, extractor=policy.args_obj.extractor, device=device)
+            #transitions=transitions, seq_len=seq_len, extractor=policy.args_obj.extractor, device=device)
+            transitions=transitions, seq_len=seq_len, extractor=DummyExtractor(), device=device)
         device_data = []
         for data in datas:
-            device_data.append(data[:episodes].to(policy.args_obj.device))
+            device_data.append(data[:episodes].to(device))
         actions, observations, rewards = device_data
         rewards = rewards
+        if expected_rewards_after is None:
+            expected_rewards_after = th.clone(rewards)
+            expected_rewards_before = th.clone(rewards)
 
         if return_gen_trj:
             return actions, policy.history.gen_trj[0][:episodes], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]

@@ -104,13 +104,19 @@ class ActiveCriticLearner(nn.Module):
                 (loss_critic, debug_dict['Loss '].unsqueeze(0)), dim=0)
         return loss_critic
 
-    def add_training_data(self):
+    def add_training_data(self, policy=None, episodes = None):
+        if policy is None:
+            policy = self.policy
+
+        if episodes is None:
+            episodes = self.network_args.training_epsiodes
+
         h = time.perf_counter()
         actions, observations, rewards, _, _ = sample_new_episode(
-            policy=self.policy,
+            policy=policy,
             env=self.env,
             device=self.network_args.device,
-            episodes=self.network_args.training_epsiodes)
+            episodes=episodes)
 
         debug_dict = {
             'Training epoch time': th.tensor(time.perf_counter() - h)

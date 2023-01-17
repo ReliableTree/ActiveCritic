@@ -80,7 +80,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'revert pickplace 16 heads'
+    acla.logname = 'pickplace 10 ep td'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 10
@@ -101,6 +101,7 @@ def make_acl(device):
 
 def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
+    acl.add_training_data(policy=expert, episodes=10)
     #acl.run_validation()
     acl.train(epochs=100000)
 
