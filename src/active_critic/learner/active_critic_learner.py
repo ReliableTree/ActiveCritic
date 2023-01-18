@@ -53,6 +53,7 @@ class ActiveCriticLearner(nn.Module):
         self.logname = network_args_obj.logname
 
         self.scores = ACLScores()
+        self.last_scores = None
 
         if network_args_obj.tboard:
             self.tboard = TBoardGraphs(
@@ -212,6 +213,9 @@ class ActiveCriticLearner(nn.Module):
                                 ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i))
 
         last_reward, _ = rewards.max(dim=1)
+        if (self.last_scores is None) or (self.last_scores < last_reward.mean()):
+            self.policy.args_obj.opt_steps *= 1.1
+            print(f'new opt_steps = {self.policy.args_obj.opt_steps}')
         best_model = self.scores.update_max_score(
             self.scores.mean_reward, last_reward.mean())
         if best_model:
