@@ -95,3 +95,6 @@ def get_seq_end_mask(inpt, current_step):
 
 def get_rew_mask(reward):
     return (reward.squeeze()>=0)
+
+def get_done_rew_mask(reward):
+    return (reward[...,-1]==1).squeeze()

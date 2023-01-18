@@ -81,6 +81,7 @@ class ActiveCriticLearner(nn.Module):
         actor_input = self.policy.get_actor_input(
             obs=obsv, actions=actions, rew=reward)
         mask = get_rew_mask(reward)
+
         debug_dict = self.policy.actor.optimizer_step(
             inputs=actor_input, label=actions, mask=mask)
         if loss_actor is None:
@@ -93,10 +94,10 @@ class ActiveCriticLearner(nn.Module):
     def critic_step(self, data, loss_critic):
         obsv, actions, reward = data
         critic_inpt = self.policy.get_critic_input(acts=actions, obs_seq=obsv)
-        mask = get_rew_mask(reward)
+        #mask = get_rew_mask(reward)
 
         debug_dict = self.policy.critic.optimizer_step(
-            inputs=critic_inpt, label=reward, mask=mask)
+            inputs=critic_inpt, label=reward, critic=True)
         if loss_critic is None:
             loss_critic = debug_dict['Loss '].unsqueeze(0)
         else:
