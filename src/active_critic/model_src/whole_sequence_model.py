@@ -54,7 +54,10 @@ class WholeSequenceModel(nn.Module, ABC):
 
     def loss_fct(self, result:th.Tensor, label:th.Tensor, mask:th.Tensor = None) -> th.Tensor:
         if mask is not None:
-            loss = calcMSE(result[mask], label[mask])
+            #loss = calcMSE(result[mask], label[mask])
+            loss = -(result[mask]**2).mean()
         else:
-            loss = calcMSE(result, label)
+            #loss = calcMSE(result, label)
+            loss = -(result**2).mean()
+
         return loss
