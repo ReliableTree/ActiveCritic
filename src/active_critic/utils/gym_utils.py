@@ -194,7 +194,7 @@ def fill_arrays(inpt, seq_len):
     d = []
     for epoch in inpt:
         if epoch.shape[0] < seq_len:
-            fill = -np.ones([seq_len-epoch.shape[0], epoch.shape[-1]])
+            fill = np.ones([seq_len-epoch.shape[0], epoch.shape[-1]])
             nv = np.append(epoch, fill, axis=0)
             d.append(nv)
         else:
