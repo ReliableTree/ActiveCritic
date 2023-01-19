@@ -250,10 +250,10 @@ class ActiveCriticPolicy(BaseModel):
         return critic_input
 
     def get_actor_input(self, obs: th.Tensor, actions: th.Tensor, rew: th.Tensor):
-        max_reward, _ = rew.max(dim=1)
-        max_reward = max_reward.unsqueeze(1).repeat([1, obs.shape[1], 1])
-        actor_inpt = th.cat((obs, max_reward), dim=-1)
-        return actor_inpt
+        #max_reward, _ = rew.max(dim=1)
+        #max_reward = max_reward.unsqueeze(1).repeat([1, obs.shape[1], 1])
+        #actor_inpt = th.cat((obs, max_reward), dim=-1)
+        return obs
 
     def proj_actions(self, org_actions: th.Tensor, new_actions: th.Tensor, current_step: int):
         with th.no_grad():
