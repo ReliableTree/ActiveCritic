@@ -80,16 +80,16 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'pickplace 5e-3 5e-4'
+    acla.logname = 'pickplace max 5e-4 5e-5'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 1
     acla.add_data_every = 1
     acla.validation_episodes = 50
     acla.training_epsiodes = 1
-    acla.actor_threshold = 5e-3
-    acla.critic_threshold = 5e-4
-    acla.num_cpu = 50
+    acla.actor_threshold = 5e-4
+    acla.critic_threshold = 5e-5
+    acla.num_cpu = 25
 
     seq_len = 100
     epsiodes = 30
