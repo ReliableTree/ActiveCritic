@@ -36,6 +36,22 @@ class ACLScores:
             old_score[0] = new_score
         return new_max
 
+class MLP(nn.Module):
+    def __init__(self, input_size, hidden_size_list, output_size):
+        super(MLP, self).__init__()
+        self.hidden_layers = nn.ModuleList()
+        for i in range(len(hidden_size_list)):
+            self.hidden_layers.append(nn.Linear(hidden_size_list[i], hidden_size_list[i+1]))
+            self.hidden_layers.append(nn.ReLU())
+        self.output_layer = nn.Linear(hidden_size_list[-1], output_size)
+
+    def forward(self, x):
+        for i in range(0, len(self.hidden_layers), 2):
+            x = self.hidden_layers[i](x)
+            x = self.hidden_layers[i+1](x)
+        return self.output_layer(x)
+
+
 
 class ActiveCriticLearner(nn.Module):
     def __init__(self,
@@ -105,12 +121,9 @@ class ActiveCriticLearner(nn.Module):
                 (loss_critic, debug_dict['Loss '].unsqueeze(0)), dim=0)
         return loss_critic
 
-    def add_training_data(self, policy=None, episodes = None):
+    def add_training_data(self, policy=None, episodes = 1):
         if policy is None:
             policy = self.policy
-
-        if episodes is None:
-            episodes = self.network_args.training_epsiodes
 
         h = time.perf_counter()
         actions, observations, rewards, _, _ = sample_new_episode(
@@ -147,12 +160,13 @@ class ActiveCriticLearner(nn.Module):
                 self.add_training_data()
 
             self.policy.eval()
-            loss_actor = None
-            loss_critic = None
+
             mean_actor = float('inf')
             mean_critic = float('inf')
 
             while (mean_actor > self.network_args.actor_threshold) or (mean_critic > self.network_args.critic_threshold):
+                loss_actor = None
+                loss_critic = None
 
                 loss_actor, loss_critic = self.train_step(
                     train_loader=self.train_loader,
@@ -172,9 +186,10 @@ class ActiveCriticLearner(nn.Module):
 
                 debug_dict = {
                     'Loss Actor': mean_actor,
-                    'Loss Critic': mean_critic
+                    'Loss Critic': mean_critic,
+                    'Examples': th.tensor(int(len(self.train_data) / self.policy.args_obj.epoch_len))
                 }
-                self.write_tboard_scalar(debug_dict=debug_dict, train=True)
+                self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
                 self.global_step += len(self.train_data)
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every
@@ -183,8 +198,7 @@ class ActiveCriticLearner(nn.Module):
 
     def write_tboard_scalar(self, debug_dict, train, step=None):
         if step is None:
-            step = self.global_step
-        step = int(len(self.train_data) / self.policy.args_obj.epoch_len)
+            step = int(len(self.train_data) / self.policy.args_obj.epoch_len)
 
         if self.network_args.tboard:
             for para, value in debug_dict.items():
@@ -214,7 +228,7 @@ class ActiveCriticLearner(nn.Module):
 
         last_reward, _ = rewards.max(dim=1)
         if (self.last_scores is None) or (self.last_scores < last_reward.mean()):
-            self.policy.args_obj.opt_steps *= 1.1
+            #self.policy.args_obj.opt_steps *= 1.1
             print(f'new opt_steps = {self.policy.args_obj.opt_steps}')
         best_model = self.scores.update_max_score(
             self.scores.mean_reward, last_reward.mean())
