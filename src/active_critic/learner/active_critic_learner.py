@@ -68,8 +68,14 @@ class ActiveCriticLearner(nn.Module):
         self.extractor = network_args_obj.extractor
         self.logname = network_args_obj.logname
 
+
+
         self.scores = ACLScores()
         self.last_scores = None
+
+        self.last_trj = None
+        self.last_trj_training = None
+        
 
         if network_args_obj.tboard:
             self.tboard = TBoardGraphs(
@@ -98,6 +104,7 @@ class ActiveCriticLearner(nn.Module):
 
         b, _ = th.max(reward, dim=1)
         successfull_trj = (b == 1).squeeze()
+
         if successfull_trj.sum() > 0:
             obsv = obsv[successfull_trj]
             actions = actions[successfull_trj]
@@ -136,11 +143,24 @@ class ActiveCriticLearner(nn.Module):
             policy = self.policy
             policy.eval()
         h = time.perf_counter()
-        actions, observations, rewards, _, _ = sample_new_episode(
+        actions, observations, rewards, _, expected_rewards = sample_new_episode(
             policy=policy,
             env=self.env,
             device=self.network_args.device,
             episodes=episodes)
+
+        '''print(f'rewards:{rewards}')
+        print(f'expected rewards: {expected_rewards}')
+        print('__________________________________________')'''
+
+        if self.last_trj_training is not None:
+            self.compare_expecations(self.last_trj_training, 'Training')
+        self.last_trj_training = [
+            observations[:1],
+            actions[:1],
+            rewards[:1],
+            expected_rewards[:1]
+        ]
 
         debug_dict = {
             'Training epoch time': th.tensor(time.perf_counter() - h)
@@ -168,7 +188,10 @@ class ActiveCriticLearner(nn.Module):
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every
                 if self.network_args.tboard:
-                    self.run_validation()
+                    print('_____________________________________________________________')
+                    self.run_validation(optimize=True)
+                    self.run_validation(optimize=False)
+
 
             if (not self.network_args.imitation_phase) and (epoch >= next_add):
                 next_add += self.network_args.add_data_every
@@ -220,7 +243,26 @@ class ActiveCriticLearner(nn.Module):
                 else:
                     self.tboard.addValidationScalar(para, value, step)
 
-    def run_validation(self):
+    def compare_expecations(self, trj, post_fix):
+        last_obsv = trj[0]
+        last_actions = trj[1]
+        last_rewards = trj[2]
+        last_expected_reward = trj[3]
+        critic_input = self.policy.get_critic_input(acts=last_actions, obs_seq=last_obsv)
+        expected_reward = self.policy.critic.forward(critic_input)
+        self.createGraphs([last_rewards[0], last_expected_reward[0], expected_reward[0]], ['Last Rewards', 'Last Expected Rewards', 'Current Expectation'], 'Compare Learn Critic ' + post_fix)
+
+    def run_validation(self, optimize):
+        if optimize:
+            fix = ' optimize'
+            if self.last_trj is not None:
+                self.compare_expecations(self.last_trj, 'Validation')
+        else:
+            fix = ' w/0 optimize'
+            
+        pre_opt = self.policy.args_obj.optimize
+        self.policy.args_obj.optimize = optimize
+
         h = time.perf_counter()
         opt_actions, gen_actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
             policy=self.policy,
@@ -228,15 +270,22 @@ class ActiveCriticLearner(nn.Module):
             device=self.network_args.device,
             episodes=self.network_args.validation_episodes,
             return_gen_trj=True)
+        if optimize:
+            self.last_trj = [
+                observations[:1],
+                opt_actions[:1],
+                rewards[:1],
+                expected_rewards_after[:1]
+            ]
         debug_dict = {
-            'Validation epoch time': th.tensor(time.perf_counter() - h)
+            'Validation epoch time '+fix : th.tensor(time.perf_counter() - h)
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
         for i in range(min(opt_actions.shape[0], 4)):
-            self.createGraphs([gen_actions[i], opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i))
+            self.createGraphs([gen_actions[i], opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i) + fix)
             self.createGraphs([rewards[i], self.policy.history.opt_scores[0][i], self.policy.history.gen_scores[0][i]], 
-                                ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i))
+                                ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i) + fix)
 
         last_reward, _ = rewards.max(dim=1)
         if (self.last_scores is None) or (self.last_scores < last_reward.mean()):
@@ -250,21 +299,22 @@ class ActiveCriticLearner(nn.Module):
         last_expected_rewards_before, _ = expected_rewards_before.max(dim=1)
         last_expected_reward_after, _ = expected_rewards_after.max(dim=1)
         self.analyze_critic_scores(
-            last_reward, last_expected_rewards_before, '')
+            last_reward, last_expected_rewards_before,  fix)
         self.analyze_critic_scores(
-            last_reward, last_expected_reward_after, ' optimized')
+            last_reward, last_expected_reward_after, ' optimized'+ fix)
         success = (last_reward == 1)
         success = success.type(th.float)
         debug_dict = {
-            'Success Rate': success.mean(),
-            'Reward': last_reward.mean(),
-            'Training Epochs': th.tensor(int(len(self.train_data)/self.policy.args_obj.epoch_len))
+            'Success Rate' + fix: success.mean(),
+            'Reward' + fix: last_reward.mean(),
+            'Training Epochs' + fix: th.tensor(int(len(self.train_data)/self.policy.args_obj.epoch_len))
         }
-        print(f'Success Rate: {success.mean()}')
-        print(f'Reward: {last_reward.mean()}')
+        print(f'Success Rate: {success.mean()}' + fix)
+        print(f'Reward: {last_reward.mean()}' + fix)
         print(
-            f'training samples: {int(len(self.train_data) / self.policy.args_obj.epoch_len)}')
+            f'training samples: {int(len(self.train_data) / self.policy.args_obj.epoch_len)}' + fix)
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
+        self.policy.args_obj.optimize = pre_opt
 
 
     def analyze_critic_scores(self, reward: th.Tensor, expected_reward: th.Tensor, add: str):

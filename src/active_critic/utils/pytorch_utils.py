@@ -40,6 +40,8 @@ def make_partially_observed_seq(obs: th.Tensor, acts: th.Tensor, seq_len: int, a
     result = fill_tensor(result, obs, start_dim=0)
     if acts is not None:
         result = fill_tensor(result, acts, start_dim=obs.shape[-1])
+    else:
+        1/0
     return result
 
 
@@ -71,6 +73,9 @@ def apply_triu(inpt:th.Tensor, diagonal:th.Tensor):
         [shape[2], shape[2]], device=inpt.device), diagonal=diagonal).T
     # batch, seq, seq, dims...
     exp_out = exp_inpt * mask[None, :, :, None]
+    '''mask[mask==0] = -2
+    mask[mask==1] = 0
+    exp_out = exp_out + mask[None, :, :, None]'''
     return exp_out
 
 

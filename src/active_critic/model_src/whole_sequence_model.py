@@ -39,6 +39,8 @@ class WholeSequenceModel(nn.Module, ABC):
     def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, prefix='', mask:th.Tensor=None) -> typing.Dict:
         result = self.forward(inputs=inputs)
         if mask is not None:
+            if (mask.shape[0] != result.shape[0]) and (result.shape[0] == 1):
+                mask = mask.unsqueeze(0)
             loss = self.loss_fct(result=result[mask], label=label[mask])
         else:
             loss = self.loss_fct(result=result, label=label)

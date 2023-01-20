@@ -56,9 +56,9 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     return acps
 
 
-def setup_ac_reach(seq_len, num_cpu, device):
+def setup_ac(seq_len, num_cpu, device, tag):
     seq_len = seq_len
-    env, expert = make_vec_env('reach', num_cpu, seq_len=seq_len)
+    env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
     wsm_actor_setup = make_wsm_setup(
         seq_len=seq_len, d_output=d_output, device=device)
@@ -80,7 +80,8 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'pickplace equal training steps'
+    tag = 'pickplace'
+    acla.logname = tag + ' equal training steps reinforcement'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 1 * 50
@@ -93,8 +94,8 @@ def make_acl(device):
 
     seq_len = 100
     epsiodes = 30
-    ac, acps, env, expert = setup_ac_reach(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device)
-    eval_env, expert = make_vec_env('pickplace', num_cpu=acla.num_cpu, seq_len=seq_len)
+    ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, tag=tag)
+    eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
     return acl, env, expert, seq_len, epsiodes, device
 

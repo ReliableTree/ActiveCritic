@@ -163,7 +163,9 @@ class ActiveCriticPolicy(BaseModel):
 
         if not optimize:
             result = ACPOptResult(
-                gen_trj=actions, expected_succes_before=expected_success.detach())
+                gen_trj=actions, 
+                expected_succes_before=expected_success.detach(),
+                expected_succes_after=expected_success.detach())
             return result
 
         else:

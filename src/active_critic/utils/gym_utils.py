@@ -205,6 +205,7 @@ def sample_expert_transitions(policy, env, episodes):
 
     expert = policy
     print(f"Sampling transitions. {episodes}")
+
     rollouts = rollout(
         expert,
         env,
@@ -237,7 +238,6 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:
         for data in datas:
             device_data.append(data[:episodes].to(device))
         actions, observations, rewards = device_data
-        rewards = rewards
         if expected_rewards_after is None:
             expected_rewards_after = th.clone(rewards)
             expected_rewards_before = th.clone(rewards)
