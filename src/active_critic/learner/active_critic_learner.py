@@ -128,6 +128,9 @@ class ActiveCriticLearner(nn.Module):
         critic_inpt = self.policy.get_critic_input(acts=actions, obs_seq=obsv)
         mask = get_rew_mask(reward)
 
+        b, _ = reward.max(dim=1)
+        reward = b.unsqueeze(1).repeat([1,obsv.shape[1],1])
+
         debug_dict = self.policy.critic.optimizer_step(
             inputs=critic_inpt, label=reward, mask=mask)
         if loss_critic is None:

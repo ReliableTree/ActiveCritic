@@ -81,12 +81,12 @@ def make_acl(device):
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' equal training steps reinforcement 20 opt steps'
+    acla.logname = tag + ' semi sparse reward'
     acla.tboard = True
     acla.batch_size = 32
-    acla.val_every = 1 * 50
-    acla.add_data_every = 50
-    acla.validation_episodes = 50
+    acla.val_every = 1 * 1
+    acla.add_data_every = 1
+    acla.validation_episodes = 1
     acla.training_epsiodes = 10
     acla.actor_threshold = 5e-4
     acla.critic_threshold = 5e-5
