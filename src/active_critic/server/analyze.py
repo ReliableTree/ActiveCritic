@@ -81,7 +81,7 @@ def make_acl(device):
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' equal training steps reinforcement'
+    acla.logname = tag + ' equal training steps reinforcement add all data'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 1 * 50
