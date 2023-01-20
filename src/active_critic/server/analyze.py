@@ -46,7 +46,7 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.epoch_len = seq_len
     acps.extractor = extractor
     acps.new_epoch = new_epoch
-    acps.opt_steps = 5
+    acps.opt_steps = 20
     acps.optimisation_threshold = 1
     acps.inference_opt_lr = 5e-3
     acps.optimize = True
@@ -81,7 +81,7 @@ def make_acl(device):
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' equal training steps reinforcement'
+    acla.logname = tag + ' equal training steps reinforcement 20 opt steps'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 1 * 50
