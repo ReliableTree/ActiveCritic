@@ -134,7 +134,7 @@ class ActiveCriticLearner(nn.Module):
     def add_training_data(self, policy=None, episodes = 1):
         if policy is None:
             policy = self.policy
-
+            policy.eval()
         h = time.perf_counter()
         actions, observations, rewards, _, _ = sample_new_episode(
             policy=policy,
@@ -163,48 +163,50 @@ class ActiveCriticLearner(nn.Module):
 
     def train(self, epochs):
         next_val = self.network_args.val_every
-        next_add = 0
+        next_add = self.network_args.add_data_every
         for epoch in range(epochs):
-            if (not self.network_args.imitation_phase) and (self.global_step >= next_add):
-                next_add += self.network_args.add_data_every
-                self.add_training_data()
-
-            self.policy.eval()
-
-            max_actor = float('inf')
-            max_critic = float('inf')
-
-            while (max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold):
-                loss_actor = None
-                loss_critic = None
-
-                loss_actor, loss_critic = self.train_step(
-                    train_loader=self.train_loader,
-                    actor_step=self.actor_step,
-                    critic_step=self.critic_step,
-                    loss_actor=loss_actor,
-                    loss_critic=loss_critic
-                )
-
-                max_actor = th.max(loss_actor)
-                max_critic = th.max(loss_critic)
-
-                self.scores.update_min_score(
-                    self.scores.mean_critic, max_critic)
-                self.scores.update_min_score(
-                    self.scores.mean_actor, max_actor)
-
-                debug_dict = {
-                    'Loss Actor': max_actor,
-                    'Loss Critic': max_critic,
-                    'Examples': th.tensor(int(len(self.train_data) / self.policy.args_obj.epoch_len))
-                }
-                self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
-                self.global_step += len(self.train_data)
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every
                 if self.network_args.tboard:
                     self.run_validation()
+
+            if (not self.network_args.imitation_phase) and (epoch >= next_add):
+                next_add += self.network_args.add_data_every
+                self.add_training_data()
+
+            self.policy.train()
+
+            max_actor = float('inf')
+            max_critic = float('inf')
+
+            #while current_step < self.network_args.train_steps: #(max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold):
+            loss_actor = None
+            loss_critic = None
+
+            loss_actor, loss_critic = self.train_step(
+                train_loader=self.train_loader,
+                actor_step=self.actor_step,
+                critic_step=self.critic_step,
+                loss_actor=loss_actor,
+                loss_critic=loss_critic
+            )
+
+            max_actor = th.max(loss_actor)
+            max_critic = th.max(loss_critic)
+
+            self.scores.update_min_score(
+                self.scores.mean_critic, max_critic)
+            self.scores.update_min_score(
+                self.scores.mean_actor, max_actor)
+
+            debug_dict = {
+                'Loss Actor': max_actor,
+                'Loss Critic': max_critic,
+                'Examples': th.tensor(int(len(self.train_data) / self.policy.args_obj.epoch_len))
+            }
+            self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
+            self.global_step += len(self.train_data)
+
 
     def write_tboard_scalar(self, debug_dict, train, step=None):
         if step is None:
