@@ -286,6 +286,7 @@ class ActiveCriticLearner(nn.Module):
         last_reward, _ = rewards.max(dim=1)
         if (self.last_scores is None) or (self.last_scores < last_reward.mean()):
             self.policy.args_obj.opt_steps *= 1.1
+            self.last_scores = last_reward.mean()
             print(f'new opt_steps = {self.policy.args_obj.opt_steps}')
         best_model = self.scores.update_max_score(
             self.scores.mean_reward, last_reward.mean())
