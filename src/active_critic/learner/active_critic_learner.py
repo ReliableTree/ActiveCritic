@@ -191,7 +191,7 @@ class ActiveCriticLearner(nn.Module):
 
             if (not self.network_args.imitation_phase) and (epoch >= next_add):
                 next_add += self.network_args.add_data_every
-                self.add_training_data()
+                self.add_training_data(episodes=self.network_args.training_epsiodes)
 
             self.policy.train()
 
