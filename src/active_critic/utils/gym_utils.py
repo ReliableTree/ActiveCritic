@@ -105,6 +105,24 @@ class ResetCounterWrapper(gym.Wrapper):
             rew = rew - 5
         return obsv, rew, done, info
 
+class StrictSeqLenWrapper(gym.Wrapper):
+    def __init__(self, env: Env, seq_len) -> None:
+        super().__init__(env)
+        self.seq_len = seq_len
+        self.current_step = 0
+
+    def reset(self):
+        self.current_step = 1
+        return super().reset()
+
+    def step(self, action):
+        self.current_step += 1
+        obsv, rew, done, info = super().step(action)
+        
+        done = self.current_step == self.seq_len
+
+        return obsv, rew, done, info
+
 def make_vec_env(env_id, num_cpu, seq_len):
     policy_dict = make_policy_dict()
 
@@ -115,7 +133,8 @@ def make_vec_env(env_id, num_cpu, seq_len):
             env._freeze_rand_vec = False
             #rce = ResetCounterWrapper(env)
             timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
-            riw = RolloutInfoWrapper(timelimit)
+            strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+            riw = RolloutInfoWrapper(strict_time)
             return riw
         return _init
         
@@ -191,6 +210,7 @@ def parse_sampled_transitions(transitions, extractor, seq_len, device='cuda'):
     return actions, observations, rewards
 
 def fill_arrays(inpt, seq_len):
+    return inpt
     d = []
     for epoch in inpt:
         if epoch.shape[0] < seq_len:
