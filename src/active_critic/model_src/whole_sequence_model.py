@@ -34,6 +34,8 @@ class WholeSequenceModel(nn.Module, ABC):
         if self.optimizer is None:
             self.optimizer = self.wsms.optimizer_class(
                 self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
+            self.scheduler = th.optim.lr_scheduler.StepLR(self.optimizer, int(100000/32), gamma=0.97)
+
         return result
 
     def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, prefix='', mask:th.Tensor=None) -> typing.Dict:
@@ -47,9 +49,11 @@ class WholeSequenceModel(nn.Module, ABC):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+        self.scheduler.step()
 
         debug_dict = {
-            'Loss ' + prefix: loss.detach()
+            'Loss ' + prefix: loss.detach(),
+            'Learning Rate' + prefix: th.tensor(self.scheduler.get_last_lr())
         }
 
         return debug_dict
@@ -60,3 +64,16 @@ class WholeSequenceModel(nn.Module, ABC):
         else:
             loss = calcMSE(result, label)
         return loss
+
+class CriticSequenceModel(WholeSequenceModel):
+    def __init__(self, wsms: WholeSequenceModelSetup) -> None:
+        super().__init__(wsms)
+        self.result_decoder = None
+        self.sm = th.nn.Softmax(dim=-1)
+
+    def forward(self, inputs: th.Tensor) -> th.Tensor:
+        if self.result_decoder is None:
+            self.result_decoder = nn.Linear(self.wsms.model_setup.d_output * self.wsms.model_setup.seq_len, 1, device=inputs.device)
+        trans_result = super().forward(inputs)
+        pre_sm = self.result_decoder.forward(trans_result.reshape([trans_result.shape[0], -1]))
+        return pre_sm

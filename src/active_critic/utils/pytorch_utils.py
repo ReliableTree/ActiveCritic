@@ -38,10 +38,8 @@ def make_partially_observed_seq(obs: th.Tensor, acts: th.Tensor, seq_len: int, a
                       obs.shape[-1] + act_space.shape[0]], device=obs.device)
     # obs: batch, seq, dim
     result = fill_tensor(result, obs, start_dim=0)
-    if acts is not None:
-        result = fill_tensor(result, acts, start_dim=obs.shape[-1])
-    else:
-        1/0
+    result = fill_tensor(result, acts, start_dim=obs.shape[-1])
+
     return result
 
 
@@ -82,8 +80,10 @@ def apply_triu(inpt:th.Tensor, diagonal:th.Tensor):
 def make_part_obs_data(actions:th.Tensor, observations:th.Tensor, rewards:th.Tensor):
     acts = actions.repeat([1, actions.shape[1], 1]).reshape([-1, actions.shape[1], actions.shape[2]])
     rews = rewards.repeat([1, rewards.shape[1], 1]).reshape([-1, actions.shape[1], 1])
-    obsv = apply_triu(observations, diagonal=0).reshape([-1, observations.shape[-2], observations.shape[-1]])
-    return acts, obsv, rews
+    
+    obsv = observations[:, :1, :].repeat([1, observations.shape[1], 1]).reshape([-1, observations.shape[1], observations.shape[2]])
+    #obsv = apply_triu(observations, diagonal=0).reshape([-1, observations.shape[-2], observations.shape[-1]])
+    return actions, obsv, rewards
 
 def make_inf_seq(obs:th.Tensor, seq_len:th.Tensor):
     start_seq = th.zeros([obs.shape[0], int(seq_len/2), obs.shape[-1]], device= obs.device)

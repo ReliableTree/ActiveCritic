@@ -21,6 +21,13 @@ class DummyExtractor:
             features = th.tensor(features)
         return features
 
+class ReductiveExtractor:
+    def forward(self, features):
+        if type(features) is np.ndarray:
+            features = th.tensor(features)
+        result = th.cat((features[...,:3], features[...,3:6], features[..., 9:13], features[...,-3:]), dim=-1)
+
+        return result
 
 def make_policy_dict():
     policy_dict = {}
@@ -236,7 +243,7 @@ def sample_expert_transitions(policy, env, episodes):
     return flatten_trajectories(rollouts)
 
 
-def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:int=1, return_gen_trj = False):
+def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str, episodes:int=1, return_gen_trj = False):
         try:
             policy.eval()
             policy.reset()
@@ -253,7 +260,7 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, device:str, episodes:
             expected_rewards_after = None
         datas = parse_sampled_transitions(
             #transitions=transitions, seq_len=seq_len, extractor=policy.args_obj.extractor, device=device)
-            transitions=transitions, seq_len=seq_len, extractor=DummyExtractor(), device=device)
+            transitions=transitions, seq_len=seq_len, extractor=extractor, device=device)
         device_data = []
         for data in datas:
             device_data.append(data[:episodes].to(device))

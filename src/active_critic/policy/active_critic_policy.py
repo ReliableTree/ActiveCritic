@@ -3,7 +3,7 @@ from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 import torch as th
-from active_critic.model_src.whole_sequence_model import WholeSequenceModel
+from active_critic.model_src.whole_sequence_model import WholeSequenceModel, CriticSequenceModel
 from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -62,7 +62,7 @@ class ActiveCriticPolicy(BaseModel):
         observation_space,
         action_space,
         actor: WholeSequenceModel,
-        critic: WholeSequenceModel,
+        critic: CriticSequenceModel,
         acps: ActiveCriticPolicySetup = None
     ):
 
@@ -72,7 +72,7 @@ class ActiveCriticPolicy(BaseModel):
         self.critic = critic
         self.args_obj = acps
         self.register_buffer('gl', th.ones(
-            size=[1000, acps.epoch_len, critic.wsms.model_setup.d_output], dtype=th.float, device=acps.device))
+            size=[1000, 1], dtype=th.float, device=acps.device))
         self.history = ActiveCriticPolicyHistory()
         self.clip_min = th.tensor(self.action_space.low, device=acps.device)
         self.clip_max = th.tensor(self.action_space.high, device=acps.device)
@@ -88,7 +88,7 @@ class ActiveCriticPolicy(BaseModel):
         self.last_goal = vec_obsv
         self.current_result = None
 
-        scores_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.critic.wsms.model_setup.d_output]
+        scores_size = [vec_obsv.shape[0], 1]
         self.history.new_epoch(self.history.gen_scores, size=scores_size, device=self.args_obj.device)
         self.history.new_epoch(self.history.opt_scores, size=scores_size, device=self.args_obj.device)
 
@@ -115,23 +115,24 @@ class ActiveCriticPolicy(BaseModel):
             self.current_step += 1
             action_seq = self.current_result.gen_trj
 
-        self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
+        #self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
+        self.obs_seq = vec_obsv.repeat([1, self.obs_seq.shape[1], 1]).type(th.float)
+        if action_seq is None:
+            self.current_result = self.forward(
+                observation_seq=self.obs_seq, action_seq=action_seq, 
+                optimize=self.args_obj.optimize, 
+                current_step=self.current_step,
+                stop_opt=self.args_obj.stop_opt
+                )
 
-        self.current_result = self.forward(
-            observation_seq=self.obs_seq, action_seq=action_seq, 
-            optimize=self.args_obj.optimize, 
-            current_step=self.current_step,
-            stop_opt=self.args_obj.stop_opt
-            )
-
-        if self.args_obj.optimize:
+        '''if self.args_obj.optimize:
             self.history.add_value(
                 history=self.history.opt_scores, 
-                value=self.current_result.expected_succes_after[:, self.current_step].detach(), 
+                value=self.current_result.expected_succes_after[:, 0].detach(), 
                 current_step=self.current_step
             )
-        self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, self.current_step].detach(), current_step=self.current_step)
-
+        self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
+'''
         return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
 
     def forward(self, 
@@ -145,7 +146,6 @@ class ActiveCriticPolicy(BaseModel):
         actor_input = self.get_actor_input(
             obs=observation_seq, actions=action_seq, rew=self.gl[:observation_seq.shape[0]])
         actions = self.actor.forward(actor_input)
-
         if self.args_obj.clip:
             actions = th.clamp(actions, min=self.clip_min, max=self.clip_max)
 
@@ -153,7 +153,8 @@ class ActiveCriticPolicy(BaseModel):
             actions = self.proj_actions(
                 action_seq, actions, current_step)
 
-        self.history.add_value(self.history.gen_trj, actions[:, self.current_step].detach(), current_step=self.current_step)
+        for step in range(actions.shape[1]):
+            self.history.add_value(self.history.gen_trj, actions[:, step].detach(), current_step=step)
 
         critic_input = self.get_critic_input(
             acts=actions, obs_seq=observation_seq)
@@ -193,7 +194,7 @@ class ActiveCriticPolicy(BaseModel):
         optimizer = th.optim.AdamW(
             [optimized_actions], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         expected_success = th.zeros(
-            size=[actions.shape[0], self.critic.wsms.model_setup.seq_len, self.critic.wsms.model_setup.d_output], dtype=th.float, device=actions.device)
+            size=[actions.shape[0], 1], dtype=th.float, device=actions.device)
         final_exp_success = th.clone(expected_success)
         goal_label = self.gl[:actions.shape[0]]
         step = 0
@@ -222,6 +223,7 @@ class ActiveCriticPolicy(BaseModel):
         if self.args_obj.clip:
             with th.no_grad():
                 th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
+
         return final_actions, final_exp_success
 
     def inference_opt_step(self, 
@@ -235,16 +237,13 @@ class ActiveCriticPolicy(BaseModel):
         critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
 
-        mask = get_seq_end_mask(critic_result, current_step)
-        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label, mask=mask)
 
+        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
         optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()
 
-        actions = self.proj_actions(
-            org_actions=org_actions, new_actions=opt_actions, current_step=current_step)
-        return actions, critic_result
+        return opt_actions, critic_result
 
     def get_critic_input(self, acts, obs_seq):
         critic_input = make_partially_observed_seq(
@@ -259,7 +258,7 @@ class ActiveCriticPolicy(BaseModel):
 
     def proj_actions(self, org_actions: th.Tensor, new_actions: th.Tensor, current_step: int):
         with th.no_grad():
-            new_actions[:, :current_step] = org_actions[:, :current_step]
+            #new_actions[:, :current_step] = org_actions[:, :current_step]
             if self.args_obj.clip:
                 th.clamp(new_actions, min=self.clip_min, max=self.clip_max, out=new_actions)
         return new_actions
