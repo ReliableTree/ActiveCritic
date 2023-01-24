@@ -2,7 +2,7 @@ import torch as th
 from active_critic.learner.active_critic_learner import ActiveCriticLearner, ACLScores
 from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
-from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env, parse_sampled_transitions, sample_expert_transitions, DummyExtractor, new_epoch_reach, sample_new_episode
+from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env, parse_sampled_transitions, sample_expert_transitions, DummyExtractor, ReductiveExtractor, new_epoch_reach, sample_new_episode
 from active_critic.utils.pytorch_utils import make_part_obs_data, count_parameters
 from active_critic.utils.dataset import DatasetAC
 from stable_baselines3.common.policies import BasePolicy
@@ -31,10 +31,10 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     wsm.model_setup.d_model = 512
     wsm.model_setup.nlayers = 4
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout = 0
+    wsm.model_setup.dropout = 0.2
     wsm.lr = 1e-4
     wsm.model_setup.device = device
-    wsm.optimizer_class = th.optim.Adam
+    wsm.optimizer_class = th.optim.AdamW
     wsm.optimizer_kwargs = {}
     return wsm
 
@@ -46,9 +46,9 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.epoch_len = seq_len
     acps.extractor = extractor
     acps.new_epoch = new_epoch
-    acps.opt_steps = 20
+    acps.opt_steps = 2
     acps.optimisation_threshold = 1
-    acps.inference_opt_lr = 5e-3
+    acps.inference_opt_lr = 1e-2
     acps.optimize = True
     acps.batch_size = 32
     acps.stop_opt = False
@@ -65,7 +65,7 @@ def setup_ac(seq_len, num_cpu, device, tag):
     wsm_critic_setup = make_wsm_setup(
         seq_len=seq_len, d_output=1, device=device)
     acps = make_acps(
-        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
+        seq_len=seq_len, extractor=ReductiveExtractor(), new_epoch=new_epoch_reach, device=device)
     actor = WholeSequenceModel(wsm_actor_setup)
     critic = WholeSequenceModel(wsm_critic_setup)
     ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
@@ -78,21 +78,21 @@ def make_acl(device):
     acla = ActiveCriticLearnerArgs()
     acla.data_path = '/data/bing/hendrik/'
     acla.device = device
-    acla.extractor = DummyExtractor()
+    acla.extractor = ReductiveExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' equal training steps reinforcement 20 opt steps'
+    acla.logname = tag + ' regularized dense lookup'
     acla.tboard = True
     acla.batch_size = 32
-    acla.val_every = 1 * 50
-    acla.add_data_every = 50
+    acla.val_every = 1 * 10
+    acla.add_data_every = 10
     acla.validation_episodes = 50
     acla.training_epsiodes = 10
-    acla.actor_threshold = 5e-4
-    acla.critic_threshold = 5e-5
+    acla.actor_threshold = 1e-2
+    acla.critic_threshold = 1e-2
     acla.num_cpu = 10
 
-    seq_len = 100
+    seq_len = 200
     epsiodes = 30
     ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, tag=tag)
     eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len)
