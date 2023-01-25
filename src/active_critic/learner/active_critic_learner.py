@@ -228,9 +228,6 @@ class ActiveCriticLearner(nn.Module):
                 }
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
                 self.global_step += len(self.train_data)
-                print(f'max_actor: {max_actor}')
-                print(f'max_critic: {max_critic}')
-            print(f'epoch: {epoch}')
 
 
     def write_tboard_scalar(self, debug_dict, train, step=None):
