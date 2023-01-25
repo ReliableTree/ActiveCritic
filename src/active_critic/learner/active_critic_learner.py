@@ -149,6 +149,8 @@ class ActiveCriticLearner(nn.Module):
             device=self.network_args.device,
             episodes=episodes)
 
+        last_reward, _ = rewards.max(dim=1)
+        print(f'Mean Reward: {last_reward.mean()}')
 
         if self.last_trj_training is not None:
             self.compare_expecations(self.last_trj_training, 'Training')
