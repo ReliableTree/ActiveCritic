@@ -69,11 +69,12 @@ class CriticSequenceModel(WholeSequenceModel):
     def __init__(self, wsms: WholeSequenceModelSetup) -> None:
         super().__init__(wsms)
         self.result_decoder = None
-        self.sm = th.nn.Softmax(dim=-1)
+        self.sm = th.nn.Sigmoid()
 
     def forward(self, inputs: th.Tensor) -> th.Tensor:
         if self.result_decoder is None:
             self.result_decoder = nn.Linear(self.wsms.model_setup.d_output * self.wsms.model_setup.seq_len, 1, device=inputs.device)
         trans_result = super().forward(inputs)
         pre_sm = self.result_decoder.forward(trans_result.reshape([trans_result.shape[0], -1]))
-        return pre_sm
+        result = self.sm(pre_sm)
+        return result
