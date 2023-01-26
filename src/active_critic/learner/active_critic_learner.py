@@ -11,7 +11,7 @@ from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 from active_critic.utils.dataset import DatasetAC
 from active_critic.utils.gym_utils import sample_new_episode
-from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask, make_part_obs_data, count_parameters
+from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask, make_part_obs_data, count_parameters, generate_partial_observed_mask, make_dense_seq_encoding_data
 from active_critic.utils.tboard_graphs import TBoardGraphs
 from gym.envs.mujoco import MujocoEnv
 from torch.utils.data.dataloader import DataLoader
@@ -85,6 +85,9 @@ class ActiveCriticLearner(nn.Module):
         self.train_data = DatasetAC(device='cpu')
         self.train_data.onyl_positiv = False
 
+        self.current_critic_steps = 0
+        self.current_epi_cycle = 0
+
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
         if len(train_data) > 0:
@@ -92,8 +95,7 @@ class ActiveCriticLearner(nn.Module):
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
     def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor):
-        acts, obsv, rews = make_part_obs_data(
-            actions=actions, observations=observations, rewards=rewards)
+        acts, obsv, rews = make_dense_seq_encoding_data(actions=actions, obsv=observations, rewards=rewards)
         self.train_data.add_data(obsv=obsv.to(
             'cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
         self.train_loader = DataLoader(
@@ -110,34 +112,35 @@ class ActiveCriticLearner(nn.Module):
             actions = actions[successfull_trj]
             reward = reward[successfull_trj]
 
+            attention_mask, result_mask = generate_partial_observed_mask(reward=reward, nheads=self.policy.actor.wsms.model_setup.nhead)
+
             actor_input = self.policy.get_actor_input(
                 obs=obsv, actions=actions, rew=reward)
-            mask = get_rew_mask(reward)
             debug_dict = self.policy.actor.optimizer_step(
-                inputs=actor_input, label=actions, mask=mask)
+                inputs=actor_input, label=actions, result_mask=result_mask, attention_mask=attention_mask)
             if loss_actor is None:
                 loss_actor = debug_dict['Loss '].unsqueeze(0)
             else:
                 loss_actor = th.cat(
                     (loss_actor, debug_dict['Loss '].unsqueeze(0)), dim=0)
-            self.write_tboard_scalar(debug_dict={'lr actor': debug_dict['Learning Rate'].mean()}, train=True)
         return loss_actor
 
 
     def critic_step(self, data, loss_critic):
         obsv, actions, reward = data
+        attention_mask, result_mask = generate_partial_observed_mask(reward=reward, nheads=self.policy.critic.wsms.model_setup.nhead)
         critic_inpt = self.policy.get_critic_input(acts=actions, obs_seq=obsv)
 
         label = self.make_critic_score(reward)
 
         debug_dict = self.policy.critic.optimizer_step(
-            inputs=critic_inpt, label=label)
+            inputs=critic_inpt, label=label, attention_mask=attention_mask)
+
         if loss_critic is None:
             loss_critic = debug_dict['Loss '].unsqueeze(0)
         else:
             loss_critic = th.cat(
                 (loss_critic, debug_dict['Loss '].unsqueeze(0)), dim=0)
-        self.write_tboard_scalar(debug_dict={'lr critic': debug_dict['Learning Rate'].mean()}, train=True)
 
         return loss_critic
 
@@ -152,7 +155,8 @@ class ActiveCriticLearner(nn.Module):
             env=self.env,
             extractor=self.network_args.extractor,
             device=self.network_args.device,
-            episodes=episodes)
+            episodes=episodes,
+            seq_len = self.policy.args_obj.epoch_len)
 
 
         if self.last_trj_training is not None:
@@ -164,16 +168,20 @@ class ActiveCriticLearner(nn.Module):
             expected_rewards[:1]
         ]
 
+        max_rew = rewards.max(dim=-2).values == 1
+        mean_success = max_rew.type(th.float).mean()
+
         debug_dict = {
-            'Training epoch time': th.tensor(time.perf_counter() - h)
+            'Training epoch time': th.tensor(time.perf_counter() - h),
+            'Mean Training Success': mean_success
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=True)
-        if ((self.last_scores is None) or (self.last_scores < rewards.mean())) and (policy == self.policy):
-            self.last_scores = rewards.mean()
+        if ((self.last_scores is None) or (self.last_scores < mean_success)) and (policy == self.policy):
+            self.last_scores = mean_success
             self.policy.args_obj.opt_steps *= 1.1
             print(f'new opt_steps = {self.policy.args_obj.opt_steps}')
-        print(f'last rewards: {rewards.mean()}')
-        print(f'self.last_scores: {self.last_scores}')
+        print(f'last mean_success: {mean_success.mean()}')
+        print(f'self.mean_success: {self.last_scores}')
         self.add_data(
             actions=actions,
             observations=observations,
@@ -182,17 +190,23 @@ class ActiveCriticLearner(nn.Module):
 
     def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic):
         for data in train_loader:
+            self.current_critic_steps += 1
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
             loss_actor = actor_step(device_data, loss_actor)
-            loss_critic = critic_step(device_data, loss_critic)
+            if self.current_critic_steps < self.network_args.max_critic_steps:
+                loss_critic = critic_step(device_data, loss_critic)
+            else:
+                loss_critic = None
         return loss_actor, loss_critic
 
     def train(self, epochs):
         next_val = self.network_args.val_every
         next_add = 0
         for epoch in range(epochs):
+            print(f'epoch: {epoch}')
+            print(f'next_val: {next_val}')
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every
                 if self.network_args.tboard:
@@ -208,9 +222,13 @@ class ActiveCriticLearner(nn.Module):
 
             self.policy.train()
 
-            max_actor = float('inf')
-            max_critic = float('inf')
-
+            max_actor = th.tensor(float('inf'))
+            if self.current_critic_steps < self.network_args.max_critic_steps:
+                max_critic = th.tensor(float('inf'))
+            
+            loss_actor = None
+            loss_critic = None
+            
             while (max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold):
                 loss_actor = None
                 loss_critic = None
@@ -224,7 +242,8 @@ class ActiveCriticLearner(nn.Module):
                 )
 
                 max_actor = th.max(loss_actor)
-                max_critic = th.max(loss_critic)
+                if self.current_critic_steps < self.network_args.max_critic_steps:
+                    max_critic = th.max(loss_critic)
 
                 self.scores.update_min_score(
                     self.scores.mean_critic, max_critic)
@@ -238,10 +257,11 @@ class ActiveCriticLearner(nn.Module):
 
                 debug_dict = {
                     'Loss Actor': max_actor,
-                    'Loss Critic': max_critic,
-                    'Examples': th.tensor(int(len(self.train_data))),
-                    'Positive Examples': positive_examples
+                    'Examples': th.tensor(int(len(self.train_data)/self.policy.args_obj.epoch_len))
                 }
+                if max_critic < 1e4:
+                    debug_dict['Loss Critic']= max_critic
+
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
                 self.global_step += len(self.train_data)
             if epoch == 0:
@@ -251,7 +271,7 @@ class ActiveCriticLearner(nn.Module):
 
     def write_tboard_scalar(self, debug_dict, train, step=None):
         if step is None:
-            step = int(len(self.train_data))
+            step = int(len(self.train_data)/self.policy.args_obj.epoch_len)
 
         if self.network_args.tboard:
             for para, value in debug_dict.items():
@@ -280,6 +300,10 @@ class ActiveCriticLearner(nn.Module):
         return labels
 
     def run_validation(self, optimize):
+        self.current_epi_cycle += 1
+        if self.current_epi_cycle > self.network_args.reset_interval:
+            self.current_epi_cycle = 0
+            self.current_critic_steps = 0
         if optimize:
             fix = ' optimize'
             if self.last_trj is not None:

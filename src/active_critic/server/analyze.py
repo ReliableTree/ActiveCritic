@@ -34,7 +34,7 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     wsm.model_setup.nlayers = 5
     wsm.model_setup.seq_len = seq_len
     wsm.model_setup.dropout = 0.2
-    wsm.lr = 1e-4
+    wsm.lr = 5e-5
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
     wsm.optimizer_kwargs = {}
@@ -48,9 +48,8 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.epoch_len = seq_len
     acps.extractor = extractor
     acps.new_epoch = new_epoch
-    acps.opt_steps = 10
+    acps.opt_steps = 5
     acps.optimisation_threshold = 1
-    acps.inference_opt_lr = 5e-3
     acps.inference_opt_lr = 1e-2
     
     acps.optimize = True
@@ -85,23 +84,26 @@ def make_acl(device):
     acla.extractor = ReductiveExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' sparse critic sigmoid'
+    acla.logname = tag + ' sparse cont'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
-    acla.val_every = 200
-    acla.add_data_every = 200
+    acla.val_every = 5
+    acla.add_data_every = 5
     acla.validation_episodes = 50
     acla.training_epsiodes = 10
-    acla.actor_threshold = 1e-2
+    acla.actor_threshold = 5e-2
     acla.critic_threshold = 1e-2
-    acla.num_cpu = 50
+    acla.num_cpu = 25
+    acla.max_critic_steps = 1200
+    acla.reset_interval = 1
 
-    seq_len = 200
+    seq_len = 100
     epsiodes = 30
     ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, tag=tag)
     eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
+    acl.policy.args_obj.tboard = acl.tboard
     return acl, env, expert, seq_len, epsiodes, device
 
 

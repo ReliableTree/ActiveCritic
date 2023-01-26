@@ -243,14 +243,14 @@ def sample_expert_transitions(policy, env, episodes):
     return flatten_trajectories(rollouts)
 
 
-def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str, episodes:int=1, return_gen_trj = False):
+def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str, episodes:int=1, return_gen_trj = False, seq_len=None):
         try:
             policy.eval()
             policy.reset()
             seq_len = policy.args_obj.epoch_len
 
         except:
-            seq_len = 100
+            seq_len = seq_len
         transitions = sample_expert_transitions(
             policy.predict, env, episodes)
         try:

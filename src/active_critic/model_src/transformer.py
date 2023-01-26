@@ -56,6 +56,7 @@ class TransformerModel(nn.Module):
             self._lazy_init(src)
         src = self.encoder(src) * math.sqrt(self.model_setup.d_model)
         src = self.pos_encoder(src)
+
         if return_attention:
             output, attention = self.transformer_encoder.forward(src=src, mask=mask, return_attention=return_attention)
         else:

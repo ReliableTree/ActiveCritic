@@ -9,6 +9,7 @@ from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
 import pickle
+from active_critic.utils.tboard_graphs import TBoardGraphs
 
 class ACPOptResult:
     def __init__(self, gen_trj: th.Tensor, inpt_trj: th.Tensor = None, expected_succes_before: th.Tensor = None, expected_succes_after: th.Tensor = None) -> None:
@@ -31,6 +32,7 @@ class ActiveCriticPolicySetup:
         self.batch_size: int = None
         self.stop_opt: bool = None
         self.clip:bool = True
+        self.tboard:TBoardGraphs = None
 
 
 class ActiveCriticPolicyHistory:
@@ -116,14 +118,14 @@ class ActiveCriticPolicy(BaseModel):
             action_seq = self.current_result.gen_trj
 
         #self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
-        self.obs_seq = vec_obsv.repeat([1, self.obs_seq.shape[1], 1]).type(th.float)
-        if action_seq is None:
-            self.current_result = self.forward(
-                observation_seq=self.obs_seq, action_seq=action_seq, 
-                optimize=self.args_obj.optimize, 
-                current_step=self.current_step,
-                stop_opt=self.args_obj.stop_opt
-                )
+        self.obs_seq = vec_obsv.repeat([1, self.args_obj.epoch_len - self.current_step, 1]).type(th.float)
+        #if action_seq is None:
+        self.current_result = self.forward(
+            observation_seq=self.obs_seq, action_seq=action_seq, 
+            optimize=self.args_obj.optimize, 
+            current_step=self.current_step,
+            stop_opt=self.args_obj.stop_opt
+            )
 
         '''if self.args_obj.optimize:
             self.history.add_value(
@@ -133,7 +135,7 @@ class ActiveCriticPolicy(BaseModel):
             )
         self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
 '''
-        return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
+        return self.current_result.gen_trj[:, 0].detach().cpu().numpy()
 
     def forward(self, 
             observation_seq: th.Tensor, 
@@ -191,8 +193,8 @@ class ActiveCriticPolicy(BaseModel):
         optimized_actions = th.clone(actions.detach())
         final_actions = th.clone(optimized_actions)
         optimized_actions.requires_grad_(True)
-        optimizer = th.optim.AdamW(
-            [optimized_actions], lr=self.args_obj.inference_opt_lr, weight_decay=0)
+        optimizer = th.optim.Adam(
+            [optimized_actions], lr=self.args_obj.inference_opt_lr)
         expected_success = th.zeros(
             size=[actions.shape[0], 1], dtype=th.float, device=actions.device)
         final_exp_success = th.clone(expected_success)
@@ -212,7 +214,10 @@ class ActiveCriticPolicy(BaseModel):
                 current_step=current_step
                 )
             step += 1
-
+            if self.current_step == 0:
+                self.args_obj.tboard.addValidationScalar('Expected Success 0', expected_success[0].mean(), stepid=step)
+            if self.current_step == 50:
+                self.args_obj.tboard.addValidationScalar('Expected Success 50', expected_success[0].mean(), stepid=step)
             if stop_opt:
                 final_actions[mask] = optimized_actions[mask]
                 final_exp_success[mask] = expected_success[mask]

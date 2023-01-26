@@ -100,3 +100,57 @@ def get_seq_end_mask(inpt, current_step):
 
 def get_rew_mask(reward):
     return (reward.squeeze()>=0)
+
+def pull_tens_to_front(src, i):
+    if i > 0:
+        src[i, :, :-i] = src[i,:,i:]
+        src[i, :, -i:] = -1
+
+    return src
+
+def pull_tens_to_front_sparse(src, i):
+    pulled = src[i,:,i:]
+    max_pulled = pulled.max(dim=-2).values == 1
+    max_pulled = max_pulled.unsqueeze(-2).repeat([1, 1, src.shape[2] - i, 1])
+    if i > 0:
+        src[i, :, :-i] = max_pulled
+        src[i, :, -i:] = -1
+    else:
+        src[i, :] = max_pulled
+
+    return src
+
+def repeat_along_seq_td(src):
+    src = src.repeat([src.shape[1], 1, 1]).reshape([src.shape[1], src.shape[0], src.shape[1], src.shape[2]])
+    return src
+
+def repeat_along_seq(src, seq_len):
+    src = src.repeat([1, seq_len, 1])
+    return src
+
+
+def make_dense_seq_encoding_data(actions, obsv, rewards):
+    actions = repeat_along_seq_td(actions)
+    obsv = repeat_along_seq_td(obsv)
+    rewards = repeat_along_seq_td(rewards)
+    for i in range(len(obsv)):
+        obsv[i] = obsv[i,:,i].unsqueeze(1)
+
+        actions = pull_tens_to_front(actions, i)
+        rewards = pull_tens_to_front_sparse(rewards, i)
+    return actions.reshape([-1, actions.shape[-2], actions.shape[-1]]), obsv.reshape([-1, obsv.shape[-2], obsv.shape[-1]]), rewards.reshape([-1, rewards.shape[-2], rewards.shape[-1]])
+
+def generate_partial_observed_mask(reward, nheads):
+    device = reward.device
+    inv_result_mask = reward.reshape([reward.shape[0], -1]) == -1
+    result_mask = ~inv_result_mask
+    args = th.argwhere(inv_result_mask)
+    restructured_args = args.repeat([1, reward.shape[1]]).reshape([-1, 2])
+    exp_ind = th.arange(reward.shape[1], device=device).repeat(args.shape[0])
+    full_ind = th.cat((restructured_args[:, :1], exp_ind.unsqueeze(1), restructured_args[:, 1:]), dim=-1)
+    attention_mask = th.zeros([reward.shape[0], reward.shape[1], reward.shape[1]], device=device)
+    attention_mask[tuple(full_ind.T)] = -float('inf')
+    attention_mask = attention_mask.repeat([1,1,nheads]).reshape([nheads*attention_mask.shape[0], attention_mask.shape[1], attention_mask.shape[2]])
+    result_mask = th.clone(result_mask.detach())
+    attention_mask = th.clone(attention_mask.detach())
+    return attention_mask, result_mask

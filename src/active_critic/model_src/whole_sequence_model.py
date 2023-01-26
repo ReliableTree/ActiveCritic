@@ -25,35 +25,41 @@ class WholeSequenceModel(nn.Module, ABC):
         self.model = None
         self.optimizer = None
 
-    def forward(self, inputs: th.Tensor) -> th.Tensor:
+    def forward(self, inputs: th.Tensor, attention_mask:th.Tensor=None) -> th.Tensor:
         if (self.model is None):
             self.wsms.model_setup.ntoken = inputs.size(-1)
             self.model = TransformerModel(
                 model_setup=self.wsms.model_setup).to(inputs.device)
-        result = self.model.forward(inputs)
+
+        result = self.model.forward(inputs, mask=attention_mask)
         if self.optimizer is None:
             self.optimizer = self.wsms.optimizer_class(
                 self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
-            self.scheduler = th.optim.lr_scheduler.StepLR(self.optimizer, int(100000/32), gamma=0.97)
+            #self.scheduler = th.optim.lr_scheduler.StepLR(self.optimizer, int(100000/32), gamma=0.97)
 
         return result
 
-    def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, prefix='', mask:th.Tensor=None) -> typing.Dict:
-        result = self.forward(inputs=inputs)
-        if mask is not None:
-            if (mask.shape[0] != result.shape[0]) and (result.shape[0] == 1):
-                mask = mask.unsqueeze(0)
-            loss = self.loss_fct(result=result[mask], label=label[mask])
+    def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, prefix='', result_mask:th.Tensor=None, attention_mask:th.Tensor=None) -> typing.Dict:
+
+        result = self.forward(inputs=inputs, attention_mask=attention_mask)
+        if result_mask is not None:
+            if (result_mask.shape[0] != result.shape[0]) and (result.shape[0] == 1):
+                result_mask = result_mask.unsqueeze(0)
+            try:
+                loss = self.loss_fct(result=result[result_mask], label=label[result_mask])
+            except:
+                print(f'result_mask: {result_mask}')
+                print(f'result: {result.shape}')
+                print(f'label: {label.shape}')
+                print(f'result_mask: {result_mask.shape}')
         else:
             loss = self.loss_fct(result=result, label=label)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        self.scheduler.step()
 
         debug_dict = {
             'Loss ' + prefix: loss.detach(),
-            'Learning Rate' + prefix: th.tensor(self.scheduler.get_last_lr())
         }
 
         return debug_dict
@@ -68,13 +74,10 @@ class WholeSequenceModel(nn.Module, ABC):
 class CriticSequenceModel(WholeSequenceModel):
     def __init__(self, wsms: WholeSequenceModelSetup) -> None:
         super().__init__(wsms)
-        self.result_decoder = None
         self.sm = th.nn.Sigmoid()
 
-    def forward(self, inputs: th.Tensor) -> th.Tensor:
-        if self.result_decoder is None:
-            self.result_decoder = nn.Linear(self.wsms.model_setup.d_output * self.wsms.model_setup.seq_len, 1, device=inputs.device)
-        trans_result = super().forward(inputs)
-        pre_sm = self.result_decoder.forward(trans_result.reshape([trans_result.shape[0], -1]))
+    def forward(self, inputs: th.Tensor, attention_mask:th.Tensor=None) -> th.Tensor:
+        trans_result = super().forward(inputs, attention_mask=attention_mask)
+        pre_sm = trans_result[:, :1]
         result = self.sm(pre_sm)
         return result
