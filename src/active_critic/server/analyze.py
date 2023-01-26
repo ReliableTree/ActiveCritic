@@ -92,8 +92,8 @@ def make_acl(device):
     acla.add_data_every = 5
     acla.validation_episodes = 50
     acla.training_epsiodes = 10
-    acla.actor_threshold = 1e-3
-    acla.critic_threshold = 1e-2
+    acla.actor_threshold = 1e-2
+    acla.critic_threshold = 1e-3
     acla.num_cpu = 50
     acla.max_critic_steps = 12000
     acla.reset_interval = 1
