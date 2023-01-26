@@ -160,9 +160,10 @@ class ActiveCriticPolicy(BaseModel):
 
         critic_input = self.get_critic_input(
             acts=actions, obs_seq=observation_seq)
-
+        
         expected_success = self.critic.forward(
             inputs=critic_input)  # batch_size, seq_len, 1
+
 
         if not optimize:
             result = ACPOptResult(

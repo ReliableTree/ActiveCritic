@@ -223,13 +223,12 @@ class ActiveCriticLearner(nn.Module):
             self.policy.train()
 
             max_actor = th.tensor(float('inf'))
-            if self.current_critic_steps < self.network_args.max_critic_steps:
-                max_critic = th.tensor(float('inf'))
+            max_critic = th.tensor(float('inf'))
             
             loss_actor = None
             loss_critic = None
             
-            while (max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold):
+            while (max_actor > self.network_args.actor_threshold) or ((max_critic > self.network_args.critic_threshold) and (max_critic < 1e5)):
                 loss_actor = None
                 loss_critic = None
 
@@ -259,7 +258,7 @@ class ActiveCriticLearner(nn.Module):
                     'Loss Actor': max_actor,
                     'Examples': th.tensor(int(len(self.train_data)/self.policy.args_obj.epoch_len))
                 }
-                if max_critic < 1e4:
+                if self.current_critic_steps < self.network_args.max_critic_steps:
                     debug_dict['Loss Critic']= max_critic
 
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
