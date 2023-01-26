@@ -92,13 +92,13 @@ def make_acl(device):
     acla.add_data_every = 5
     acla.validation_episodes = 50
     acla.training_epsiodes = 10
-    acla.actor_threshold = 5e-2
+    acla.actor_threshold = 1e-1
     acla.critic_threshold = 1e-2
     acla.num_cpu = 25
     acla.max_critic_steps = 1200
     acla.reset_interval = 1
 
-    seq_len = 100
+    seq_len = 200
     epsiodes = 30
     ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, tag=tag)
     eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len)
