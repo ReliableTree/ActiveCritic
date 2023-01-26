@@ -232,8 +232,8 @@ class ActiveCriticLearner(nn.Module):
                 loss_actor = None
                 loss_critic = None
 
-                print(f'max_actor: {max_actor.shape}')
-                print(f'max_critic: {max_critic.shape}')
+                print(f'max_actor: {max_actor}')
+                print(f'max_critic: {max_critic}')
 
                 loss_actor, loss_critic = self.train_step(
                     train_loader=self.train_loader,
