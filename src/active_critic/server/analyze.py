@@ -89,12 +89,12 @@ def make_acl(device):
     acla.tboard = True
     acla.batch_size = 16
     number = 10
-    acla.val_every = 1 
-    acla.add_data_every = 1
+    acla.val_every = 200
+    acla.add_data_every = 200
     acla.validation_episodes = 50
     acla.training_epsiodes = 10
-    acla.actor_threshold = 5e-3
-    acla.critic_threshold = 5e-3
+    acla.actor_threshold = 1e-2
+    acla.critic_threshold = 1e-2
     acla.num_cpu = 50
 
     seq_len = 200
