@@ -137,7 +137,7 @@ def make_dense_seq_encoding_data(actions, obsv, rewards):
         obsv[i] = obsv[i,:,i].unsqueeze(1)
 
         actions = pull_tens_to_front(actions, i)
-        rewards = pull_tens_to_front_sparse(rewards, i)
+        rewards = pull_tens_to_front(rewards, i)
     return actions.reshape([-1, actions.shape[-2], actions.shape[-1]]), obsv.reshape([-1, obsv.shape[-2], obsv.shape[-1]]), rewards.reshape([-1, rewards.shape[-2], rewards.shape[-1]])
 
 def generate_partial_observed_mask(reward, nheads):

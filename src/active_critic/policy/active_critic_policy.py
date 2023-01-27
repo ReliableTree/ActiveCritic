@@ -74,7 +74,7 @@ class ActiveCriticPolicy(BaseModel):
         self.critic = critic
         self.args_obj = acps
         self.register_buffer('gl', th.ones(
-            size=[1000, 1], dtype=th.float, device=acps.device))
+            size=[1000, 500], dtype=th.float, device=acps.device))
         self.history = ActiveCriticPolicyHistory()
         self.clip_min = th.tensor(self.action_space.low, device=acps.device)
         self.clip_max = th.tensor(self.action_space.high, device=acps.device)
@@ -197,9 +197,9 @@ class ActiveCriticPolicy(BaseModel):
         optimizer = th.optim.Adam(
             [optimized_actions], lr=self.args_obj.inference_opt_lr)
         expected_success = th.zeros(
-            size=[actions.shape[0], 1], dtype=th.float, device=actions.device)
+            size=[actions.shape[0], actions.shape[1]], dtype=th.float, device=actions.device)
         final_exp_success = th.clone(expected_success)
-        goal_label = self.gl[:actions.shape[0]]
+        goal_label = self.gl[:actions.shape[0], :actions.shape[1]]
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()
@@ -252,8 +252,9 @@ class ActiveCriticPolicy(BaseModel):
         return opt_actions, critic_result
 
     def get_critic_input(self, acts, obs_seq):
-        critic_input = make_partially_observed_seq(
-            obs=obs_seq, acts=acts, seq_len=self.args_obj.epoch_len, act_space=self.action_space)
+        '''critic_input = make_partially_observed_seq(
+            obs=obs_seq, acts=acts, seq_len=self.args_obj.epoch_len, act_space=self.action_space)'''
+        critic_input = th.cat((acts, obs_seq), dim=-1)
         return critic_input
 
     def get_actor_input(self, obs: th.Tensor, actions: th.Tensor, rew: th.Tensor):

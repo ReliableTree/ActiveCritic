@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 from active_critic.model_src.transformer import TransformerModel, ModelSetup
 from active_critic.utils.pytorch_utils import calcMSE
-
+import torchvision as tv
 
 class WholeSequenceModelSetup:
     def __init__(self) -> None:
@@ -74,10 +74,18 @@ class WholeSequenceModel(nn.Module, ABC):
 class CriticSequenceModel(WholeSequenceModel):
     def __init__(self, wsms: WholeSequenceModelSetup) -> None:
         super().__init__(wsms)
+        self.mlp = None
+
         self.sm = th.nn.Sigmoid()
 
     def forward(self, inputs: th.Tensor, attention_mask:th.Tensor=None) -> th.Tensor:
-        trans_result = super().forward(inputs, attention_mask=attention_mask)
-        pre_sm = trans_result[:, :1]
-        result = self.sm(pre_sm)
+        inputs_dynamics = inputs[...,:-3]
+        inputs_goal = inputs[...,-3:]
+        dynamic_results = super().forward(inputs_dynamics, attention_mask=attention_mask)
+        if self.mlp is None:
+            self.mlp = tv.ops.MLP(in_channels=3+dynamic_results.shape[-1], hidden_channels=[64, 64, 1], activation_layer=th.nn.ReLU).to(inputs.device)
+        mlp_inpt = th.cat((dynamic_results, inputs_goal), dim=-1)
+        result = self.mlp.forward(mlp_inpt)
+        #pre_sm = dynamic_results[:, :1]
+        #result = self.sm(pre_sm)
         return result

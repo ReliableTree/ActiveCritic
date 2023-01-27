@@ -131,10 +131,10 @@ class ActiveCriticLearner(nn.Module):
         attention_mask, result_mask = generate_partial_observed_mask(reward=reward, nheads=self.policy.critic.wsms.model_setup.nhead)
         critic_inpt = self.policy.get_critic_input(acts=actions, obs_seq=obsv)
 
-        label = self.make_critic_score(reward)
+        #label = self.make_critic_score(reward)
 
         debug_dict = self.policy.critic.optimizer_step(
-            inputs=critic_inpt, label=label, attention_mask=attention_mask)
+            inputs=critic_inpt, label=reward, attention_mask=attention_mask)
 
         if loss_critic is None:
             loss_critic = debug_dict['Loss '].unsqueeze(0)
@@ -234,6 +234,7 @@ class ActiveCriticLearner(nn.Module):
 
                 print(f'max_actor: {max_actor}')
                 print(f'max_critic: {max_critic}')
+                print(f'self.current_critic_steps: {self.current_critic_steps}')
 
                 loss_actor, loss_critic = self.train_step(
                     train_loader=self.train_loader,
@@ -246,6 +247,8 @@ class ActiveCriticLearner(nn.Module):
                 max_actor = th.max(loss_actor)
                 if self.current_critic_steps < self.network_args.max_critic_steps:
                     max_critic = th.max(loss_critic)
+                else:
+                    max_critic = th.tensor(float('inf'))
 
                 self.scores.update_min_score(
                     self.scores.mean_critic, max_critic)
@@ -365,7 +368,7 @@ class ActiveCriticLearner(nn.Module):
         print(f'Success Rate: {success.mean()}' + fix)
         print(f'Reward: {last_reward.mean()}' + fix)
         print(
-            f'training samples: {int(len(self.train_data))}' + fix)
+            f'training samples: {int(len(self.train_data)/self.policy.args_obj.epoch_len)}' + fix)
         if self.network_args.imitation_phase:
             self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=self.global_step)
         else:
