@@ -48,7 +48,7 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.epoch_len = seq_len
     acps.extractor = extractor
     acps.new_epoch = new_epoch
-    acps.opt_steps = 10
+    acps.opt_steps = 5
     acps.optimisation_threshold = 1
     acps.inference_opt_lr = 5e-3
     acps.inference_opt_lr = 1e-2
@@ -85,7 +85,7 @@ def make_acl(device):
     acla.extractor = ReductiveExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' sparse critic sigmoid'
+    acla.logname = tag + ' reinit 2901'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
