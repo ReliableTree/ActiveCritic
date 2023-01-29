@@ -184,16 +184,15 @@ class ActiveCriticLearner(nn.Module):
             rewards=rewards
         )
 
-    def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, current_critic_step):
+    def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic):
         for data in train_loader:
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
             loss_actor = actor_step(device_data, loss_actor)
-            if current_critic_step < self.network_args.max_critic_steps:
-                current_critic_step += 1
+            if train_critic:
                 loss_critic = critic_step(device_data, loss_critic)
-        return loss_actor, loss_critic, current_critic_step
+        return loss_actor, loss_critic
 
     def train(self, epochs):
         next_val = self.network_args.val_every
@@ -216,24 +215,25 @@ class ActiveCriticLearner(nn.Module):
 
             max_actor = float('inf')
             max_critic = float('inf')
-            current_critic_step = 0
-
+            train_critic = True
             while (max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold):
                 loss_actor = None
                 loss_critic = None
 
-                loss_actor, loss_critic, current_critic_step = self.train_step(
+                loss_actor, loss_critic = self.train_step(
                     train_loader=self.train_loader,
                     actor_step=self.actor_step,
                     critic_step=self.critic_step,
                     loss_actor=loss_actor,
                     loss_critic=loss_critic,
-                    current_critic_step = current_critic_step
+                    train_critic=train_critic
                 )
 
                 max_actor = th.max(loss_actor)
                 if loss_critic is not None:
                     max_critic = th.max(loss_critic)
+                    if max_critic < self.network_args.critic_threshold:
+                        train_critic = False
                     self.scores.update_min_score(
                     self.scores.mean_critic, max_critic)
                 else:

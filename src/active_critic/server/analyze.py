@@ -85,7 +85,7 @@ def make_acl(device):
     acla.extractor = ReductiveExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' reinit 2901'
+    acla.logname = tag + ' reinit 2901 stop critic'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
