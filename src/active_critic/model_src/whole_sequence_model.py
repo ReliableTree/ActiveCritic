@@ -4,7 +4,7 @@ import torch as th
 import torch.nn as nn
 from active_critic.model_src.transformer import TransformerModel, ModelSetup
 from active_critic.utils.pytorch_utils import calcMSE
-
+import torchvision as tv
 
 class WholeSequenceModelSetup:
     def __init__(self) -> None:
@@ -73,11 +73,14 @@ class CriticSequenceModel(WholeSequenceModel):
 
     def forward(self, inputs: th.Tensor) -> th.Tensor:
         if self.result_decoder is None:
-            self.result_decoder = nn.Linear(self.wsms.model_setup.d_output * self.wsms.model_setup.seq_len, 1, device=inputs.device)
+            #self.result_decoder = nn.Linear(self.wsms.model_setup.d_output * self.wsms.model_setup.seq_len, 1, device=inputs.device)
+            self.result_decoder = tv.ops.MLP(
+                in_channels=self.wsms.model_setup.d_output * self.wsms.model_setup.seq_len, 
+                hidden_channels=[200, 200, 200, 1]).to(inputs.device)
         trans_result = super().forward(inputs)
         pre_sm = self.result_decoder.forward(trans_result.reshape([trans_result.shape[0], -1]))
-        result = self.sm(pre_sm)
-        return result, trans_result
+        #result = self.sm(pre_sm)
+        return pre_sm, trans_result
 
     def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, proxy:th.Tensor, prefix='', mask:th.Tensor=None) -> typing.Dict:
         result, proxy_result = self.forward(inputs=inputs)

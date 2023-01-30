@@ -85,7 +85,7 @@ def make_acl(device):
     acla.extractor = ReductiveExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' reinit 2901 stop critic'
+    acla.logname = tag + ' proxy loss critic'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
@@ -95,7 +95,7 @@ def make_acl(device):
     acla.training_epsiodes = 10
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
-    acla.num_cpu = 50
+    acla.num_cpu = 25
 
     seq_len = 200
     epsiodes = 30
