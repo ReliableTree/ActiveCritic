@@ -77,4 +77,30 @@ class CriticSequenceModel(WholeSequenceModel):
         trans_result = super().forward(inputs)
         pre_sm = self.result_decoder.forward(trans_result.reshape([trans_result.shape[0], -1]))
         result = self.sm(pre_sm)
-        return result
+        return result, trans_result
+
+    def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, proxy:th.Tensor, prefix='', mask:th.Tensor=None) -> typing.Dict:
+        result, proxy_result = self.forward(inputs=inputs)
+        if mask is not None:
+            if (mask.shape[0] != result.shape[0]) and (result.shape[0] == 1):
+                mask = mask.unsqueeze(0)
+            loss = self.loss_fct(result=result[mask], label=label[mask])
+            proxy_loss = self.loss_fct(result=proxy_result[mask], label=proxy[mask])
+        else:
+            loss = self.loss_fct(result=result, label=label)
+            proxy_loss = self.loss_fct(result=proxy_result, label=proxy)
+
+        total_loss = loss + proxy_loss
+
+        self.optimizer.zero_grad()
+        total_loss.backward()
+        self.optimizer.step()
+        self.scheduler.step()
+
+        debug_dict = {
+            'Loss ' + prefix: loss.detach(),
+            'Proxy Loss ': proxy_loss.detach(), 
+            'Learning Rate' + prefix: th.tensor(self.scheduler.get_last_lr())
+        }
+
+        return debug_dict

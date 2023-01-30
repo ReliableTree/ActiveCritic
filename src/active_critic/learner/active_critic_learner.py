@@ -131,13 +131,14 @@ class ActiveCriticLearner(nn.Module):
         label = self.make_critic_score(reward)
 
         debug_dict = self.policy.critic.optimizer_step(
-            inputs=critic_inpt, label=label)
+            inputs=critic_inpt, label=label, proxy=reward)
         if loss_critic is None:
             loss_critic = debug_dict['Loss '].unsqueeze(0)
         else:
             loss_critic = th.cat(
                 (loss_critic, debug_dict['Loss '].unsqueeze(0)), dim=0)
         self.write_tboard_scalar(debug_dict={'lr critic': debug_dict['Learning Rate'].mean()}, train=True)
+        self.write_tboard_scalar(debug_dict={'proxy critic loss' : debug_dict['Proxy Loss ']}, train=True)
 
         return loss_critic
 

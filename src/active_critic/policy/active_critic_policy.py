@@ -159,7 +159,7 @@ class ActiveCriticPolicy(BaseModel):
         critic_input = self.get_critic_input(
             acts=actions, obs_seq=observation_seq)
 
-        expected_success = self.critic.forward(
+        expected_success, _ = self.critic.forward(
             inputs=critic_input)  # batch_size, seq_len, 1
 
         if not optimize:
@@ -235,7 +235,7 @@ class ActiveCriticPolicy(BaseModel):
             current_step: int
             ):
         critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_result = self.critic.forward(inputs=critic_inpt)
+        critic_result, _ = self.critic.forward(inputs=critic_inpt)
 
 
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
