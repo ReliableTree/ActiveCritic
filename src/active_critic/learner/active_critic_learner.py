@@ -85,19 +85,31 @@ class ActiveCriticLearner(nn.Module):
         self.train_data = DatasetAC(device='cpu')
         self.train_data.onyl_positiv = False
 
+        self.critic_data = DatasetAC(device='cpu')
+        self.critic_data.onyl_positiv = False
+
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
         if len(train_data) > 0:
             self.train_loader = DataLoader(
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
-    def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor):
+    def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor, add_to_actor: bool):
         acts, obsv, rews = make_part_obs_data(
             actions=actions, observations=observations, rewards=rewards)
-        self.train_data.add_data(obsv=obsv.to(
-            'cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
-        self.train_loader = DataLoader(
-            dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
+        
+        if add_to_actor:
+            self.train_data.add_data(obsv=obsv.to(
+                'cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
+            self.train_loader = DataLoader(
+                dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
+
+        self.critic_data.add_data(obsv=obsv.to(
+                'cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
+        print(f'traindata: {len(self.train_data)}')
+        self.critic_loader = DataLoader(
+                dataset=self.critic_data, batch_size=self.network_args.batch_size, shuffle=True)
+        print(f'critic data: {len(self.critic_data)}')
 
     def actor_step(self, data, loss_actor):
         obsv, actions, reward = data
@@ -191,8 +203,14 @@ class ActiveCriticLearner(nn.Module):
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
             loss_actor = actor_step(device_data, loss_actor)
-            #if train_critic:
+
+        for data in self.critic_loader:
+            device_data = []
+            for dat in data:
+                device_data.append(dat.to(self.network_args.device))
             loss_critic = critic_step(device_data, loss_critic)
+
+
         return loss_actor, loss_critic
 
     def train(self, epochs):

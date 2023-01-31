@@ -247,6 +247,7 @@ class ActiveCriticPolicy(BaseModel):
         critic_loss.backward()
         optimizer.step()
 
+        print(f'critic_rewards: {critic_rewards.shape}')
         self.history.add_value(self.history.opt_scores[0], critic_rewards.detach(), current_step=current_step)
 
         return opt_actions, critic_result
