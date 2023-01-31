@@ -48,14 +48,13 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.epoch_len = seq_len
     acps.extractor = extractor
     acps.new_epoch = new_epoch
-    acps.opt_steps = 5
+    acps.opt_steps = 50
     acps.optimisation_threshold = 1
     acps.inference_opt_lr = 5e-3
-    acps.inference_opt_lr = 1e-2
     
     acps.optimize = True
     acps.batch_size = 32
-    acps.stop_opt = False
+    acps.stop_opt = True
     acps.clip = False
     return acps
 
@@ -85,7 +84,7 @@ def make_acl(device):
     acla.extractor = ReductiveExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' proxy loss critic'
+    acla.logname = tag + ' proxy loss critic 50 opt steps'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
@@ -107,7 +106,7 @@ def make_acl(device):
 
 def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
-    acl.add_training_data(policy=expert, episodes=10)
+    acl.add_training_data(policy=expert, episodes=100)
     #acl.run_validation()
     acl.train(epochs=100000)
 

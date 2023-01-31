@@ -195,14 +195,14 @@ class ActiveCriticPolicy(BaseModel):
             [optimized_actions], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         expected_success = th.zeros(
             size=[actions.shape[0], 1], dtype=th.float, device=actions.device)
-        final_exp_success = th.clone(expected_success)
+        final_exp_success = th.clone(expected_success.reshape([-1]))
         goal_label = self.gl[:actions.shape[0]]
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()
-
-        while (step <= self.args_obj.opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
-            mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
+        while (step <= self.args_obj.opt_steps) and (not th.all(final_exp_success >= self.args_obj.optimisation_threshold)):
+            mask = (final_exp_success < self.args_obj.optimisation_threshold)
+        
             optimized_actions, expected_success = self.inference_opt_step(
                 org_actions=actions,
                 opt_actions=optimized_actions,
@@ -211,19 +211,23 @@ class ActiveCriticPolicy(BaseModel):
                 goal_label=goal_label,
                 current_step=current_step
                 )
+            if step == 0:
+                print('_________________________________________________')
+                print(f'init exp success: {expected_success}')
+
             step += 1
 
             if stop_opt:
                 final_actions[mask] = optimized_actions[mask]
-                final_exp_success[mask] = expected_success[mask]
+                final_exp_success[mask] = expected_success.reshape([-1])[mask]
             else:
                 final_actions = optimized_actions
                 final_exp_success = expected_success
-
+        
         if self.args_obj.clip:
             with th.no_grad():
                 th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
-
+        print(f'final_exp_success: {final_exp_success} ')
         return final_actions, final_exp_success
 
     def inference_opt_step(self, 
