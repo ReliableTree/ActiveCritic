@@ -3,7 +3,7 @@ import typing
 import torch as th
 import torch.nn as nn
 from active_critic.model_src.transformer import TransformerModel, ModelSetup
-from active_critic.utils.pytorch_utils import calcMSE
+from active_critic.utils.pytorch_utils import calcMSE, part_goal_obs
 import torchvision as tv
 
 class WholeSequenceModelSetup:
@@ -72,17 +72,24 @@ class CriticSequenceModel(WholeSequenceModel):
         self.sm = th.nn.Sigmoid()
 
     def forward(self, inputs: th.Tensor) -> th.Tensor:
+        goal, obsv = part_goal_obs(inputs)
         if self.result_decoder is None:
             #self.result_decoder = nn.Linear(self.wsms.model_setup.d_output * self.wsms.model_setup.seq_len, 1, device=inputs.device)
             self.result_decoder = tv.ops.MLP(
                 in_channels=self.wsms.model_setup.d_output * self.wsms.model_setup.seq_len, 
                 hidden_channels=[200, 200, 200, 1]).to(inputs.device)
+            
+            self.goal_decoder = tv.ops.MLP(
+                in_channels=self.wsms.model_setup.d_output + 3, 
+                hidden_channels=[200, 200, 200, 1]).to(inputs.device)
 
-        trans_result = super().forward(inputs)
-        pre_sm = self.result_decoder.forward(trans_result.reshape([trans_result.shape[0], -1]))
+        trans_result = super().forward(obsv)
+        trans_result = th.cat((trans_result, goal), dim=-1)
+        trans_goal_result = self.goal_decoder.forward(trans_result)
+        pre_sm = self.result_decoder.forward(trans_goal_result.reshape([trans_result.shape[0], -1]))
 
         #result = self.sm(pre_sm)
-        return pre_sm, trans_result
+        return pre_sm, trans_goal_result
 
     def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, proxy:th.Tensor, prefix='', mask:th.Tensor=None) -> typing.Dict:
         result, proxy_result = self.forward(inputs=inputs)

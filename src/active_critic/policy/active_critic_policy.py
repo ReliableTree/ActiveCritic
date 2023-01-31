@@ -88,7 +88,7 @@ class ActiveCriticPolicy(BaseModel):
         self.last_goal = vec_obsv
         self.current_result = None
 
-        scores_size = [vec_obsv.shape[0], 1]
+        scores_size = [vec_obsv.shape[0], self.args_obj.epoch_len]
         self.history.new_epoch(self.history.gen_scores, size=scores_size, device=self.args_obj.device)
         self.history.new_epoch(self.history.opt_scores, size=scores_size, device=self.args_obj.device)
 
@@ -125,14 +125,14 @@ class ActiveCriticPolicy(BaseModel):
                 stop_opt=self.args_obj.stop_opt
                 )
 
-        '''if self.args_obj.optimize:
+        if self.args_obj.optimize:
             self.history.add_value(
                 history=self.history.opt_scores, 
                 value=self.current_result.expected_succes_after[:, 0].detach(), 
                 current_step=self.current_step
             )
         self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
-'''
+
         return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
 
     def forward(self, 
@@ -159,7 +159,7 @@ class ActiveCriticPolicy(BaseModel):
         critic_input = self.get_critic_input(
             acts=actions, obs_seq=observation_seq)
 
-        expected_success, _ = self.critic.forward(
+        expected_success, expected_rewards = self.critic.forward(
             inputs=critic_input)  # batch_size, seq_len, 1
 
         if not optimize:
@@ -209,11 +209,11 @@ class ActiveCriticPolicy(BaseModel):
                 obs_seq=observations,
                 optimizer=optimizer,
                 goal_label=goal_label,
-                current_step=current_step
+                current_step=step
                 )
             if step == 0:
                 print('_________________________________________________')
-                print(f'init exp success: {expected_success}')
+                print(f'init exp success: {expected_success.mean()}')
 
             step += 1
 
@@ -227,7 +227,7 @@ class ActiveCriticPolicy(BaseModel):
         if self.args_obj.clip:
             with th.no_grad():
                 th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
-        print(f'final_exp_success: {final_exp_success} ')
+        print(f'final_exp_success: {final_exp_success.mean()} ')
         return final_actions, final_exp_success
 
     def inference_opt_step(self, 
@@ -239,13 +239,15 @@ class ActiveCriticPolicy(BaseModel):
             current_step: int
             ):
         critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
-        critic_result, _ = self.critic.forward(inputs=critic_inpt)
+        critic_result, critic_rewards = self.critic.forward(inputs=critic_inpt)
 
 
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
         optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()
+
+        self.history.add_value(self.history.opt_scores[0], critic_rewards.detach(), current_step=current_step)
 
         return opt_actions, critic_result
 
