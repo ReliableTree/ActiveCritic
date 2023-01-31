@@ -100,3 +100,10 @@ def get_seq_end_mask(inpt, current_step):
 
 def get_rew_mask(reward):
     return (reward.squeeze()>=0)
+
+def part_goal_obs(inpt:th.Tensor):
+
+    goal = inpt[..., -3:]
+    obsv = inpt[..., :-3]
+
+    return goal, obsv
