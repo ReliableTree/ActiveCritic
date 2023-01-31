@@ -33,8 +33,8 @@ class WholeSequenceModel(nn.Module, ABC):
         result = self.model.forward(inputs)
         if self.optimizer is None:
             self.optimizer = self.wsms.optimizer_class(
-                self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
-            self.scheduler = th.optim.lr_scheduler.StepLR(self.optimizer, int(100000/32), gamma=0.97)
+                self.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
+            self.scheduler = th.optim.lr_scheduler.StepLR(self.optimizer, int(100000/32), gamma=1)
 
         return result
 
@@ -77,8 +77,10 @@ class CriticSequenceModel(WholeSequenceModel):
             self.result_decoder = tv.ops.MLP(
                 in_channels=self.wsms.model_setup.d_output * self.wsms.model_setup.seq_len, 
                 hidden_channels=[200, 200, 200, 1]).to(inputs.device)
+
         trans_result = super().forward(inputs)
         pre_sm = self.result_decoder.forward(trans_result.reshape([trans_result.shape[0], -1]))
+
         #result = self.sm(pre_sm)
         return pre_sm, trans_result
 
@@ -93,7 +95,7 @@ class CriticSequenceModel(WholeSequenceModel):
             loss = self.loss_fct(result=result, label=label)
             proxy_loss = self.loss_fct(result=proxy_result, label=proxy)
 
-        total_loss = loss + proxy_loss
+        total_loss = proxy_loss + loss
 
         self.optimizer.zero_grad()
         total_loss.backward()

@@ -191,8 +191,8 @@ class ActiveCriticLearner(nn.Module):
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
             loss_actor = actor_step(device_data, loss_actor)
-            if train_critic:
-                loss_critic = critic_step(device_data, loss_critic)
+            #if train_critic:
+            loss_critic = critic_step(device_data, loss_critic)
         return loss_actor, loss_critic
 
     def train(self, epochs):
