@@ -11,12 +11,13 @@ import os
 import pickle
 
 class ACPOptResult:
-    def __init__(self, gen_trj: th.Tensor, inpt_trj: th.Tensor = None, expected_succes_before: th.Tensor = None, expected_succes_after: th.Tensor = None) -> None:
+    def __init__(self, gen_trj: th.Tensor, inpt_trj: th.Tensor = None, expected_succes_before: th.Tensor = None, expected_succes_after: th.Tensor = None, critic_rewards: th.Tensor=None, critic_rewards_opt: th.Tensor=None) -> None:
         self.gen_trj = gen_trj
         self.inpt_trj = inpt_trj
         self.expected_succes_before = expected_succes_before
         self.expected_succes_after = expected_succes_after
-
+        self.critic_rewards_opt = critic_rewards_opt
+        self.critic_rewards = critic_rewards
 
 class ActiveCriticPolicySetup:
     def __init__(self) -> None:
@@ -88,11 +89,11 @@ class ActiveCriticPolicy(BaseModel):
         self.last_goal = vec_obsv
         self.current_result = None
 
-        scores_size = [vec_obsv.shape[0], self.args_obj.epoch_len]
+        scores_size = [vec_obsv.shape[0], 200, self.args_obj.epoch_len]
         self.history.new_epoch(self.history.gen_scores, size=scores_size, device=self.args_obj.device)
         self.history.new_epoch(self.history.opt_scores, size=scores_size, device=self.args_obj.device)
 
-        trj_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.action_space.shape[0]]
+        trj_size = [vec_obsv.shape[0], 200, self.args_obj.epoch_len, self.action_space.shape[0]]
         self.history.new_epoch(self.history.gen_trj, size=trj_size, device=self.args_obj.device)
         
         self.obs_seq = th.zeros(
@@ -128,10 +129,12 @@ class ActiveCriticPolicy(BaseModel):
         if self.args_obj.optimize:
             self.history.add_value(
                 history=self.history.opt_scores, 
-                value=self.current_result.expected_succes_after[:, 0].detach(), 
+                value=self.current_result.critic_rewards_opt.squeeze().detach(), 
                 current_step=self.current_step
             )
-        self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
+            self.history.add_value(self.history.opt_scores, value=self.current_result.critic_rewards_opt.squeeze().detach(), current_step=self.current_step)
+
+        self.history.add_value(self.history.gen_scores, value=self.current_result.critic_rewards.squeeze().detach(), current_step=self.current_step)
 
         return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
 
@@ -153,8 +156,7 @@ class ActiveCriticPolicy(BaseModel):
             actions = self.proj_actions(
                 action_seq, actions, current_step)
 
-        for step in range(actions.shape[1]):
-            self.history.add_value(self.history.gen_trj, actions[:, step].detach(), current_step=step)
+        self.history.add_value(self.history.gen_trj, actions.detach(), current_step=0)
 
         critic_input = self.get_critic_input(
             acts=actions, obs_seq=observation_seq)
@@ -166,11 +168,12 @@ class ActiveCriticPolicy(BaseModel):
             result = ACPOptResult(
                 gen_trj=actions, 
                 expected_succes_before=expected_success.detach(),
-                expected_succes_after=expected_success.detach())
+                expected_succes_after=expected_success.detach(),
+                critic_rewards = expected_rewards.detach())
             return result
 
         else:
-            actions, expected_success_opt = self.optimize_act_sequence(
+            actions, expected_success_opt, critic_rewards_opt = self.optimize_act_sequence(
                 actions=actions, 
                 observations=observation_seq, 
                 current_step=current_step,
@@ -179,8 +182,10 @@ class ActiveCriticPolicy(BaseModel):
 
             return ACPOptResult(
                 gen_trj=actions.detach(),
-                expected_succes_before=expected_success,
-                expected_succes_after=expected_success_opt)
+                expected_succes_before=expected_success.detach(),
+                expected_succes_after=expected_success_opt.detach(),
+                critic_rewards = expected_rewards.detach(),
+                critic_rewards_opt= critic_rewards_opt.detach())
 
     def optimize_act_sequence(self, 
             actions: th.Tensor, 
@@ -203,7 +208,7 @@ class ActiveCriticPolicy(BaseModel):
         while (step <= self.args_obj.opt_steps) and (not th.all(final_exp_success >= self.args_obj.optimisation_threshold)):
             mask = (final_exp_success < self.args_obj.optimisation_threshold)
         
-            optimized_actions, expected_success = self.inference_opt_step(
+            optimized_actions, expected_success, critic_rewards = self.inference_opt_step(
                 org_actions=actions,
                 opt_actions=optimized_actions,
                 obs_seq=observations,
@@ -228,7 +233,7 @@ class ActiveCriticPolicy(BaseModel):
             with th.no_grad():
                 th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
         print(f'final_exp_success: {final_exp_success.mean()} ')
-        return final_actions, final_exp_success
+        return final_actions, final_exp_success, critic_rewards
 
     def inference_opt_step(self, 
             org_actions: th.Tensor, 
@@ -246,10 +251,9 @@ class ActiveCriticPolicy(BaseModel):
         optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()
+        #self.history.add_value(self.history.opt_scores[0], critic_rewards.detach(), current_step=current_step)
 
-        self.history.add_value(self.history.opt_scores[0], critic_rewards.detach(), current_step=current_step)
-
-        return opt_actions, critic_result
+        return opt_actions, critic_result, critic_rewards
 
     def get_critic_input(self, acts, obs_seq):
         critic_input = make_partially_observed_seq(

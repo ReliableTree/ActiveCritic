@@ -283,14 +283,14 @@ class ActiveCriticLearner(nn.Module):
         last_actions = trj[1]
         last_rewards = trj[2]
         last_expected_reward = trj[3]
+        last_expected_reward = last_expected_reward[0].unsqueeze(-1)
         critic_input = self.policy.get_critic_input(acts=last_actions, obs_seq=last_obsv)
-        expected_reward, _ = self.policy.critic.forward(critic_input)
-        expected_reward = expected_reward.reshape([-1, 1, 1 ])
+        expected_success, expected_reward = self.policy.critic.forward(critic_input)
 
 
         label = self.make_critic_score(last_rewards)
         last_expected_label = self.make_critic_score(last_expected_reward)
-        self.createGraphs([label[0], last_expected_label[0], expected_reward[0]], ['Last Rewards', 'Last Expected Rewards', 'Current Expectation'], 'Compare Learn Critic ' + post_fix)
+        self.createGraphs([last_rewards[0], last_expected_reward, expected_reward[0]], ['Last Rewards', 'Last Expected Rewards', 'Current Expectation'], 'Compare Learn Critic ' + post_fix)
 
     def make_critic_score(self, rewards):
         labels = rewards.max(1).values.squeeze().reshape([-1, 1, 1]) == 1
@@ -331,7 +331,10 @@ class ActiveCriticLearner(nn.Module):
         for i in range(min(opt_actions.shape[0], 4)):
             self.createGraphs([gen_actions[i], opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i) + fix)
             labels = self.make_critic_score(rewards=rewards)
-            self.createGraphs([labels[i].reshape([-1, 1]), self.policy.history.opt_scores[0][i].reshape([-1, 1]), self.policy.history.gen_scores[0][i].reshape([-1, 1])], 
+
+            opt_scores = self.policy.history.opt_scores[0][i, 0].unsqueeze(-1)
+            gen_scores = self.policy.history.gen_scores[0][i, 0].unsqueeze(-1)
+            self.createGraphs([rewards[i], opt_scores, gen_scores], 
                                 ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i) + fix)
 
         last_reward, _ = rewards.max(dim=1)

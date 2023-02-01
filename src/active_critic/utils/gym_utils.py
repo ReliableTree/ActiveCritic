@@ -270,6 +270,6 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str
             expected_rewards_before = th.clone(rewards)
 
         if return_gen_trj:
-            return actions, policy.history.gen_trj[0][:episodes], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]
+            return actions, policy.history.gen_trj[0][:episodes, 0], observations, rewards, expected_rewards_before[:episodes, 0], expected_rewards_after[:episodes, 0]
         else:
             return actions, observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]
