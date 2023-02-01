@@ -85,19 +85,31 @@ class ActiveCriticLearner(nn.Module):
         self.train_data = DatasetAC(device='cpu')
         self.train_data.onyl_positiv = False
 
+        self.critic_data = DatasetAC(device='cpu')
+        self.critic_data.onyl_positiv = False
+
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
         if len(train_data) > 0:
             self.train_loader = DataLoader(
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
-    def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor):
+    def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor, add_to_actor: bool):
         acts, obsv, rews = make_part_obs_data(
             actions=actions, observations=observations, rewards=rewards)
-        self.train_data.add_data(obsv=obsv.to(
-            'cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
-        self.train_loader = DataLoader(
-            dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
+        
+        if add_to_actor:
+            self.train_data.add_data(obsv=obsv.to(
+                'cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
+            self.train_loader = DataLoader(
+                dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
+
+        self.critic_data.add_data(obsv=obsv.to(
+                'cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
+        print(f'traindata: {len(self.train_data)}')
+        self.critic_loader = DataLoader(
+                dataset=self.critic_data, batch_size=self.network_args.batch_size, shuffle=True)
+        print(f'critic data: {len(self.critic_data)}')
 
     def actor_step(self, data, loss_actor):
         obsv, actions, reward = data
@@ -142,7 +154,7 @@ class ActiveCriticLearner(nn.Module):
 
         return loss_critic
 
-    def add_training_data(self, policy=None, episodes = 1):
+    def add_training_data(self, add_to_actor, policy=None, episodes = 1):
         if policy is None:
             policy = self.policy
             policy.eval()
@@ -182,7 +194,8 @@ class ActiveCriticLearner(nn.Module):
         self.add_data(
             actions=actions,
             observations=observations,
-            rewards=rewards
+            rewards=rewards, 
+            add_to_actor=add_to_actor
         )
 
     def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic):
@@ -191,8 +204,14 @@ class ActiveCriticLearner(nn.Module):
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
             loss_actor = actor_step(device_data, loss_actor)
-            #if train_critic:
+
+        for data in self.critic_loader:
+            device_data = []
+            for dat in data:
+                device_data.append(dat.to(self.network_args.device))
             loss_critic = critic_step(device_data, loss_critic)
+
+
         return loss_actor, loss_critic
 
     def train(self, epochs):
@@ -210,7 +229,7 @@ class ActiveCriticLearner(nn.Module):
 
             if (not self.network_args.imitation_phase) and (epoch >= next_add):
                 next_add += self.network_args.add_data_every
-                self.add_training_data(episodes=self.network_args.training_epsiodes)
+                self.add_training_data(add_to_actor=True, episodes=self.network_args.training_epsiodes)
 
             self.policy.train()
 
@@ -364,7 +383,7 @@ class ActiveCriticLearner(nn.Module):
         if self.network_args.imitation_phase:
             self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=self.global_step)
         else:
-            self.write_tboard_scalar(debug_dict=debug_dict, train=False)
+            self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=self.global_step)
         self.policy.args_obj.optimize = pre_opt
 
 

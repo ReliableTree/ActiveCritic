@@ -246,12 +246,10 @@ class ActiveCriticPolicy(BaseModel):
         critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
         critic_result, critic_rewards = self.critic.forward(inputs=critic_inpt)
 
-
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
         optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()
-        #self.history.add_value(self.history.opt_scores[0], critic_rewards.detach(), current_step=current_step)
 
         return opt_actions, critic_result, critic_rewards
 
