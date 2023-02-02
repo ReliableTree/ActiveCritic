@@ -95,7 +95,7 @@ def make_acl(device):
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-3
     acla.num_cpu = 30
-    acla.compute_steps = 10000
+    acla.compute_steps = 20000
 
     seq_len = 200
     epsiodes = 30
