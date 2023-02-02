@@ -89,10 +89,13 @@ def make_dummy_vec_env(name, seq_len):
     env._freeze_rand_vec = False
     reset_env = ResetCounterWrapper(env=env)
     timelimit = TimeLimit(env=reset_env, max_episode_steps=max_episode_steps)
-    dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(timelimit)])
+    strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+
+    dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(strict_time)])
     vec_expert = ImitationLearningWrapper(
         policy=policy_dict[env_tag][0], env=dv1)
     return dv1, vec_expert
+
 
 class ResetCounterWrapper(gym.Wrapper):
     def __init__(self, env: Env) -> None:
@@ -100,17 +103,14 @@ class ResetCounterWrapper(gym.Wrapper):
         self.reset_count = 0
 
     def reset(self):
-        self.reset_count+=1
+        self.reset_count += 1
         return super().reset()
 
     def step(self, action):
         
         obsv, rew, done, info = super().step(action)
-        if info['success']:
-            done = True
-        else:
-            rew = rew - 5
         return obsv, rew, done, info
+
 
 class StrictSeqLenWrapper(gym.Wrapper):
     def __init__(self, env: Env, seq_len) -> None:
@@ -130,15 +130,16 @@ class StrictSeqLenWrapper(gym.Wrapper):
 
         return obsv, rew, done, info
 
-def make_vec_env(env_id, num_cpu, seq_len):
+def make_vec_env(env_id, num_cpu, seq_len, reset_counter=False):
     policy_dict = make_policy_dict()
 
-    def make_env(env_id, rank, seed=0):
+    def make_env(env_id, rank, seed=0, reset_counter = reset_counter):
         def _init():
             max_episode_steps = seq_len
             env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_id][1]]()
             env._freeze_rand_vec = False
-            #rce = ResetCounterWrapper(env)
+            if reset_counter:
+                env = ResetCounterWrapper(env)
             timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
             strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
             riw = RolloutInfoWrapper(strict_time)

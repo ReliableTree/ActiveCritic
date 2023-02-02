@@ -84,7 +84,7 @@ def make_acl(device):
     acla.extractor = ReductiveExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' 10 imitation constant compute'
+    acla.logname = tag + ' 10 imitation'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
@@ -92,8 +92,8 @@ def make_acl(device):
     acla.add_data_every = 200
     acla.validation_episodes = 300
     acla.training_epsiodes = 10
-    acla.actor_threshold = 1e-2
-    acla.critic_threshold = 1e-3
+    acla.actor_threshold = 1e-3
+    acla.critic_threshold = 1e-4
     acla.num_cpu = 30
     acla.compute_steps = 20000
 
