@@ -217,26 +217,29 @@ class ActiveCriticLearner(nn.Module):
     def train(self, epochs):
         next_val = self.network_args.val_every
         next_add = 0
+        next_compute_goal = self.network_args.compute_steps
+
         for epoch in range(epochs):
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every
-                if self.network_args.tboard:
-                    print('_____________________________________________________________')
-                    self.policy.eval()
-                    self.run_validation(optimize=True)
-                    self.run_validation(optimize=False)
+            if self.network_args.tboard:
+                print('_____________________________________________________________')
+                self.policy.eval()
+                self.run_validation(optimize=True)
+                self.run_validation(optimize=False)
 
 
             if (not self.network_args.imitation_phase) and (epoch >= next_add):
                 next_add += self.network_args.add_data_every
-                self.add_training_data(add_to_actor=True, episodes=self.network_args.training_epsiodes)
+            self.add_training_data(add_to_actor=True, episodes=self.network_args.training_epsiodes)
 
             self.policy.train()
 
             max_actor = float('inf')
             max_critic = float('inf')
             train_critic = True
-            while (max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold):
+            #while (max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold):
+            while self.global_step < next_compute_goal:
                 loss_actor = None
                 loss_critic = None
 
@@ -280,6 +283,7 @@ class ActiveCriticLearner(nn.Module):
 
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
                 self.global_step += len(self.train_data)
+            next_compute_goal += self.network_args.compute_steps
             if epoch == 0:
                 count_parameters(self.policy)
 

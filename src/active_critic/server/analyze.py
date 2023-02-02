@@ -48,7 +48,7 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.epoch_len = seq_len
     acps.extractor = extractor
     acps.new_epoch = new_epoch
-    acps.opt_steps = 10000
+    acps.opt_steps = 100
     acps.optimisation_threshold = 1
     acps.inference_opt_lr = 5e-3
     
@@ -84,7 +84,7 @@ def make_acl(device):
     acla.extractor = ReductiveExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' 10 imitation long opt'
+    acla.logname = tag + ' 10 imitation constant compute'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
@@ -95,6 +95,7 @@ def make_acl(device):
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-3
     acla.num_cpu = 30
+    acla.compute_steps = 10000
 
     seq_len = 200
     epsiodes = 30

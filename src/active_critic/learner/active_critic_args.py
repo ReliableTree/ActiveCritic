@@ -20,3 +20,4 @@ class ActiveCriticLearnerArgs:
         self.critic_threshold:float = None
         self.num_cpu:int = None
         self.max_critic_steps = 12000
+        self.compute_steps = 1000
