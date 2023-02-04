@@ -84,7 +84,7 @@ def make_acl(device):
     acla.extractor = ReductiveExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' 10 imitation long opt positive'
+    acla.logname = tag + ' 20 imitation long opt positive'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
@@ -106,7 +106,7 @@ def make_acl(device):
 
 def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
-    acl.add_training_data(policy=expert, episodes=10, add_to_actor=True)
+    acl.add_training_data(policy=expert, episodes=20, add_to_actor=True)
     #acl.run_validation()
     acl.train(epochs=100000)
 

@@ -127,9 +127,9 @@ class ActiveCriticLearner(nn.Module):
 
             actor_input = self.policy.get_actor_input(
                 obs=obsv, actions=actions, rew=reward)
-            mask = get_rew_mask(reward)
+            #mask = get_rew_mask(reward)
             debug_dict = self.policy.actor.optimizer_step(
-                inputs=actor_input, label=actions, mask=mask)
+                inputs=actor_input, label=actions)
             if loss_actor is None:
                 loss_actor = debug_dict['Loss '].unsqueeze(0)
             else:
