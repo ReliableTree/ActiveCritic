@@ -84,7 +84,7 @@ def make_acl(device):
     acla.extractor = ReductiveExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' 10 imitation long opt'
+    acla.logname = tag + ' 10 imitation long opt positive'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
