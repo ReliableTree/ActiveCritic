@@ -99,8 +99,11 @@ class ActiveCriticLearner(nn.Module):
             actions=actions, observations=observations, rewards=rewards)
         
         if add_to_actor:
-            self.train_data.add_data(obsv=obsv.to(
-                'cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
+            mask = rews.squeeze().max(dim=-1).values
+            mask = mask == 1
+            self.train_data.add_data(obsv=obsv[mask].to(
+                'cpu'), actions=acts[mask].to('cpu'), reward=rews[mask].to('cpu'))
+            
             self.train_loader = DataLoader(
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
