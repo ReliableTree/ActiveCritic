@@ -109,7 +109,7 @@ def make_acl(device):
 def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
 
-    acl.add_training_data(policy=expert.predict, episodes=20, add_to_actor=True)
+    acl.add_training_data(policy=expert, episodes=20, add_to_actor=True)
     #acl.run_validation()
     acl.train(epochs=100000)
 
