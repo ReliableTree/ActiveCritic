@@ -108,7 +108,7 @@ def make_acl(device):
 
 def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
-    tqc = TQC.load('/home/hendrik/Documents/master_project/LokalData/push_tqc.zip')
+    tqc = TQC.load('/data/bing/hendrik/push_tqc.zip')
 
     acl.add_training_data(policy=tqc, episodes=100, add_to_actor=True)
     #acl.run_validation()
