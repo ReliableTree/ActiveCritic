@@ -99,8 +99,10 @@ class ActiveCriticLearner(nn.Module):
             actions=actions, observations=observations, rewards=rewards)
         
         if add_to_actor:
-            self.train_data.add_data(obsv=obsv.to(
-                'cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
+            mask = rews.squeeze().max(dim=-1).values
+            mask = mask == 1
+            self.train_data.add_data(obsv=obsv[mask].to(
+                'cpu'), actions=acts[mask].to('cpu'), reward=rews[mask].to('cpu'))
             self.train_loader = DataLoader(
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
@@ -223,24 +225,25 @@ class ActiveCriticLearner(nn.Module):
         for epoch in range(epochs):
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every
-            if self.network_args.tboard:
-                print('_____________________________________________________________')
-                self.policy.eval()
-                self.run_validation(optimize=True)
-                self.run_validation(optimize=False)
+                if self.network_args.tboard:
+                    print('_____________________________________________________________')
+                    self.policy.eval()
+                    self.run_validation(optimize=True)
+                    self.run_validation(optimize=False)
 
 
             if (not self.network_args.imitation_phase) and (epoch >= next_add):
                 next_add += self.network_args.add_data_every
-            self.add_training_data(add_to_actor=True, episodes=self.network_args.training_epsiodes)
+                self.add_training_data(add_to_actor=True, episodes=self.network_args.training_epsiodes)
 
             self.policy.train()
 
             max_actor = float('inf')
             max_critic = float('inf')
             train_critic = True
-            #while (max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold):
-            while self.global_step < next_compute_goal:
+            #while self.global_step < next_compute_goal:
+            while (max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold):
+
                 loss_actor = None
                 loss_critic = None
 

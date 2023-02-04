@@ -15,6 +15,7 @@ from active_critic.model_src.transformer import (
 from active_critic.policy.active_critic_policy import ActiveCriticPolicySetup, ActiveCriticPolicy
 import argparse
 from prettytable import PrettyTable
+from sb3_contrib import TQC
 
 from gym import Env
 th.manual_seed(0)
@@ -82,19 +83,19 @@ def make_acl(device):
     acla.data_path = '/data/bing/hendrik/'
     acla.device = device
     acla.extractor = ReductiveExtractor()
-    acla.imitation_phase = False
-    tag = 'pickplace'
-    acla.logname = tag + ' 10 imitation'
+    acla.imitation_phase = True
+    tag = 'push'
+    acla.logname = tag + ' 100 imitation tqc'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
-    acla.val_every = 200
-    acla.add_data_every = 200
-    acla.validation_episodes = 300
+    acla.val_every = 500
+    acla.add_data_every = 500
+    acla.validation_episodes = 50
     acla.training_epsiodes = 10
     acla.actor_threshold = 1e-3
     acla.critic_threshold = 1e-4
-    acla.num_cpu = 30
+    acla.num_cpu = 50
     acla.compute_steps = 20000
 
     seq_len = 200
@@ -107,7 +108,9 @@ def make_acl(device):
 
 def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
-    acl.add_training_data(policy=expert, episodes=10, add_to_actor=True)
+    tqc = TQC.load('/home/hendrik/Documents/master_project/LokalData/push_tqc.zip')
+
+    acl.add_training_data(policy=tqc, episodes=100, add_to_actor=True)
     #acl.run_validation()
     acl.train(epochs=100000)
 

@@ -243,17 +243,24 @@ def sample_expert_transitions(policy, env, episodes):
     )
     return flatten_trajectories(rollouts)
 
+def predict_wrapper(predict):
+    def fnct(obsv):
+        result, _ = predict(obsv)
+        return result
+    return fnct
+
 
 def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str, episodes:int=1, return_gen_trj = False):
         try:
             policy.eval()
             policy.reset()
             seq_len = policy.args_obj.epoch_len
-
+            predict = policy.predict
         except:
-            seq_len = 100
+            seq_len = 200
+            predict = predict_wrapper(policy.predict)
         transitions = sample_expert_transitions(
-            policy.predict, env, episodes)
+            predict, env, episodes)
         try:
             expected_rewards_after = policy.history.opt_scores[0]
             expected_rewards_before = policy.history.gen_scores[0]
