@@ -82,9 +82,9 @@ def make_acl(device):
     acla.data_path = '/data/bing/hendrik/'
     acla.device = device
     acla.extractor = ReductiveExtractor()
-    acla.imitation_phase = False
+    acla.imitation_phase = True
     tag = 'pickplace'
-    acla.logname = tag + ' 20 imitation long opt positive'
+    acla.logname = tag + ' 20 imitation long opt'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
