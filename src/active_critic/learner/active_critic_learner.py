@@ -117,25 +117,16 @@ class ActiveCriticLearner(nn.Module):
     def actor_step(self, data, loss_actor):
         obsv, actions, reward = data
 
-        b, _ = th.max(reward, dim=1)
-        successfull_trj = (b == 1).squeeze()
-
-        if successfull_trj.sum() > 0:
-            obsv = obsv[successfull_trj]
-            actions = actions[successfull_trj]
-            reward = reward[successfull_trj]
-
-            actor_input = self.policy.get_actor_input(
-                obs=obsv, actions=actions, rew=reward)
-            mask = get_rew_mask(reward)
-            debug_dict = self.policy.actor.optimizer_step(
-                inputs=actor_input, label=actions, mask=mask)
-            if loss_actor is None:
-                loss_actor = debug_dict['Loss '].unsqueeze(0)
-            else:
-                loss_actor = th.cat(
-                    (loss_actor, debug_dict['Loss '].unsqueeze(0)), dim=0)
-            self.write_tboard_scalar(debug_dict={'lr actor': debug_dict['Learning Rate'].mean()}, train=True)
+        actor_input = self.policy.get_actor_input(
+            obs=obsv, actions=actions, rew=reward)
+        debug_dict = self.policy.actor.optimizer_step(
+            inputs=actor_input, label=actions)
+        if loss_actor is None:
+            loss_actor = debug_dict['Loss '].unsqueeze(0)
+        else:
+            loss_actor = th.cat(
+                (loss_actor, debug_dict['Loss '].unsqueeze(0)), dim=0)
+        self.write_tboard_scalar(debug_dict={'lr actor': debug_dict['Learning Rate'].mean()}, train=True)
         return loss_actor
 
 

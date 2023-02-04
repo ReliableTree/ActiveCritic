@@ -85,7 +85,7 @@ def make_acl(device):
     acla.extractor = ReductiveExtractor()
     acla.imitation_phase = True
     tag = 'push'
-    acla.logname = tag + ' 100 imitation tqc'
+    acla.logname = tag + ' 20 imitation'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
@@ -108,9 +108,8 @@ def make_acl(device):
 
 def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
-    tqc = TQC.load('/data/bing/hendrik/push_tqc.zip')
 
-    acl.add_training_data(policy=tqc, episodes=100, add_to_actor=True)
+    acl.add_training_data(policy=expert.predict, episodes=20, add_to_actor=True)
     #acl.run_validation()
     acl.train(epochs=100000)
 
