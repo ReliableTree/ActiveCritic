@@ -14,6 +14,9 @@ class WholeSequenceModelSetup:
         self.lr:float = None
         self.name:str = None
 
+
+
+
 class WholeSequenceModel(nn.Module, ABC):
     def __init__(self, wsms: WholeSequenceModelSetup) -> None:
         super().__init__()
@@ -39,6 +42,8 @@ class WholeSequenceModel(nn.Module, ABC):
         return result
 
     def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, prefix='', mask:th.Tensor=None) -> typing.Dict:
+        pass
+    
         result = self.forward(inputs=inputs)
         if mask is not None:
             if (mask.shape[0] != result.shape[0]) and (result.shape[0] == 1):
@@ -64,7 +69,7 @@ class WholeSequenceModel(nn.Module, ABC):
         else:
             loss = calcMSE(result, label)
         return loss
-
+    
 class CriticSequenceModel(WholeSequenceModel):
     def __init__(self, wsms: WholeSequenceModelSetup) -> None:
         super().__init__(wsms)
@@ -90,9 +95,11 @@ class CriticSequenceModel(WholeSequenceModel):
 
         #result = self.sm(pre_sm)
         return pre_sm, trans_goal_result
-
-    def optimizer_step(self, inputs:th.Tensor, label:th.Tensor, proxy:th.Tensor, prefix='', mask:th.Tensor=None) -> typing.Dict:
+    
+class ActorSequenceModel(WholeSequenceModel):
+    def optimizer_step(self, inputs: th.Tensor, label: th.Tensor, prefix='', mask: th.Tensor = None, critc = CriticSequenceModel) -> typing.Dict:
         result, proxy_result = self.forward(inputs=inputs)
+        critic_inpt = critc.inp
         if mask is not None:
             if (mask.shape[0] != result.shape[0]) and (result.shape[0] == 1):
                 mask = mask.unsqueeze(0)
@@ -116,3 +123,6 @@ class CriticSequenceModel(WholeSequenceModel):
         }
 
         return debug_dict
+    
+ 
+
