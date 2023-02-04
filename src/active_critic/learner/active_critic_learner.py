@@ -103,6 +103,7 @@ class ActiveCriticLearner(nn.Module):
             mask = mask == 1
             self.train_data.add_data(obsv=obsv[mask].to(
                 'cpu'), actions=acts[mask].to('cpu'), reward=rews[mask].to('cpu'))
+            
             self.train_loader = DataLoader(
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
@@ -207,12 +208,11 @@ class ActiveCriticLearner(nn.Module):
                 device_data.append(dat.to(self.network_args.device))
             loss_actor = actor_step(device_data, loss_actor)
 
-        if train_critic:
-            for data in self.critic_loader:
-                device_data = []
-                for dat in data:
-                    device_data.append(dat.to(self.network_args.device))
-                loss_critic = critic_step(device_data, loss_critic)
+        for data in self.critic_loader:
+            device_data = []
+            for dat in data:
+                device_data.append(dat.to(self.network_args.device))
+            loss_critic = critic_step(device_data, loss_critic)
 
 
         return loss_actor, loss_critic
@@ -220,8 +220,6 @@ class ActiveCriticLearner(nn.Module):
     def train(self, epochs):
         next_val = self.network_args.val_every
         next_add = 0
-        next_compute_goal = self.network_args.compute_steps
-
         for epoch in range(epochs):
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every
@@ -241,9 +239,7 @@ class ActiveCriticLearner(nn.Module):
             max_actor = float('inf')
             max_critic = float('inf')
             train_critic = True
-            #while self.global_step < next_compute_goal:
             while (max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold):
-
                 loss_actor = None
                 loss_critic = None
 
@@ -287,7 +283,6 @@ class ActiveCriticLearner(nn.Module):
 
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
                 self.global_step += len(self.train_data)
-            next_compute_goal += self.network_args.compute_steps
             if epoch == 0:
                 count_parameters(self.policy)
 
