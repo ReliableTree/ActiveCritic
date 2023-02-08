@@ -59,8 +59,8 @@ def asd(env, learner):
     return np.array(success), np.array(rews)
 
 def run_experiment(device):
-    env, vec_expert = make_dummy_vec_env(name='pickplace', seq_len=200)
-    val_env, _ = make_dummy_vec_env(name='pickplace', seq_len=200)
+    env, vec_expert = make_dummy_vec_env(name='push', seq_len=200)
+    val_env, _ = make_dummy_vec_env(name='push', seq_len=200)
 
     policy_kwargs = dict(n_critics=2, n_quantiles=25)
     learner = TQC("MlpPolicy", env, top_quantiles_to_drop_per_net=2, verbose=1, policy_kwargs=policy_kwargs, device=device)
