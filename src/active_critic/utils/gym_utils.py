@@ -63,6 +63,7 @@ class reset_counter(gym.Wrapper):
     def __init__(self, env: Env) -> None:
         super().__init__(env)
         self.reset_count = 0
+        print('hää')
 
     def reset(self):
         self.reset_count+=1
@@ -86,12 +87,12 @@ def make_dummy_vec_env(name, seq_len):
     env_tag = name
     max_episode_steps = seq_len
     env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
-    env._freeze_rand_vec = False
-    reset_env = ResetCounterWrapper(env=env)
-    timelimit = TimeLimit(env=reset_env, max_episode_steps=max_episode_steps)
-    strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+    #env._freeze_rand_vec = False
+    #reset_env = ResetCounterWrapper(env=env)
+    timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
+    #strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
 
-    dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(strict_time)])
+    dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(timelimit)])
     vec_expert = ImitationLearningWrapper(
         policy=policy_dict[env_tag][0], env=dv1)
     return dv1, vec_expert
@@ -127,7 +128,9 @@ class StrictSeqLenWrapper(gym.Wrapper):
         obsv, rew, done, info = super().step(action)
         
         done = self.current_step == self.seq_len
-
+        if done:
+            self.reset()
+            print('reset')
         return obsv, rew, done, info
 
 def make_vec_env(env_id, num_cpu, seq_len, reset_counter=False):
