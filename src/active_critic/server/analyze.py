@@ -83,9 +83,9 @@ def make_acl(device):
     acla.data_path = '/data/bing/hendrik/'
     acla.device = device
     acla.extractor = ReductiveExtractor()
-    acla.imitation_phase = True
+    acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' reinit 2901 imitation'
+    acla.logname = tag + ' reinit sparse'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
@@ -96,6 +96,7 @@ def make_acl(device):
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
     acla.num_cpu = 50
+    acla.patients = 200000
 
     seq_len = 200
     epsiodes = 30
@@ -107,7 +108,7 @@ def make_acl(device):
 
 def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
-    acl.add_training_data(policy=expert, episodes=10)
+    acl.add_training_data(policy=expert, episodes=10, seq_len=seq_len)
     #acl.run_validation()
     acl.train(epochs=100000)
 

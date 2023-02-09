@@ -11,6 +11,31 @@ from active_critic.utils.rollout import rollout, make_sample_until, flatten_traj
 from stable_baselines3.common.type_aliases import GymEnv
 from gym import Env
 import gym
+import copy
+import torch.nn as nn
+import math
+
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        position = th.arange(max_len).unsqueeze(1)
+        div_term = th.exp(th.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
+        pe = th.zeros(1, max_len, d_model)
+        pe[0, :, 0::2] = th.sin(position * div_term)
+        pe[0, :, 1::2] = th.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        """
+        Args:
+            x: Tensor, shape [batch_size, seq_len, embedding_dim]
+        """
+        x = x + self.pe[:, :x.size(1)]
+        return self.dropout(x)
+    
 
 class DummyExtractor:
     def __init__(self):
@@ -89,7 +114,9 @@ def make_dummy_vec_env(name, seq_len):
     env._freeze_rand_vec = False
     reset_env = ResetCounterWrapper(env=env)
     timelimit = TimeLimit(env=reset_env, max_episode_steps=max_episode_steps)
-    dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(timelimit)])
+    strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+
+    dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(strict_time)])
     vec_expert = ImitationLearningWrapper(
         policy=policy_dict[env_tag][0], env=dv1)
     return dv1, vec_expert
@@ -193,22 +220,29 @@ def parse_sampled_transitions(transitions, extractor, seq_len, device='cuda'):
     epch_observations = []
     epch_rewards = []
     check_obsvs = extractor.forward(transitions[0]['obs'])
+    current_success = False
     for i in range(len(transitions)):
         current_obs = extractor.forward(features=transitions[i]['obs'])
 
         epch_observations.append(current_obs.numpy())
         epch_actions.append(transitions[i]['acts'])
         epch_rewards.append([transitions[i]['infos']['unscaled_reward']/10])
-
+        if transitions[i]['infos']['success'] == 1:
+            current_success = True
 
         if transitions[i]['dones']:
-            rewards.append(np.array(epch_rewards))
+            if current_success:
+                rewards.append(np.ones_like(epch_rewards))
+            else:
+                rewards.append(np.zeros_like(epch_rewards))
+
             observations.append(np.array(epch_observations))
             actions.append(np.array(epch_actions))
 
             epch_actions = []
             epch_observations = []
             epch_rewards = []
+            current_success = False
 
 
     actions = th.tensor(fill_arrays(actions, seq_len = seq_len), dtype=th.float, device=device)
@@ -243,14 +277,14 @@ def sample_expert_transitions(policy, env, episodes):
     return flatten_trajectories(rollouts)
 
 
-def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str, episodes:int=1, return_gen_trj = False):
+def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str, episodes:int=1, return_gen_trj = False, seq_len = None):
         try:
             policy.eval()
             policy.reset()
             seq_len = policy.args_obj.epoch_len
 
         except:
-            seq_len = 100
+            seq_len = seq_len
         transitions = sample_expert_transitions(
             policy.predict, env, episodes)
         try:
@@ -273,3 +307,90 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str
             return actions, policy.history.gen_trj[0][:episodes], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]
         else:
             return actions, observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]
+        
+class POMDP_Wrapper(gym.Wrapper):
+    def __init__(self, env, lookup_freq, pe_dim, seq_len) -> None:
+        super().__init__(env)
+        inpt = th.zeros([1, seq_len, pe_dim])
+        positional_encoding = PositionalEncoding(d_model=10, dropout=0)
+        self.pe = positional_encoding.forward(inpt).numpy()
+        self.current_step = 0
+        self.lookup_freq = lookup_freq
+
+    def reset(self):
+        obsv =  super().reset()
+        obsv[20:30] = self.pe[0, 0]
+        self.current_step = 0
+        self.current_obv = np.copy(obsv)
+        return obsv
+
+    def step(self, action):
+        self.current_step += 1
+        obsv, rew, done, info = super().step(action)
+        if self.current_step % self.lookup_freq == 0:
+            self.current_obv = np.copy(obsv)
+        
+        obsv = np.copy(self.current_obv)
+        obsv[20:30] = self.pe[0, self.current_step]
+
+        return obsv, rew, done, info
+    
+def make_dummy_vec_env_pomdp(name, seq_len, lookup_freq):
+    policy_dict = make_policy_dict()
+
+    env_tag = name
+    max_episode_steps = seq_len
+    env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
+    env._freeze_rand_vec = False
+    reset_env = ResetCounterWrapper(env=env)
+    timelimit = TimeLimit(env=reset_env, max_episode_steps=max_episode_steps)
+    strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+    pomdp = POMDP_Wrapper(env=strict_time, lookup_freq=lookup_freq, pe_dim=10, seq_len=201)
+
+    dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(pomdp)])
+    vec_expert = ImitationLearningWrapper(
+        policy=policy_dict[env_tag][0], env=dv1)
+    return dv1, vec_expert
+
+def get_avr_succ_rew(env, learner):
+    success = []
+    rews = []
+    for i in range(100):
+        obs = env.reset()
+        done = False
+        while not done:
+            action, _ = learner.predict(obs)
+            obs, rew, done, info = env.step(action)
+            rews.append(rew)
+            if info[0]['success'] > 0:
+                success.append(info[0]['success'])
+                break
+            if done:
+                success.append(0)
+    return np.array(success), np.array(rews)
+
+def sample_expert_transitions_rollouts(expert, env, num):
+
+    rollouts = rollout(
+        expert,
+        env,
+        make_sample_until(min_timesteps=None, min_episodes=num),
+        exclude_infos=False,
+    )
+    return flatten_trajectories(rollouts), rollouts
+
+def make_pomdp_rollouts(rollouts, lookup_frq, count_dim):
+    inpt = th.zeros([1, rollouts[0].obs.shape[0], count_dim])
+    positional_encoding = PositionalEncoding(d_model=10, dropout=0)
+    pe = positional_encoding.forward(inpt).numpy()
+    for ro in rollouts:
+        for i in range(ro.obs.shape[0]):
+            if i % lookup_frq == 0:
+                obsv = copy.deepcopy(ro.obs[i])
+            else:
+                ro.obs[i] = copy.deepcopy(obsv)
+        ro.obs[:, 20:20+count_dim] = pe
+        if i % lookup_frq == 0:
+            obs = ro
+    return rollouts
+

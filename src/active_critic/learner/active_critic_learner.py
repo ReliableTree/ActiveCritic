@@ -141,7 +141,7 @@ class ActiveCriticLearner(nn.Module):
 
         return loss_critic
 
-    def add_training_data(self, policy=None, episodes = 1):
+    def add_training_data(self, policy=None, episodes = 1, seq_len = None):
         if policy is None:
             policy = self.policy
             policy.eval()
@@ -152,7 +152,8 @@ class ActiveCriticLearner(nn.Module):
             env=self.env,
             extractor=self.network_args.extractor,
             device=self.network_args.device,
-            episodes=episodes)
+            episodes=episodes,
+            seq_len=seq_len)
 
 
         if self.last_trj_training is not None:
@@ -184,14 +185,14 @@ class ActiveCriticLearner(nn.Module):
             rewards=rewards
         )
 
-    def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic):
+    def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic):
         for data in train_loader:
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
             loss_actor = actor_step(device_data, loss_actor)
-            if train_critic:
-                loss_critic = critic_step(device_data, loss_critic)
+            loss_critic = critic_step(device_data, loss_critic)
+
         return loss_actor, loss_critic
 
     def train(self, epochs):
@@ -215,8 +216,10 @@ class ActiveCriticLearner(nn.Module):
 
             max_actor = float('inf')
             max_critic = float('inf')
-            train_critic = True
-            while (max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold):
+            current_patients = self.network_args.patients
+            while ((max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold)) and current_patients > 0:
+                current_patients -= len(self.train_data)
+
                 loss_actor = None
                 loss_critic = None
 
@@ -226,14 +229,11 @@ class ActiveCriticLearner(nn.Module):
                     critic_step=self.critic_step,
                     loss_actor=loss_actor,
                     loss_critic=loss_critic,
-                    train_critic=train_critic
                 )
 
                 max_actor = th.max(loss_actor)
                 if loss_critic is not None:
                     max_critic = th.max(loss_critic)
-                    if max_critic < self.network_args.critic_threshold:
-                        train_critic = False
                     self.scores.update_min_score(
                     self.scores.mean_critic, max_critic)
                 else:
@@ -260,8 +260,10 @@ class ActiveCriticLearner(nn.Module):
 
                 self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
                 self.global_step += len(self.train_data)
-            if epoch == 0:
-                count_parameters(self.policy)
+            if current_patients <= 0:
+                self.policy.critic.init_model()
+                print('reinit critic')
+                self.network_args.patients *= 2
 
 
 
