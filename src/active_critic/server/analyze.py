@@ -99,7 +99,7 @@ def make_acl(device):
     acla.critic_threshold = 1e-2
     acla.num_cpu = 10
     acla.patients = 200000
-    acla.num_sampled_episodes = 20
+    acla.num_sampled_episodes = 400
 
     seq_len = 200
     epsiodes = 1000000
