@@ -2,7 +2,7 @@ import torch as th
 from active_critic.learner.active_critic_learner import ActiveCriticLearner, ACLScores
 from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
-from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env, parse_sampled_transitions, sample_expert_transitions, DummyExtractor, ReductiveExtractor, new_epoch_reach, sample_new_episode
+from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env, parse_sampled_transitions, sample_expert_transitions_rollouts, make_pomdp_rollouts, ReductiveExtractor, new_epoch_reach, sample_new_episode
 from active_critic.utils.pytorch_utils import make_part_obs_data, count_parameters
 from active_critic.utils.dataset import DatasetAC
 from stable_baselines3.common.policies import BasePolicy
@@ -15,6 +15,7 @@ from active_critic.model_src.transformer import (
 from active_critic.policy.active_critic_policy import ActiveCriticPolicySetup, ActiveCriticPolicy
 import argparse
 from prettytable import PrettyTable
+from imitation.data import rollout
 
 from gym import Env
 th.manual_seed(0)
@@ -107,8 +108,28 @@ def make_acl(device):
 
 
 def run_experiment_analyze(device):
+    number_expert_demonstrations = 10
+    lookup_freq = 200
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
-    acl.add_training_data(policy=expert, episodes=10, seq_len=seq_len)
+
+    transitions, rollouts = sample_expert_transitions_rollouts(expert.predict, env, number_expert_demonstrations)
+    pomdp_rollouts = make_pomdp_rollouts(rollouts, lookup_frq=lookup_freq, count_dim=10)
+    pomdp_transitions = rollout.flatten_trajectories(pomdp_rollouts)
+
+
+    datas = parse_sampled_transitions(
+    transitions=pomdp_transitions, seq_len=seq_len, extractor=acl.network_args.extractor, device=device)
+    
+    device_data = []
+    for data in datas:
+        device_data.append(data.to(device))
+    actions, observations, rewards = device_data
+    acl.add_data(
+            actions=actions,
+            observations=observations,
+            rewards=rewards
+        )
+    #acl.add_training_data(policy=expert, episodes=10, seq_len=seq_len)
     #acl.run_validation()
     acl.train(epochs=100000)
 

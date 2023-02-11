@@ -127,16 +127,13 @@ class ResetCounterWrapper(gym.Wrapper):
         self.reset_count = 0
 
     def reset(self):
-        self.reset_count+=1
         return super().reset()
 
     def step(self, action):
         
         obsv, rew, done, info = super().step(action)
-        if info['success']:
-            done = True
-        else:
-            rew = rew - 5
+        if done:
+            self.reset_count += 1
         return obsv, rew, done, info
 
 class StrictSeqLenWrapper(gym.Wrapper):
@@ -293,7 +290,6 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str
         except:
             expected_rewards_after = None
         datas = parse_sampled_transitions(
-            #transitions=transitions, seq_len=seq_len, extractor=policy.args_obj.extractor, device=device)
             transitions=transitions, seq_len=seq_len, extractor=extractor, device=device)
         device_data = []
         for data in datas:
@@ -342,24 +338,25 @@ def make_dummy_vec_env_pomdp(name, seq_len, lookup_freq):
     max_episode_steps = seq_len
     env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
     env._freeze_rand_vec = False
-    reset_env = ResetCounterWrapper(env=env)
-    timelimit = TimeLimit(env=reset_env, max_episode_steps=max_episode_steps)
+    timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
     strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
-    pomdp = POMDP_Wrapper(env=strict_time, lookup_freq=lookup_freq, pe_dim=10, seq_len=201)
+    reset_env = ResetCounterWrapper(env=strict_time)
+
+    pomdp = POMDP_Wrapper(env=reset_env, lookup_freq=lookup_freq, pe_dim=10, seq_len=201)
 
     dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(pomdp)])
     vec_expert = ImitationLearningWrapper(
         policy=policy_dict[env_tag][0], env=dv1)
     return dv1, vec_expert
 
-def get_avr_succ_rew(env, learner):
+def get_avr_succ_rew(env, learner, epsiodes):
     success = []
     rews = []
-    for i in range(100):
+    for i in range(epsiodes):
         obs = env.reset()
         done = False
         while not done:
-            action, _ = learner.predict(obs)
+            action, _ = learner.predict(obs, deterministic=True)
             obs, rew, done, info = env.step(action)
             rews.append(rew)
             if info[0]['success'] > 0:
