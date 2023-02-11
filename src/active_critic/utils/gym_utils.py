@@ -349,7 +349,7 @@ class POMDP_Wrapper(gym.Wrapper):
         
         obsv = np.copy(self.current_obv)
         obsv[20:30] = self.pe[0, self.current_step]
-        if done and info[0]['success'] > 0:
+        if done and info['success'] > 0:
             rew = 10
         else:
             rew = 0
