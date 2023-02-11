@@ -174,6 +174,27 @@ def make_vec_env(env_id, num_cpu, seq_len):
         policy=policy_dict[env_id][0], env=env)
     return env, vec_expert
 
+def make_vec_env_pomdp(env_id, num_cpu, seq_len, lookup_freq):
+    policy_dict = make_policy_dict()
+
+    def make_env(env_id, rank, seed=0):
+        def _init():
+            max_episode_steps = seq_len
+            env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_id][1]]()
+            env._freeze_rand_vec = False
+            reset_env = ResetCounterWrapper(env=env)
+            timelimit = TimeLimit(env=reset_env, max_episode_steps=max_episode_steps)
+            strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+            riw = RolloutInfoWrapper(strict_time)
+            pomdp = POMDP_Wrapper(env=riw, lookup_freq=lookup_freq, pe_dim=10, seq_len=seq_len+1)
+            return pomdp
+        return _init
+        
+    env = SubprocVecEnv([make_env(env_id, i) for i in range(num_cpu)])
+    vec_expert = ImitationLearningWrapper(
+        policy=policy_dict[env_id][0], env=env)
+    return env, vec_expert
+
 def parse_sampled_transitions_legacy(transitions, new_epoch, extractor, seq_len, device='cuda'):
     observations = []
     actions = []
@@ -342,7 +363,7 @@ def make_dummy_vec_env_pomdp(name, seq_len, lookup_freq):
     strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
     reset_env = ResetCounterWrapper(env=strict_time)
 
-    pomdp = POMDP_Wrapper(env=reset_env, lookup_freq=lookup_freq, pe_dim=10, seq_len=201)
+    pomdp = POMDP_Wrapper(env=reset_env, lookup_freq=lookup_freq, pe_dim=10, seq_len=seq_len+1)
 
     dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(pomdp)])
     vec_expert = ImitationLearningWrapper(
@@ -391,3 +412,19 @@ def make_pomdp_rollouts(rollouts, lookup_frq, count_dim):
             obs = ro
     return rollouts
 
+def get_avr_succ_rew_det(env, learner, epsiodes):
+    success = []
+    rews = []
+    for i in range(epsiodes):
+        obs = env.reset()
+        done = False
+        while not done:
+            action, _ = learner.predict(obs, deterministic=True)
+            obs, rew, done, info = env.step(action)
+            rews.append(rew)
+            if info[0]['success'] > 0:
+                success.append(info[0]['success'])
+                break
+            if done:
+                success.append(0)
+    return np.array(success), np.array(rews)

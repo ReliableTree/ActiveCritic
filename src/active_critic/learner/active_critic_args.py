@@ -20,3 +20,5 @@ class ActiveCriticLearnerArgs:
         self.critic_threshold:float = None
         self.num_cpu:int = None
         self.patients: int = None
+        self.num_imitation: int = None
+        self.num_sampled_episodes: int = None

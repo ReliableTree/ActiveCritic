@@ -414,7 +414,7 @@ class TQCPolicyEval(BasePolicy):
         self._build(lr_schedule)
 
     def evaluate_actions(self, obs: th.Tensor, actions: th.Tensor) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
-        actions = th.clamp(actions, th.tensor(self.action_space.low), th.tensor(self.action_space.high))
+        actions = th.clamp(actions, th.tensor(self.action_space.low, device=actions.device), th.tensor(self.action_space.high, device=actions.device))
         return self.actor.evaluate_actions(obs=obs, actions=actions)
 
     def _build(self, lr_schedule: Schedule) -> None:

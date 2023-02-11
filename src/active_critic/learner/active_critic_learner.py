@@ -198,6 +198,7 @@ class ActiveCriticLearner(nn.Module):
     def train(self, epochs):
         next_val = self.network_args.val_every
         next_add = 0
+
         for epoch in range(epochs):
             if epoch >= next_val:
                 next_val = epoch + self.network_args.val_every
@@ -206,6 +207,8 @@ class ActiveCriticLearner(nn.Module):
                     self.policy.eval()
                     self.run_validation(optimize=True)
                     self.run_validation(optimize=False)
+                    if (self.network_args.num_sampled_episodes <= int(len(self.train_data) - self.network_args.num_imitation)) and (not self.network_args.imitation_phase):
+                        return None
 
 
             if (not self.network_args.imitation_phase) and (epoch >= next_add):
@@ -269,7 +272,7 @@ class ActiveCriticLearner(nn.Module):
 
     def write_tboard_scalar(self, debug_dict, train, step=None):
         if step is None:
-            step = int(len(self.train_data))
+            step = int(len(self.train_data) - self.network_args.num_imitation)
 
         if self.network_args.tboard:
             for para, value in debug_dict.items():
@@ -303,7 +306,7 @@ class ActiveCriticLearner(nn.Module):
             if self.last_trj is not None:
                 self.compare_expecations(self.last_trj, 'Validation')
         else:
-            fix = ' non optimize'
+            fix = ''
             
         pre_opt = self.policy.args_obj.optimize
         self.policy.args_obj.optimize = optimize
