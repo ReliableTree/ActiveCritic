@@ -91,8 +91,8 @@ def make_acl(device):
     number = 10
     acla.val_every = 200
     acla.add_data_every = 200
-    acla.validation_episodes = 50 #(*4)
-    acla.validation_rep = 4
+    acla.validation_episodes = 25 #(*8)
+    acla.validation_rep = 8
     acla.training_epsiodes = 10
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2

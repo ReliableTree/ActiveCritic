@@ -36,6 +36,8 @@ from stable_baselines3.ppo import MlpPolicy
 from active_critic.utils.tboard_graphs import TBoardGraphs
 from active_critic.model_src.transformer import PositionalEncoding
 import os.path
+from imitation.algorithms.adversarial.gail import GAIL
+
 
 import copy
 
@@ -112,7 +114,7 @@ def run_eval_TQC(device, lr, demonstrations, seq_len):
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=1000)
     tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env, device=device, learning_rate=lr)
     logname = 'TQC ' + f'lr: {lr} demonstrations: {demonstrations} seq_len: {seq_len}'
-    bc_logname = 'TQC ' + f'demonstrations: {demonstrations}'
+    bc_logname = 'TQC ' + f'demonstrations: {demonstrations} seq_len: {seq_len}'
     evaluate_learner(env_tag, logname=logname, save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=demonstrations, bc_epochs=400, n_samples=400, device=device, learner=tqc_learner, bc_logname=bc_logname)
     
 
@@ -121,7 +123,7 @@ def run_eval_PPO(device, lr, demonstrations, seq_len):
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=1000)
     PPO_learner = PPO("MlpPolicy", pomdp_env, verbose=0, device=device, learning_rate=lr)
     logname = 'PPO ' + f'lr: {lr} demonstrations: {demonstrations} seq_len: {seq_len}'
-    bc_logname = 'PPO ' + f'demonstrations: {demonstrations}'
+    bc_logname = 'PPO ' + f'demonstrations: {demonstrations} seq_len: {seq_len}'
     evaluate_learner(env_tag, logname=logname, save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=demonstrations, bc_epochs=400, n_samples=400, device=device, learner=PPO_learner, bc_logname=bc_logname)
     
 def run_eval_BC(device):
@@ -152,6 +154,139 @@ def run_tune_PPO(device):
                 run_eval_PPO(device=device, lr=lr, demonstrations=demonstrations, seq_len=seq_len)
         lr = lr * 0.6
 
+
+def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learner, pomdp_env, save_path, bc_epochs, bc_logname, device):
+    lookup_freq = 1000
+    env, vec_expert = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
+    val_env, _ = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
+    transitions, rollouts = sample_expert_transitions_rollouts(vec_expert.predict, val_env, n_demonstrations)
+
+    pomdp_rollouts = make_pomdp_rollouts(rollouts, lookup_frq=lookup_freq, count_dim=10)
+    pomdp_transitions = rollout.flatten_trajectories(pomdp_rollouts)
+
+    pomdp_env_val, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
+    if (not os.path.isfile(save_path + bc_logname + ' BC best')):
+        print('BC')
+        bc_learner = bc.BC(
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            demonstrations=pomdp_transitions,
+            device=device,
+            policy=learner.policy)
+        
+        tboard = TBoardGraphs(logname=logname + ' BC' , data_path='/data/bing/hendrik/gboard/')
+        best_succes_rate = -1
+        best_model = None
+        runs_per_epoch = 20
+        for i in range(bc_epochs):
+            bc_learner.train(n_epochs=runs_per_epoch)
+            success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=bc_learner.policy, epsiodes=200)
+            success_rate = success.mean()
+            tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=i)
+            tboard.addValidationScalar('Success Rate', value=th.tensor(success_rate), stepid=i)
+            if success_rate > best_succes_rate:
+                best_succes_rate = success_rate
+                th.save(bc_learner.policy.state_dict(), save_path + bc_logname + ' BC best')
+                print(save_path + logname + ' BC best')
+    else:
+        print('skipping BC')
+
+    reward_net = BasicRewardNet(
+        pomdp_env.observation_space, pomdp_env.action_space, normalize_input_layer=RunningNorm
+    )
+
+    learner.policy.load_state_dict(th.load(save_path + bc_logname + ' BC best'))
+
+    gail_trainer = GAIL(
+        demonstrations=pomdp_transitions,
+        demo_batch_size=min(1024, len(transitions)),
+        gen_replay_buffer_capacity=2048,
+        n_disc_updates_per_round=4,
+        venv=pomdp_env,
+        gen_algo=learner,
+        reward_net=reward_net,
+    ) 
+
+    tboard = TBoardGraphs(logname=logname , data_path=save_path)
+    success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=200)
+    success_rate = success.mean()
+    tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=min(learner.env.envs[0].reset_count, n_samples))
+    tboard.addValidationScalar('Success Rate', value=th.tensor(success_rate), stepid=min(learner.env.envs[0].reset_count, n_samples))
+
+    while learner.env.envs[0].reset_count <= n_samples:
+        print(f'nsamples: {n_samples}')
+        print(f'learner.env.envs[0].reset_count')
+        print('before learn')
+        gail_trainer.train(5000)
+        print('after learn')
+        print(learner.env.envs[0].reset_count)
+        success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=200)
+        success_rate = success.mean()
+        tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=min(learner.env.envs[0].reset_count, n_samples))
+        tboard.addValidationScalar('Success Rate', value=th.tensor(success_rate), stepid=min(learner.env.envs[0].reset_count, n_samples))
+
+def evaluate_GAIL_PPO(device):
+    env_tag = 'pickplace'
+    lookup_freq = 1000
+    lr = 1e-3
+    seq_lens = [50, 100, 200]
+    for i in range(5):
+        for seq_len in seq_lens:
+            demonstrations = 6
+            for j in range(4):
+                demonstrations += 2
+                pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
+                learner = PPO(
+                        env=pomdp_env,
+                        policy=MlpPolicy,
+                        batch_size=64,
+                        ent_coef=0.0,
+                        learning_rate=lr,
+                        n_epochs=10,
+                        device=device
+                    )
+                logname = f'GAIL + PPO lr: {lr}, Demonstrations: {demonstrations}, seq_len: {seq_len}'
+                bc_logname = f'GAIL + PPO Demonstrations: {demonstrations}, seq_len: {seq_len}'
+                evaluate_GAIL(
+                    env_tag=env_tag, 
+                    logname=logname, 
+                    seq_len=seq_len, 
+                    demonstrations=demonstrations, 
+                    n_samples = 400, 
+                    learner = learner, 
+                    pomdp_env = pomdp_env, 
+                    save_path='/data/bing/hendrik/Evaluate Baseline/',
+                    bc_epochs = 400,
+                    bc_logname = bc_logname)
+        lr = lr * 0.6
+
+def evaluate_GAIL_TQC(device):
+    env_tag = 'pickplace'
+    lookup_freq = 1000
+    lr = 1e-3
+    seq_lens = [50, 100, 200]
+    for i in range(5):
+        for seq_len in seq_lens:
+            demonstrations = 6
+            for j in range(4):
+                demonstrations += 2
+                pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
+                learner = TQC(policy='MlpPolicy', env=pomdp_env, device=device, learning_rate=lr)
+                logname = f'GAIL + TQC lr: {lr}, Demonstrations: {demonstrations}, seq_len: {seq_len}'
+                bc_logname = f'GAIL + TQC Demonstrations: {demonstrations}, seq_len: {seq_len}'
+                evaluate_GAIL(
+                    env_tag=env_tag, 
+                    logname=logname, 
+                    seq_len=seq_len, 
+                    demonstrations=demonstrations, 
+                    n_samples = 400, 
+                    learner = learner, 
+                    pomdp_env = pomdp_env, 
+                    save_path='/data/bing/hendrik/Evaluate Baseline/',
+                    bc_epochs = 400,
+                    bc_logname = bc_logname)
+        lr = lr * 0.6
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
@@ -175,5 +310,9 @@ if __name__ == '__main__':
     elif args.learner == 'TQC_f':
         print('running BC')
         run_tune_TQC(device=args.device)
+    elif args.learner == 'GAIL_TQC':
+        evaluate_GAIL_TQC(device=args.device)
+    elif args.learner == 'GAIL_PPO':
+        evaluate_GAIL_PPO(device=args.device)
     else:
         print('choose other algo')
