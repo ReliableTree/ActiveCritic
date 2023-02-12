@@ -102,25 +102,37 @@ def evaluate_learner(env_tag, logname, save_path, seq_len, n_demonstrations, bc_
             tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=learner.env.envs[0].reset_count)
             tboard.addValidationScalar('Success Rate', value=th.tensor(success_rate), stepid=learner.env.envs[0].reset_count)
 
-def run_eval_TQC(device):
+def run_eval_TQC(device, lr=1e-3, postfix = ''):
     env_tag = 'pickplace'
     seq_len = 200
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=1000)
-    tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env, device=device)
-    evaluate_learner(env_tag, 'TQC 10', save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=10, bc_epochs=400, n_samples=400, device=device, learner=tqc_learner)
+    tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env, device=device, learning_rate=lr)
+    evaluate_learner(env_tag, logname='TQC 10 ' + postfix, save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=10, bc_epochs=400, n_samples=400, device=device, learner=tqc_learner)
 
-def run_eval_PPO(device):
+def run_eval_PPO(device, lr, postfix = ''):
     env_tag = 'pickplace'
     seq_len = 200
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=1000)
-    PPO_learner = PPO("MlpPolicy", pomdp_env, verbose=0, device=device)
-    evaluate_learner(env_tag, 'PPO 10', save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=10, bc_epochs=400, n_samples=400, device=device, learner=PPO_learner)
+    PPO_learner = PPO("MlpPolicy", pomdp_env, verbose=0, device=device, learning_rate=lr)
+    evaluate_learner(env_tag, logname='PPO 10 '+postfix, save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=10, bc_epochs=400, n_samples=400, device=device, learner=PPO_learner)
 
 def run_eval_BC(device):
     env_tag = 'pickplace'
     seq_len = 200
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=1000)
     evaluate_learner(env_tag, 'BC 10', save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=10, bc_epochs=400, n_samples=400, device=device)
+
+def run_lr_tune_TQC(device):
+    lr = 1e-3
+    for i in range(10):
+        run_eval_TQC(device=device, lr=lr, postfix=str(lr))
+        lr = lr * 0.6
+
+def run_lr_tune_PPO(device):
+    lr = 1e-3
+    for i in range(10):
+        run_eval_PPO(device=device, lr=lr, postfix=str(lr))
+        lr = lr * 0.6
 
 if __name__ == '__main__':
     import argparse
@@ -139,5 +151,11 @@ if __name__ == '__main__':
     elif args.learner == 'BC':
         print('running BC')
         run_eval_BC(device=args.device)
+    elif args.learner == 'PPO_f':
+        print('running BC')
+        run_lr_tune_PPO(device=args.device)
+    elif args.learner == 'TQC_f':
+        print('running BC')
+        run_lr_tune_TQC(device=args.device)
     else:
         print('choose other algo')
