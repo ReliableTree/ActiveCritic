@@ -251,13 +251,14 @@ def evaluate_GAIL_PPO(device):
                     env_tag=env_tag, 
                     logname=logname, 
                     seq_len=seq_len, 
-                    demonstrations=demonstrations, 
+                    n_demonstrations=demonstrations, 
                     n_samples = 400, 
                     learner = learner, 
                     pomdp_env = pomdp_env, 
                     save_path='/data/bing/hendrik/Evaluate Baseline/',
                     bc_epochs = 400,
-                    bc_logname = bc_logname)
+                    bc_logname = bc_logname,
+                    device=device)
         lr = lr * 0.6
 
 def evaluate_GAIL_TQC(device):
@@ -278,13 +279,14 @@ def evaluate_GAIL_TQC(device):
                     env_tag=env_tag, 
                     logname=logname, 
                     seq_len=seq_len, 
-                    demonstrations=demonstrations, 
+                    n_demonstrations=demonstrations, 
                     n_samples = 400, 
                     learner = learner, 
                     pomdp_env = pomdp_env, 
                     save_path='/data/bing/hendrik/Evaluate Baseline/',
                     bc_epochs = 400,
-                    bc_logname = bc_logname)
+                    bc_logname = bc_logname,
+                    device=device)
         lr = lr * 0.6
 
 if __name__ == '__main__':
