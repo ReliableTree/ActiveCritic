@@ -157,7 +157,6 @@ class ActiveCriticLearner(nn.Module):
             episodes=episodes,
             seq_len=seq_len)
 
-
         if self.last_trj_training is not None:
             self.compare_expecations(self.last_trj_training, 'Training')
         self.last_trj_training = [

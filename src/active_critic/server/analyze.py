@@ -61,7 +61,6 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
 
 
 def setup_ac(seq_len, num_cpu, device, tag):
-    seq_len = seq_len
     env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
     wsm_actor_setup = make_wsm_setup(
@@ -77,7 +76,7 @@ def setup_ac(seq_len, num_cpu, device, tag):
     return ac, acps, env, expert
 
 
-def make_acl(device):
+def make_acl(device, logname,  seq_len = 200):
     device = device
     acla = ActiveCriticLearnerArgs()
     acla.data_path = '/data/bing/hendrik/EvalAC'
@@ -85,21 +84,20 @@ def make_acl(device):
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' 10 Exp 400 Int'
+    acla.logname = tag + logname
     acla.tboard = True
     acla.batch_size = 16
     number = 10
     acla.val_every = 200
     acla.add_data_every = 200
-    acla.validation_episodes = 25 #(*8)
+    acla.validation_episodes = 1 #(*8)
     acla.validation_rep = 8
     acla.training_epsiodes = 10
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
-    acla.num_cpu = 50
+    acla.num_cpu = 1
     acla.patients = 200000
 
-    seq_len = 200
     epsiodes = 30
     ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, tag=tag)
     eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len)
@@ -109,9 +107,21 @@ def make_acl(device):
 
 def run_experiment_analyze(device):
     acl, env, expert, seq_len, epsiodes, device = make_acl(device)
-    acl.add_training_data(policy=expert, episodes=10, seq_len=seq_len)
+    acl.add_training_data(policy=expert, episodes=100, seq_len=seq_len)
     #acl.run_validation()
     acl.train(epochs=100000)
+
+def run_eval(device):
+    seq_lens = [100, 150, 200]
+    demonstrations = [8, 10, 12, 14]
+    for seq_len in seq_lens:
+        for demos in demonstrations:
+            logname = f'seq_len: {seq_len}, demonstrations: {demos}'
+            acl, env, expert, seq_len, epsiodes, device = make_acl(device, seq_len=seq_len, logname=logname)
+            acl.add_training_data(policy=expert, episodes=demos, seq_len=seq_len)
+            acl.train(epochs=100000)
+
+
 
 if __name__ == '__main__':
     run_experiment_analyze(device='cuda')
