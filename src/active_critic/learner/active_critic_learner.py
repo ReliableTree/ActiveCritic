@@ -80,6 +80,8 @@ class ActiveCriticLearner(nn.Module):
         if network_args_obj.tboard:
             self.tboard = TBoardGraphs(
                 self.logname, data_path=network_args_obj.data_path)
+            self.tboard_opt = TBoardGraphs(
+                self.logname + ' optimized', data_path=network_args_obj.data_path)
         self.global_step = 0
 
         self.train_data = DatasetAC(device='cpu')
@@ -267,7 +269,7 @@ class ActiveCriticLearner(nn.Module):
 
 
 
-    def write_tboard_scalar(self, debug_dict, train, step=None):
+    def write_tboard_scalar(self, debug_dict, train, step=None, optimize=True):
         if step is None:
             step = int(len(self.train_data))
 
@@ -275,9 +277,15 @@ class ActiveCriticLearner(nn.Module):
             for para, value in debug_dict.items():
                 value = value.detach().to('cpu')
                 if train:
-                    self.tboard.addTrainScalar(para, value, step)
+                    if optimize:
+                        self.tboard_opt.addTrainScalar(para, value, step)
+                    else:
+                        self.tboard.addTrainScalar(para, value, step)
                 else:
-                    self.tboard.addValidationScalar(para, value, step)
+                    if optimize:
+                        self.tboard_opt.addValidationScalar(para, value, step)
+                    else:
+                        self.tboard.addValidationScalar(para, value, step)
 
     def compare_expecations(self, trj, post_fix):
         last_obsv = trj[0]
@@ -303,65 +311,72 @@ class ActiveCriticLearner(nn.Module):
             if self.last_trj is not None:
                 self.compare_expecations(self.last_trj, 'Validation')
         else:
-            fix = ' non optimize'
+            fix = ''
             
         pre_opt = self.policy.args_obj.optimize
         self.policy.args_obj.optimize = optimize
 
         h = time.perf_counter()
-        opt_actions, gen_actions, observations, rewards, expected_rewards_before, expected_rewards_after = sample_new_episode(
-            policy=self.policy,
-            env=self.eval_env,
-            extractor=self.network_args.extractor,
-            device=self.network_args.device,
-            episodes=self.network_args.validation_episodes,
-            return_gen_trj=True)
+        rewards_cumm = None
+        for i in range(self.network_args.validation_rep):
+            opt_actions, gen_actions, observations, rewards_run, expected_rewards_before, expected_rewards_after = sample_new_episode(
+                policy=self.policy,
+                env=self.eval_env,
+                extractor=self.network_args.extractor,
+                device=self.network_args.device,
+                episodes=self.network_args.validation_episodes,
+                return_gen_trj=True)
+            if rewards_cumm is None:
+                rewards_cumm = rewards_run
+            else:
+                rewards_cumm = th.cat((rewards_cumm, rewards_run))
         if optimize:
             self.last_trj = [
                 observations[:1],
                 opt_actions[:1],
-                rewards[:1],
+                rewards_run[:1],
                 expected_rewards_after[:1]
             ]
         debug_dict = {
             'Validation epoch time '+fix : th.tensor(time.perf_counter() - h)
         }
-        self.write_tboard_scalar(debug_dict=debug_dict, train=False)
+        self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize)
 
         for i in range(min(opt_actions.shape[0], 4)):
             self.createGraphs([gen_actions[i], opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i) + fix)
-            labels = self.make_critic_score(rewards=rewards)
+            labels = self.make_critic_score(rewards=rewards_run)
             self.createGraphs([labels[i].reshape([-1, 1]), self.policy.history.opt_scores[0][i].reshape([-1, 1]), self.policy.history.gen_scores[0][i].reshape([-1, 1])], 
                                 ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i) + fix)
 
-        last_reward, _ = rewards.max(dim=1)
+        last_sparse_reward, _ = rewards_run.max(dim=1)
+        sparse_reward, _ = rewards_cumm.max(dim=1)
 
         best_model = self.scores.update_max_score(
-            self.scores.mean_reward, last_reward.mean())
+            self.scores.mean_reward, sparse_reward.mean())
         if best_model:
             self.saveNetworkToFile(add='best_validation', data_path=os.path.join(
                 self.network_args.data_path, self.logname))
         last_expected_rewards_before, _ = expected_rewards_before.max(dim=1)
         last_expected_reward_after, _ = expected_rewards_after.max(dim=1)
         self.analyze_critic_scores(
-            last_reward, last_expected_rewards_before,  fix)
+            last_sparse_reward, last_expected_rewards_before,  fix)
         self.analyze_critic_scores(
-            last_reward, last_expected_reward_after, ' optimized'+ fix)
-        success = (last_reward == 1)
+            last_sparse_reward, last_expected_reward_after, ' optimized'+ fix)
+        success = (sparse_reward == 1)
         success = success.type(th.float)
         debug_dict = {
-            'Success Rate' + fix: success.mean(),
-            'Reward' + fix: last_reward.mean(),
-            'Training Epochs' + fix: th.tensor(int(len(self.train_data)/self.policy.args_obj.epoch_len))
+            'Success Rate': success.mean(),
+            'Reward': sparse_reward.mean(),
+            'Training Epochs': th.tensor(int(len(self.train_data)/self.policy.args_obj.epoch_len))
         }
         print(f'Success Rate: {success.mean()}' + fix)
-        print(f'Reward: {last_reward.mean()}' + fix)
+        print(f'Reward: {sparse_reward.mean()}' + fix)
         print(
             f'training samples: {int(len(self.train_data))}' + fix)
         if self.network_args.imitation_phase:
-            self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=self.global_step)
+            self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=self.global_step, optimize=optimize)
         else:
-            self.write_tboard_scalar(debug_dict=debug_dict, train=False)
+            self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize)
         self.policy.args_obj.optimize = pre_opt
 
 

@@ -80,20 +80,21 @@ def setup_ac(seq_len, num_cpu, device, tag):
 def make_acl(device):
     device = device
     acla = ActiveCriticLearnerArgs()
-    acla.data_path = '/data/bing/hendrik/'
+    acla.data_path = '/data/bing/hendrik/EvalAC'
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
-    acla.logname = tag + ' reinit sparse tight'
+    acla.logname = tag + ' 10 Exp 400 Int'
     acla.tboard = True
     acla.batch_size = 16
     number = 10
     acla.val_every = 200
     acla.add_data_every = 200
-    acla.validation_episodes = 200
+    acla.validation_episodes = 50 #(*4)
+    acla.validation_rep = 4
     acla.training_epsiodes = 10
-    acla.actor_threshold = 1e-3
+    acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
     acla.num_cpu = 50
     acla.patients = 200000
