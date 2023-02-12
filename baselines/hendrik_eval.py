@@ -35,13 +35,14 @@ from imitation.rewards.reward_nets import BasicRewardNet
 from stable_baselines3.ppo import MlpPolicy
 from active_critic.utils.tboard_graphs import TBoardGraphs
 from active_critic.model_src.transformer import PositionalEncoding
+import os.path
 
 import copy
 
 from active_critic.TQC.tqc import TQC
 from active_critic.TQC.tqc_policy import TQCPolicyEval
 
-def evaluate_learner(env_tag, logname, save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, learner:TQC=None):
+def evaluate_learner(env_tag, logname, save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, bc_logname, learner:TQC=None):
     lookup_freq = 1000
     env, vec_expert = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
     val_env, _ = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
@@ -65,32 +66,36 @@ def evaluate_learner(env_tag, logname, save_path, seq_len, n_demonstrations, bc_
             policy=learner.policy)
 
     pomdp_env_val, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
+    if (not os.path.isfile(save_path + bc_logname + ' BC best')):
+        tboard = TBoardGraphs(logname=logname + ' BC' , data_path='/data/bing/hendrik/gboard/')
+        best_succes_rate = -1
+        best_model = None
+        runs_per_epoch = 20
+        for i in range(bc_epochs):
+            bc_learner.train(n_epochs=runs_per_epoch)
+            success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=bc_learner.policy, epsiodes=200)
+            success_rate = success.mean()
+            tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=i)
+            tboard.addValidationScalar('Success Rate', value=th.tensor(success_rate), stepid=i)
+            if success_rate > best_succes_rate:
+                best_succes_rate = success_rate
+                th.save(bc_learner.policy.state_dict(), save_path + bc_logname + ' BC best')
+                print(save_path + logname + ' BC best')
+    else:
+        print('skipping BC')
 
-    tboard = TBoardGraphs(logname=logname + ' BC' , data_path='/data/bing/hendrik/gboard/')
-    best_succes_rate = -1
-    best_model = None
-    runs_per_epoch = 20
-    for i in range(bc_epochs):
-        bc_learner.train(n_epochs=runs_per_epoch)
-        success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=bc_learner.policy, epsiodes=200)
-        success_rate = success.mean()
-        tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=i)
-        tboard.addValidationScalar('Success Rate', value=th.tensor(success_rate), stepid=i)
-        if success_rate > best_succes_rate:
-            best_succes_rate = success_rate
-            th.save(bc_learner.policy.state_dict(), save_path + logname + ' BC best')
-            print(save_path + logname + ' BC best')
-    
     if learner is not None:
 
         tboard = TBoardGraphs(logname=logname + str(' Reinforcement') , data_path='/data/bing/hendrik/gboard/')
-        learner.policy.load_state_dict(th.load(save_path + logname + ' BC best'))
+        learner.policy.load_state_dict(th.load(save_path + bc_logname + ' BC best'))
+
+
         success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=200)
         tboard.addValidationScalar('Reloaded Success Rate', value=th.tensor(success.mean()), stepid=0)
         tboard.addValidationScalar('Reloaded Reward', value=th.tensor(rews.mean()), stepid=0)
 
         tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=learner.env.envs[0].reset_count)
-        tboard.addValidationScalar('Success Rate', value=th.tensor(success_rate), stepid=learner.env.envs[0].reset_count)
+        tboard.addValidationScalar('Success Rate', value=th.tensor(success.mean()), stepid=learner.env.envs[0].reset_count)
 
         while learner.env.envs[0].reset_count <= n_samples:
             print('before learn')
@@ -102,36 +107,49 @@ def evaluate_learner(env_tag, logname, save_path, seq_len, n_demonstrations, bc_
             tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=learner.env.envs[0].reset_count)
             tboard.addValidationScalar('Success Rate', value=th.tensor(success_rate), stepid=learner.env.envs[0].reset_count)
 
-def run_eval_TQC(device, lr=1e-3, postfix = ''):
+def run_eval_TQC(device, lr, demonstrations, seq_len):
     env_tag = 'pickplace'
-    seq_len = 200
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=1000)
     tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env, device=device, learning_rate=lr)
-    evaluate_learner(env_tag, logname='TQC 10 ' + postfix, save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=10, bc_epochs=400, n_samples=400, device=device, learner=tqc_learner)
+    logname = 'TQC ' + f'lr: {lr} demonstrations: {demonstrations} seq_len: {seq_len}'
+    bc_logname = 'TQC ' + f'demonstrations: {demonstrations}'
+    evaluate_learner(env_tag, logname=logname, save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=demonstrations, bc_epochs=400, n_samples=400, device=device, learner=tqc_learner, bc_logname=bc_logname)
+    
 
-def run_eval_PPO(device, lr, postfix = ''):
+def run_eval_PPO(device, lr, demonstrations, seq_len):
     env_tag = 'pickplace'
-    seq_len = 200
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=1000)
     PPO_learner = PPO("MlpPolicy", pomdp_env, verbose=0, device=device, learning_rate=lr)
-    evaluate_learner(env_tag, logname='PPO 10 '+postfix, save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=10, bc_epochs=400, n_samples=400, device=device, learner=PPO_learner)
-
+    logname = 'PPO ' + f'lr: {lr} demonstrations: {demonstrations} seq_len: {seq_len}'
+    bc_logname = 'PPO ' + f'demonstrations: {demonstrations}'
+    evaluate_learner(env_tag, logname=logname, save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=demonstrations, bc_epochs=400, n_samples=400, device=device, learner=PPO_learner, bc_logname=bc_logname)
+    
 def run_eval_BC(device):
     env_tag = 'pickplace'
     seq_len = 200
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=1000)
     evaluate_learner(env_tag, 'BC 10', save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=10, bc_epochs=400, n_samples=400, device=device)
 
-def run_lr_tune_TQC(device):
+def run_tune_TQC(device):
     lr = 1e-3
-    for i in range(10):
-        run_eval_TQC(device=device, lr=lr, postfix=str(lr))
+    seq_lens = [50, 100, 200]
+    for i in range(5):
+        for seq_len in seq_lens:
+            demonstrations = 6
+            for j in range(4):
+                demonstrations += 2
+                run_eval_TQC(device=device, lr=lr, demonstrations=demonstrations, seq_len=seq_len)
         lr = lr * 0.6
 
-def run_lr_tune_PPO(device):
+def run_tune_PPO(device):
     lr = 1e-3
-    for i in range(10):
-        run_eval_PPO(device=device, lr=lr, postfix=str(lr))
+    seq_lens = [50, 100, 200]
+    for i in range(5):
+        for seq_len in seq_lens:
+            demonstrations = 6
+            for j in range(4):
+                demonstrations += 2
+                run_eval_PPO(device=device, lr=lr, demonstrations=demonstrations, seq_len=seq_len)
         lr = lr * 0.6
 
 if __name__ == '__main__':
@@ -153,9 +171,9 @@ if __name__ == '__main__':
         run_eval_BC(device=args.device)
     elif args.learner == 'PPO_f':
         print('running BC')
-        run_lr_tune_PPO(device=args.device)
+        run_tune_PPO(device=args.device)
     elif args.learner == 'TQC_f':
         print('running BC')
-        run_lr_tune_TQC(device=args.device)
+        run_tune_TQC(device=args.device)
     else:
         print('choose other algo')
