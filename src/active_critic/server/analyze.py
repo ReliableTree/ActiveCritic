@@ -2,7 +2,7 @@ import torch as th
 from active_critic.learner.active_critic_learner import ActiveCriticLearner, ACLScores
 from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
-from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env, parse_sampled_transitions, sample_expert_transitions, DummyExtractor, ReductiveExtractor, new_epoch_reach, sample_new_episode
+from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env, parse_sampled_transitions, sample_expert_transitions, DummyExtractor, new_epoch_reach, sample_new_episode
 from active_critic.utils.pytorch_utils import make_part_obs_data, count_parameters
 from active_critic.utils.dataset import DatasetAC
 from stable_baselines3.common.policies import BasePolicy
@@ -69,7 +69,7 @@ def setup_ac(seq_len, num_cpu, device, tag):
     wsm_critic_setup = make_wsm_setup(
         seq_len=seq_len, d_output=1, device=device)
     acps = make_acps(
-        seq_len=seq_len, extractor=ReductiveExtractor(), new_epoch=new_epoch_reach, device=device)
+        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
     actor = WholeSequenceModel(wsm_actor_setup)
     critic = CriticSequenceModel(wsm_critic_setup)
     ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
@@ -82,7 +82,7 @@ def make_acl(device):
     acla = ActiveCriticLearnerArgs()
     acla.data_path = '/data/bing/hendrik/'
     acla.device = device
-    acla.extractor = ReductiveExtractor()
+    acla.extractor = DummyExtractor()
     acla.imitation_phase = False
     tag = 'pickplace'
     acla.logname = tag + ' reinit sparse'
