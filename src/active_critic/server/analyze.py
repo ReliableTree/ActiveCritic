@@ -76,7 +76,7 @@ def setup_ac(seq_len, num_cpu, device, tag):
     return ac, acps, env, expert
 
 
-def make_acl(device, logname,  seq_len , imitation_phase, total_training_epsiodes, training_episodes):
+def make_acl(device, logname,  seq_len , imitation_phase, total_training_epsiodes, training_episodes, min_critic_threshold):
     device = device
     acla = ActiveCriticLearnerArgs()
     acla.data_path = '/data/bing/hendrik/EvalAC_Fast'
@@ -88,13 +88,14 @@ def make_acl(device, logname,  seq_len , imitation_phase, total_training_epsiode
     acla.tboard = True
     acla.batch_size = 16
     number = 10
-    acla.val_every = 1000
+    acla.val_every = int(1000 / training_episodes)
     acla.add_data_every = 100
     acla.validation_episodes = 25 #(*8)
     acla.validation_rep = 8
     acla.training_epsiodes = training_episodes
     acla.actor_threshold = 1e-2
     acla.critic_threshold = 1e-2
+    acla.min_critic_threshold = min_critic_threshold
     acla.num_cpu = 25
     acla.patients = 40000
     acla.total_training_epsiodes = total_training_epsiodes
@@ -121,26 +122,29 @@ def run_eval(device):
     seq_lens = [100, 200]
     demonstrations = [14,16,18]
     training_episodes_list = [1, 10]
+    min_critic_thresholds = [1e-4, 5e-5]
     for seq_len in seq_lens:
         for demos in demonstrations:
-            for training_episodes in training_episodes_list:
-                for imitation_phase in imitation_phases:
-                    if imitation_phase:
-                        total_training_epsiodes = 50
-                        logname = f'seq_len: {seq_len}, demonstrations: {demos}, training_episodes: {training_episodes} BC'
-                    else:
-                        total_training_epsiodes = 200
-                        logname = f'seq_len: {seq_len}, demonstrations: {demos}, training_episodes: {training_episodes}'
+            for min_critic_threshold in min_critic_thresholds:
+                for training_episodes in training_episodes_list:
+                    for imitation_phase in imitation_phases:
+                        if imitation_phase:
+                            total_training_epsiodes = 50
+                            logname = f'seq_len: {seq_len}, demonstrations: {demos}, training_episodes: {training_episodes}, min critic: {min_critic_threshold} BC'
+                        else:
+                            total_training_epsiodes = 200
+                            logname = f'seq_len: {seq_len}, demonstrations: {demos}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}'
 
-                    acl, env, expert, seq_len, epsiodes, device = make_acl(
-                        device, seq_len=seq_len, 
-                        logname=logname, 
-                        imitation_phase=imitation_phase, 
-                        total_training_epsiodes=total_training_epsiodes,
-                        training_episodes=training_episodes)
-                    acl.network_args.num_expert_demos = demos
-                    acl.add_training_data(policy=expert, episodes=demos, seq_len=seq_len)
-                    acl.train(epochs=100000)
+                        acl, env, expert, seq_len, epsiodes, device = make_acl(
+                            device, seq_len=seq_len, 
+                            logname=logname, 
+                            imitation_phase=imitation_phase, 
+                            total_training_epsiodes=total_training_epsiodes,
+                            training_episodes=training_episodes,
+                            min_critic_threshold=min_critic_threshold)
+                        acl.network_args.num_expert_demos = demos
+                        acl.add_training_data(policy=expert, episodes=demos, seq_len=seq_len)
+                        acl.train(epochs=100000)
 
 
 if __name__ == '__main__':

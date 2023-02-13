@@ -18,6 +18,7 @@ class ActiveCriticLearnerArgs:
         self.add_data_every:int = None
         self.actor_threshold:float = None
         self.critic_threshold:float = None
+        self.min_critic_threshold:float = None
         self.num_cpu:int = None
         self.patients: int = None
         self.validation_rep:int = None

@@ -219,6 +219,8 @@ class ActiveCriticLearner(nn.Module):
                     self.policy.eval()
                     self.run_validation(optimize=True)
                     self.run_validation(optimize=False)
+                    print(f'self.get_num_training_samples(): {self.get_num_training_samples()}')
+                    print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
                     if self.get_num_training_samples()>= self.network_args.total_training_epsiodes:
                         return None
 
@@ -226,8 +228,11 @@ class ActiveCriticLearner(nn.Module):
             if (not self.network_args.imitation_phase) and (epoch >= next_add):
                 next_add += self.network_args.add_data_every
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
-            else:
+            if (self.network_args.imitation_phase) and (epoch >= next_add):
+                next_add += self.network_args.add_data_every
                 self.network_args.total_training_epsiodes -= self.network_args.training_epsiodes
+                print(f'training now: {self.network_args.training_epsiodes}')
+                print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
 
             self.policy.train()
 
@@ -254,7 +259,7 @@ class ActiveCriticLearner(nn.Module):
                     max_critic = th.max(loss_critic)
                     self.scores.update_min_score(
                     self.scores.mean_critic, max_critic)
-                    self.train_critic = (max_critic>0.1*self.network_args.critic_threshold)
+                    self.train_critic = (max_critic>self.network_args.min_critic_threshold)
                 else:
                     max_critic = None
 
