@@ -79,7 +79,7 @@ def setup_ac(seq_len, num_cpu, device, tag):
 def make_acl(device, logname,  seq_len = 200):
     device = device
     acla = ActiveCriticLearnerArgs()
-    acla.data_path = '/data/bing/hendrik/EvalAC'
+    acla.data_path = '/data/bing/hendrik/EvalAC_Fast'
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
@@ -117,8 +117,8 @@ def run_experiment_analyze(device):
     acl.train(epochs=100000)
 
 def run_eval(device):
-    seq_lens = [100, 150, 200]
-    demonstrations = [8, 10, 12, 14]
+    seq_lens = [100, 200]
+    demonstrations = [14,16,18]
     for seq_len in seq_lens:
         for demos in demonstrations:
             logname = f'seq_len: {seq_len}, demonstrations: {demos}'
