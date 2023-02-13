@@ -44,6 +44,11 @@ import copy
 from active_critic.TQC.tqc import TQC
 from active_critic.TQC.tqc_policy import TQCPolicyEval
 
+global save_path
+save_path = '/data/bing/hendrik/Evaluate Baseline Fast/'
+if not os.path.exists(save_path):
+   os.makedirs(save_path)
+
 def evaluate_learner(env_tag, logname, save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, bc_logname, learner:TQC=None):
     lookup_freq = 1000
     env, vec_expert = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
@@ -93,7 +98,7 @@ def evaluate_learner(env_tag, logname, save_path, seq_len, n_demonstrations, bc_
         learner.policy.load_state_dict(th.load(save_path + bc_logname + ' BC best'))
 
 
-        success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=200)
+        success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=100)
         tboard.addValidationScalar('Reloaded Success Rate', value=th.tensor(success.mean()), stepid=0)
         tboard.addValidationScalar('Reloaded Reward', value=th.tensor(rews.mean()), stepid=0)
 
@@ -102,7 +107,7 @@ def evaluate_learner(env_tag, logname, save_path, seq_len, n_demonstrations, bc_
 
         while learner.env.envs[0].reset_count <= n_samples:
             print('before learn')
-            learner.learn(10000)
+            learner.learn(2000)
             print('after learn')
             print(learner.env.envs[0].reset_count)
             success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=200)
@@ -116,7 +121,7 @@ def run_eval_TQC(device, lr, demonstrations, seq_len):
     tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env, device=device, learning_rate=lr)
     logname = 'TQC ' + f'lr: {lr} demonstrations: {demonstrations} seq_len: {seq_len}'
     bc_logname = 'TQC ' + f'demonstrations: {demonstrations} seq_len: {seq_len}'
-    evaluate_learner(env_tag, logname=logname, save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=demonstrations, bc_epochs=400, n_samples=400, device=device, learner=tqc_learner, bc_logname=bc_logname)
+    evaluate_learner(env_tag, logname=logname, save_path=save_path, seq_len=seq_len, n_demonstrations=demonstrations, bc_epochs=400, n_samples=400, device=device, learner=tqc_learner, bc_logname=bc_logname)
     
 
 def run_eval_PPO(device, lr, demonstrations, seq_len):
@@ -125,34 +130,34 @@ def run_eval_PPO(device, lr, demonstrations, seq_len):
     PPO_learner = PPO("MlpPolicy", pomdp_env, verbose=0, device=device, learning_rate=lr)
     logname = 'PPO ' + f'lr: {lr} demonstrations: {demonstrations} seq_len: {seq_len}'
     bc_logname = 'PPO ' + f'demonstrations: {demonstrations} seq_len: {seq_len}'
-    evaluate_learner(env_tag, logname=logname, save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=demonstrations, bc_epochs=400, n_samples=400, device=device, learner=PPO_learner, bc_logname=bc_logname)
+    evaluate_learner(env_tag, logname=logname, save_path=save_path, seq_len=seq_len, n_demonstrations=demonstrations, bc_epochs=400, n_samples=400, device=device, learner=PPO_learner, bc_logname=bc_logname)
     
 def run_eval_BC(device):
     env_tag = 'pickplace'
     seq_len = 200
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=1000)
-    evaluate_learner(env_tag, 'BC 10', save_path='/data/bing/hendrik/Evaluate Baseline/', seq_len=seq_len, n_demonstrations=10, bc_epochs=400, n_samples=400, device=device)
+    evaluate_learner(env_tag, 'BC 10', save_path=save_path, seq_len=seq_len, n_demonstrations=10, bc_epochs=400, n_samples=400, device=device)
 
 def run_tune_TQC(device):
     lr = 1e-3
-    seq_lens = [50, 100, 200]
-    for i in range(5):
+    seq_lens = [100, 200]
+    for i in range(3):
         for seq_len in seq_lens:
-            demonstrations = 6
-            for j in range(4):
-                demonstrations += 2
+            demonstrations = 14
+            for j in range(3):
                 run_eval_TQC(device=device, lr=lr, demonstrations=demonstrations, seq_len=seq_len)
+                demonstrations += 2
         lr = lr * 0.6
 
 def run_tune_PPO(device):
     lr = 1e-3
-    seq_lens = [50, 100, 200]
-    for i in range(5):
+    seq_lens = [100, 200]
+    for i in range(3):
         for seq_len in seq_lens:
-            demonstrations = 6
-            for j in range(4):
-                demonstrations += 2
+            demonstrations = 14
+            for j in range(3):
                 run_eval_PPO(device=device, lr=lr, demonstrations=demonstrations, seq_len=seq_len)
+                demonstrations += 2
         lr = lr * 0.6
 
 
@@ -201,7 +206,7 @@ def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learne
 
     gail_trainer = GAIL(
         demonstrations=pomdp_transitions,
-        demo_batch_size=min(1024, len(transitions)),
+        demo_batch_size=64,
         gen_replay_buffer_capacity=2048,
         n_disc_updates_per_round=4,
         venv=pomdp_env,
@@ -220,7 +225,7 @@ def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learne
         print(f'nsamples: {n_samples}')
         print(f'learner.env.envs[0].reset_count')
         print('before learn')
-        gail_trainer.train(2048)
+        gail_trainer.train(200)
         print('after learn')
         print(learner.env.envs[0].reset_count)
         success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=200)
@@ -228,16 +233,15 @@ def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learne
         tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=min(learner.env.envs[0].reset_count, n_samples))
         tboard.addValidationScalar('Success Rate', value=th.tensor(success_rate), stepid=min(learner.env.envs[0].reset_count, n_samples))
 
-def evaluate_GAIL_PPO(device):
+def run_tune_GAIL_PPO(device):
     env_tag = 'pickplace'
     lookup_freq = 1000
     lr = 1e-3
-    seq_lens = [50, 100, 200]
-    for i in range(5):
+    seq_lens = [100, 200]
+    for i in range(3):
         for seq_len in seq_lens:
-            demonstrations = 6
-            for j in range(4):
-                demonstrations += 2
+            demonstrations = 14
+            for j in range(3):
                 pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
                 learner = PPO(
                         env=pomdp_env,
@@ -258,10 +262,11 @@ def evaluate_GAIL_PPO(device):
                     n_samples = 400, 
                     learner = learner, 
                     pomdp_env = pomdp_env, 
-                    save_path='/data/bing/hendrik/Evaluate Baseline/',
+                    save_path=save_path,
                     bc_epochs = 400,
                     bc_logname = bc_logname,
                     device=device)
+                demonstrations += 2
         lr = lr * 0.6
 
 def evaluate_GAIL_PPO_Fast(device):
@@ -292,22 +297,21 @@ def evaluate_GAIL_PPO_Fast(device):
                 n_samples = 400, 
                 learner = learner, 
                 pomdp_env = pomdp_env, 
-                save_path='/data/bing/hendrik/Evaluate Baseline/',
+                save_path=save_path,
                 bc_epochs = 400,
                 bc_logname = bc_logname,
                 device=device)
             lr = lr * 0.6
 
-def evaluate_GAIL_TQC(device):
+def run_tune_GAIL_TQC(device):
     env_tag = 'pickplace'
     lookup_freq = 1000
     lr = 1e-3
-    seq_lens = [50, 100, 200]
-    for i in range(5):
+    seq_lens = [100, 200]
+    for i in range(3):
         for seq_len in seq_lens:
-            demonstrations = 6
-            for j in range(4):
-                demonstrations += 2
+            demonstrations = 14
+            for j in range(3):
                 pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
                 learner = TQC(policy='MlpPolicy', env=pomdp_env, device=device, learning_rate=lr)
                 logname = f'GAIL + TQC lr: {lr}, Demonstrations: {demonstrations}, seq_len: {seq_len}'
@@ -320,10 +324,11 @@ def evaluate_GAIL_TQC(device):
                     n_samples = 400, 
                     learner = learner, 
                     pomdp_env = pomdp_env, 
-                    save_path='/data/bing/hendrik/Evaluate Baseline/',
+                    save_path=save_path,
                     bc_epochs = 400,
                     bc_logname = bc_logname,
                     device=device)
+                demonstrations
         lr = lr * 0.6
 
 def evaluate_GAIL_TQC_Fast(device):
@@ -346,7 +351,7 @@ def evaluate_GAIL_TQC_Fast(device):
                 n_samples = 400, 
                 learner = learner, 
                 pomdp_env = pomdp_env, 
-                save_path='/data/bing/hendrik/Evaluate Baseline/',
+                save_path=save_path,
                 bc_epochs = 400,
                 bc_logname = bc_logname,
                 device=device)
@@ -382,7 +387,7 @@ def evaluate_GAIL_PPO_custom(device, lr, seq_len, demonstrations):
         n_samples = 400, 
         learner = learner, 
         pomdp_env = pomdp_env, 
-        save_path='/data/bing/hendrik/Evaluate Baseline/',
+        save_path=save_path,
         bc_epochs = 400,
         bc_logname = bc_logname,
         device=device)
@@ -417,9 +422,9 @@ if __name__ == '__main__':
         print('running BC')
         run_tune_TQC(device=args.device)
     elif args.learner == 'GAIL_TQC':
-        evaluate_GAIL_TQC(device=args.device)
+        run_tune_GAIL_TQC(device=args.device)
     elif args.learner == 'GAIL_PPO':
-        evaluate_GAIL_PPO(device=args.device)
+        run_tune_GAIL_PPO(device=args.device)
     elif args.learner == 'GAIL_PPO_fast':
         evaluate_GAIL_PPO_Fast(device=args.device)
     elif args.learner == 'GAIL_TQC_fast':

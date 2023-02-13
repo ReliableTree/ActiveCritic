@@ -75,6 +75,8 @@ class ActiveCriticLearner(nn.Module):
 
         self.last_trj = None
         self.last_trj_training = None
+        self.best_success = -1
+        self.train_critic = self.network_args.start_critic
         
 
         if network_args_obj.tboard:
@@ -84,7 +86,7 @@ class ActiveCriticLearner(nn.Module):
                 self.logname + ' optimized', data_path=network_args_obj.data_path)
         self.global_step = 0
 
-        self.train_data = DatasetAC(device='cpu')
+        self.train_data = DatasetAC(device=self.network_args.device)
         self.train_data.onyl_positiv = False
 
     def setDatasets(self, train_data: DatasetAC):
@@ -97,7 +99,7 @@ class ActiveCriticLearner(nn.Module):
         acts, obsv, rews = make_part_obs_data(
             actions=actions, observations=observations, rewards=rewards)
         self.train_data.add_data(obsv=obsv.to(
-            'cpu'), actions=acts.to('cpu'), reward=rews.to('cpu'))
+            self.network_args.device), actions=acts.to(self.network_args.device), reward=rews.to(self.network_args.device))
         self.train_loader = DataLoader(
             dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
@@ -105,7 +107,7 @@ class ActiveCriticLearner(nn.Module):
         obsv, actions, reward = data
 
         b, _ = th.max(reward, dim=1)
-        successfull_trj = (b == 1).squeeze()
+        successfull_trj = (b == 1).reshape([-1])
 
         if successfull_trj.sum() > 0:
             obsv = obsv[successfull_trj]
@@ -114,9 +116,9 @@ class ActiveCriticLearner(nn.Module):
 
             actor_input = self.policy.get_actor_input(
                 obs=obsv, actions=actions, rew=reward)
-            mask = get_rew_mask(reward)
+            #mask = get_rew_mask(reward)
             debug_dict = self.policy.actor.optimizer_step(
-                inputs=actor_input, label=actions, mask=mask)
+                inputs=actor_input, label=actions)
             if loss_actor is None:
                 loss_actor = debug_dict['Loss '].unsqueeze(0)
             else:
@@ -147,8 +149,12 @@ class ActiveCriticLearner(nn.Module):
         if policy is None:
             policy = self.policy
             policy.eval()
+            opt_before = self.policy.args_obj.optimize
+            self.policy.args_obj.optimize = (self.policy.args_obj.optimize and self.network_args.start_critic)
+        else:
+            opt_before = None
+
         h = time.perf_counter()
-        self.network_args.extractor
         actions, observations, rewards, _, expected_rewards = sample_new_episode(
             policy=policy,
             env=self.env,
@@ -185,16 +191,22 @@ class ActiveCriticLearner(nn.Module):
             observations=observations,
             rewards=rewards
         )
+        if opt_before is not None:
+            self.policy.args_obj.optimize = opt_before
 
-    def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic):
+    def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic):
         for data in train_loader:
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
             loss_actor = actor_step(device_data, loss_actor)
-            loss_critic = critic_step(device_data, loss_critic)
+            if train_critic:
+                loss_critic = critic_step(device_data, loss_critic)
 
         return loss_actor, loss_critic
+
+    def get_num_training_samples(self):
+        return int(len(self.train_data) - self.network_args.num_expert_demos)
 
     def train(self, epochs):
         next_val = self.network_args.val_every
@@ -207,7 +219,7 @@ class ActiveCriticLearner(nn.Module):
                     self.policy.eval()
                     self.run_validation(optimize=True)
                     self.run_validation(optimize=False)
-                    if int(len(self.train_data) - self.network_args.num_expert_demos) >= self.network_args.total_training_epsiodes:
+                    if self.get_num_training_samples()>= self.network_args.total_training_epsiodes:
                         return None
 
 
@@ -232,6 +244,7 @@ class ActiveCriticLearner(nn.Module):
                     critic_step=self.critic_step,
                     loss_actor=loss_actor,
                     loss_critic=loss_critic,
+                    train_critic=self.train_critic
                 )
 
                 max_actor = th.max(loss_actor)
@@ -239,6 +252,7 @@ class ActiveCriticLearner(nn.Module):
                     max_critic = th.max(loss_critic)
                     self.scores.update_min_score(
                     self.scores.mean_critic, max_critic)
+                    self.train_critic = (max_critic>0.1*self.network_args.critic_threshold)
                 else:
                     max_critic = None
 
@@ -272,7 +286,7 @@ class ActiveCriticLearner(nn.Module):
 
     def write_tboard_scalar(self, debug_dict, train, step=None, optimize=True):
         if step is None:
-            step = int(len(self.train_data))
+            step = self.get_num_training_samples()
 
         if self.network_args.tboard:
             for para, value in debug_dict.items():
@@ -357,6 +371,8 @@ class ActiveCriticLearner(nn.Module):
         if best_model:
             self.saveNetworkToFile(add='best_validation', data_path=os.path.join(
                 self.network_args.data_path, self.logname))
+            
+
         last_expected_rewards_before, _ = expected_rewards_before.max(dim=1)
         last_expected_reward_after, _ = expected_rewards_after.max(dim=1)
         self.analyze_critic_scores(
@@ -368,8 +384,20 @@ class ActiveCriticLearner(nn.Module):
         debug_dict = {
             'Success Rate': success.mean(),
             'Reward': sparse_reward.mean(),
-            'Training Epochs': th.tensor(int(len(self.train_data)))
+            'Training Epochs': th.tensor(self.get_num_training_samples())
         }
+
+        if not optimize:
+            if (self.best_success >= 0) and (self.best_success > success.mean()):
+                self.network_args.start_critic = True
+
+            if self.network_args.start_critic:
+                self.train_critic = True
+
+            if success.mean() > self.best_success:
+                self.best_success = success.mean()
+
+
         print(f'Success Rate: {success.mean()}' + fix)
         print(f'Reward: {sparse_reward.mean()}' + fix)
         print(
@@ -377,7 +405,7 @@ class ActiveCriticLearner(nn.Module):
         if self.network_args.imitation_phase:
             self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=self.global_step, optimize=optimize)
         else:
-            self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize, step=int(len(self.train_data) - self.network_args.num_expert_demos))
+            self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize, step=self.get_num_training_samples())
         self.policy.args_obj.optimize = pre_opt
 
 

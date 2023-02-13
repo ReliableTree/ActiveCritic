@@ -23,3 +23,4 @@ class ActiveCriticLearnerArgs:
         self.validation_rep:int = None
         self.total_training_epsiodes:int =None
         self.num_expert_demos:int = None
+        self.start_critic:int = None

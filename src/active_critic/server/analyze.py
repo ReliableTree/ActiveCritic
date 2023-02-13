@@ -88,16 +88,17 @@ def make_acl(device, logname,  seq_len = 200):
     acla.tboard = True
     acla.batch_size = 16
     number = 10
-    acla.val_every = 200
-    acla.add_data_every = 200
+    acla.val_every = 1000
+    acla.add_data_every = 100
     acla.validation_episodes = 25 #(*8)
     acla.validation_rep = 8
-    acla.training_epsiodes = 10
+    acla.training_epsiodes = 1
     acla.actor_threshold = 1e-2
-    acla.critic_threshold = 1e-2
+    acla.critic_threshold = 1e-1
     acla.num_cpu = 25
-    acla.patients = 200000
-    acla.total_training_epsiodes = 400
+    acla.patients = 20000
+    acla.total_training_epsiodes = 150
+    acla.start_critic = False
 
     epsiodes = 30
     ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, tag=tag)
@@ -107,9 +108,12 @@ def make_acl(device, logname,  seq_len = 200):
 
 
 def run_experiment_analyze(device):
-    acl, env, expert, seq_len, epsiodes, device = make_acl(device)
-    acl.add_training_data(policy=expert, episodes=100, seq_len=seq_len)
-    #acl.run_validation()
+    seq_len = 100
+    demos = 14
+    logname = f'seq_len: {seq_len}, demonstrations: {demos}'
+    acl, env, expert, seq_len, epsiodes, device = make_acl(device, seq_len=seq_len, logname=logname)
+    acl.network_args.num_expert_demos = demos
+    acl.add_training_data(policy=expert, episodes=demos, seq_len=seq_len)
     acl.train(epochs=100000)
 
 def run_eval(device):
