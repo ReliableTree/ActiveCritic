@@ -226,13 +226,15 @@ class ActiveCriticLearner(nn.Module):
             if (not self.network_args.imitation_phase) and (epoch >= next_add):
                 next_add += self.network_args.add_data_every
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
+            else:
+                self.network_args.total_training_epsiodes -= self.network_args.training_epsiodes
 
             self.policy.train()
 
             max_actor = float('inf')
             max_critic = float('inf')
             current_patients = self.network_args.patients
-            while ((max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold)) and current_patients > 0:
+            while ((max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold and (not self.network_args.imitation_phase))) and current_patients > 0:
                 current_patients -= len(self.train_data)
 
                 loss_actor = None

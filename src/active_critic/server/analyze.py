@@ -76,7 +76,7 @@ def setup_ac(seq_len, num_cpu, device, tag):
     return ac, acps, env, expert
 
 
-def make_acl(device, logname,  seq_len , imitation_phase, total_training_epsiodes):
+def make_acl(device, logname,  seq_len , imitation_phase, total_training_epsiodes, training_episodes):
     device = device
     acla = ActiveCriticLearnerArgs()
     acla.data_path = '/data/bing/hendrik/EvalAC_Fast'
@@ -92,11 +92,11 @@ def make_acl(device, logname,  seq_len , imitation_phase, total_training_epsiode
     acla.add_data_every = 100
     acla.validation_episodes = 25 #(*8)
     acla.validation_rep = 8
-    acla.training_epsiodes = 1
+    acla.training_epsiodes = training_episodes
     acla.actor_threshold = 1e-2
-    acla.critic_threshold = 1e-1
+    acla.critic_threshold = 1e-2
     acla.num_cpu = 25
-    acla.patients = 20000
+    acla.patients = 40000
     acla.total_training_epsiodes = total_training_epsiodes
     acla.start_critic = False
 
@@ -120,18 +120,27 @@ def run_eval(device):
     imitation_phases = [True, False]
     seq_lens = [100, 200]
     demonstrations = [14,16,18]
+    training_episodes_list = [1, 10]
     for seq_len in seq_lens:
         for demos in demonstrations:
-            for imitation_phase in imitation_phases:
-                if imitation_phase:
-                    total_training_epsiodes = 50
-                else:
-                    total_training_epsiodes = 200
-                logname = f'seq_len: {seq_len}, demonstrations: {demos}'
-                acl, env, expert, seq_len, epsiodes, device = make_acl(device, seq_len=seq_len, logname=logname, imitation_phase=imitation_phase, total_training_epsiodes=total_training_epsiodes)
-                acl.network_args.num_expert_demos = demos
-                acl.add_training_data(policy=expert, episodes=demos, seq_len=seq_len)
-                acl.train(epochs=100000)
+            for training_episodes in training_episodes_list:
+                for imitation_phase in imitation_phases:
+                    if imitation_phase:
+                        total_training_epsiodes = 50
+                        logname = f'seq_len: {seq_len}, demonstrations: {demos}, training_episodes: {training_episodes} BC'
+                    else:
+                        total_training_epsiodes = 200
+                        logname = f'seq_len: {seq_len}, demonstrations: {demos}, training_episodes: {training_episodes}'
+
+                    acl, env, expert, seq_len, epsiodes, device = make_acl(
+                        device, seq_len=seq_len, 
+                        logname=logname, 
+                        imitation_phase=imitation_phase, 
+                        total_training_epsiodes=total_training_epsiodes,
+                        training_episodes=training_episodes)
+                    acl.network_args.num_expert_demos = demos
+                    acl.add_training_data(policy=expert, episodes=demos, seq_len=seq_len)
+                    acl.train(epochs=100000)
 
 
 if __name__ == '__main__':
