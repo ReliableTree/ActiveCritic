@@ -217,7 +217,7 @@ def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learne
         print(f'nsamples: {n_samples}')
         print(f'learner.env.envs[0].reset_count')
         print('before learn')
-        gail_trainer.train(5000)
+        gail_trainer.train(50000)
         print('after learn')
         print(learner.env.envs[0].reset_count)
         success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=200)
@@ -259,6 +259,39 @@ def evaluate_GAIL_PPO(device):
                     bc_epochs = 400,
                     bc_logname = bc_logname,
                     device=device)
+        lr = lr * 0.6
+
+def evaluate_GAIL_PPO_Fast(device):
+    env_tag = 'pickplace'
+    lookup_freq = 1000
+    lr = 1e-4
+    seq_len = 100
+    for i in range(5):
+        demonstrations = 10
+        pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
+        learner = PPO(
+                env=pomdp_env,
+                policy=MlpPolicy,
+                batch_size=64,
+                ent_coef=0.0,
+                learning_rate=lr,
+                n_epochs=10,
+                device=device
+            )
+        logname = f'GAIL + PPO lr: {lr}, Demonstrations: {demonstrations}, seq_len: {seq_len}'
+        bc_logname = f'GAIL + PPO Demonstrations: {demonstrations}, seq_len: {seq_len}'
+        evaluate_GAIL(
+            env_tag=env_tag, 
+            logname=logname, 
+            seq_len=seq_len, 
+            n_demonstrations=demonstrations, 
+            n_samples = 400, 
+            learner = learner, 
+            pomdp_env = pomdp_env, 
+            save_path='/data/bing/hendrik/Evaluate Baseline/',
+            bc_epochs = 400,
+            bc_logname = bc_logname,
+            device=device)
         lr = lr * 0.6
 
 def evaluate_GAIL_TQC(device):
@@ -316,5 +349,7 @@ if __name__ == '__main__':
         evaluate_GAIL_TQC(device=args.device)
     elif args.learner == 'GAIL_PPO':
         evaluate_GAIL_PPO(device=args.device)
+    elif args.learner == 'GAIL_PPO_fast':
+        evaluate_GAIL_PPO_Fast(device=args.device)
     else:
         print('choose other algo')
