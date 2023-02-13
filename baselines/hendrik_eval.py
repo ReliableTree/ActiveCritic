@@ -174,14 +174,14 @@ def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learne
             device=device,
             policy=learner.policy)
         
-        tboard = TBoardGraphs(logname=logname + ' BC' , data_path='/data/bing/hendrik/gboard/')
+        tboard = TBoardGraphs(logname=logname + ' BC' , data_path=save_path + '/' + logname)
         best_succes_rate = -1
         best_model = None
-        fac = 10
+        fac = 40
         runs_per_epoch = 20*fac
         for i in range(int(bc_epochs/fac)):
             bc_learner.train(n_epochs=runs_per_epoch)
-            success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=bc_learner.policy, epsiodes=200)
+            success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=bc_learner.policy, epsiodes=50)
             success_rate = success.mean()
             tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=i)
             tboard.addValidationScalar('Success Rate', value=th.tensor(success_rate), stepid=i)
@@ -209,7 +209,7 @@ def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learne
     ) 
     print(f'logname: {logname}')
     print(f'save_path: {save_path}')
-    tboard = TBoardGraphs(logname=logname , data_path=save_path)
+    tboard = TBoardGraphs(logname=logname , data_path=save_path + '/' + logname)
     success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=200)
     success_rate = success.mean()
     tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=min(learner.env.envs[0].reset_count, n_samples))
@@ -349,6 +349,41 @@ def evaluate_GAIL_TQC_Fast(device):
             device=device)
         lr = lr * 0.6
 
+def evaluate_GAIL_PPO_custom(device, lr, seq_len, demonstrations):
+    env_tag = 'pickplace'
+    lookup_freq = 1000
+    if lr is None:
+        lr = 1e-4
+    if seq_len is None:
+        seq_len = 100
+    if demonstrations is None:
+        demonstrations = 10
+
+    pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
+    learner = PPO(
+            env=pomdp_env,
+            policy=MlpPolicy,
+            batch_size=64,
+            ent_coef=0.0,
+            learning_rate=lr,
+            n_epochs=10,
+            device=device
+        )
+    logname = f'GAIL + PPO lr: {lr}, Demonstrations: {demonstrations}, seq_len: {seq_len}'
+    bc_logname = f'GAIL + PPO Demonstrations: {demonstrations}, seq_len: {seq_len}'
+    evaluate_GAIL(
+        env_tag=env_tag, 
+        logname=logname, 
+        seq_len=seq_len, 
+        n_demonstrations=demonstrations, 
+        n_samples = 400, 
+        learner = learner, 
+        pomdp_env = pomdp_env, 
+        save_path='/data/bing/hendrik/Evaluate Baseline/',
+        bc_epochs = 400,
+        bc_logname = bc_logname,
+        device=device)
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
@@ -356,6 +391,12 @@ if __name__ == '__main__':
                     help='Choose free GPU')
     parser.add_argument('-learner', type=str,
                 help='pick Learner')
+    parser.add_argument('-lr', type=float,
+                help='pick lr')
+    parser.add_argument('-seq', type=int,
+                help='pick seq_len')
+    parser.add_argument('-exp', type=int,
+                help='pick num expert demos')
     args = parser.parse_args()
     if args.learner == 'TQC':
         print('running TQC')
@@ -380,5 +421,17 @@ if __name__ == '__main__':
         evaluate_GAIL_PPO_Fast(device=args.device)
     elif args.learner == 'GAIL_TQC_fast':
         evaluate_GAIL_TQC_Fast(device=args.device)
+    elif args.learner == 'GAIL_PPO_custom':
+        lr = None
+        seq_len = None
+        expert_samples = None
+        if args.lr:
+            lr = args.lr
+        if args.seq:
+            seq_len = args.seq
+        if args.exp:
+            expert_samples = args.exp
+        evaluate_GAIL_PPO_custom(device=args.device, lr=lr, seq_len=seq_len, demonstrations=expert_samples)
+
     else:
         print('choose other algo')
