@@ -177,8 +177,9 @@ def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learne
         tboard = TBoardGraphs(logname=logname + ' BC' , data_path='/data/bing/hendrik/gboard/')
         best_succes_rate = -1
         best_model = None
-        runs_per_epoch = 20
-        for i in range(bc_epochs):
+        fac = 10
+        runs_per_epoch = 20*fac
+        for i in range(int(bc_epochs/fac)):
             bc_learner.train(n_epochs=runs_per_epoch)
             success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=bc_learner.policy, epsiodes=200)
             success_rate = success.mean()
@@ -206,7 +207,8 @@ def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learne
         gen_algo=learner,
         reward_net=reward_net,
     ) 
-
+    print(f'logname: {logname}')
+    print(f'save_path: {save_path}')
     tboard = TBoardGraphs(logname=logname , data_path=save_path)
     success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=200)
     success_rate = success.mean()
@@ -217,7 +219,7 @@ def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learne
         print(f'nsamples: {n_samples}')
         print(f'learner.env.envs[0].reset_count')
         print('before learn')
-        gail_trainer.train(50000)
+        gail_trainer.train(2048)
         print('after learn')
         print(learner.env.envs[0].reset_count)
         success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=200)
@@ -322,6 +324,31 @@ def evaluate_GAIL_TQC(device):
                     device=device)
         lr = lr * 0.6
 
+def evaluate_GAIL_TQC_Fast(device):
+    env_tag = 'pickplace'
+    lookup_freq = 1000
+    lr = 1e-3
+    seq_len = 100
+    demonstrations = 10
+    for i in range(5):
+        pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
+        learner = TQC(policy='MlpPolicy', env=pomdp_env, device=device, learning_rate=lr)
+        logname = f'GAIL + TQC lr: {lr}, Demonstrations: {demonstrations}, seq_len: {seq_len}'
+        bc_logname = f'GAIL + TQC Demonstrations: {demonstrations}, seq_len: {seq_len}'
+        evaluate_GAIL(
+            env_tag=env_tag, 
+            logname=logname, 
+            seq_len=seq_len, 
+            n_demonstrations=demonstrations, 
+            n_samples = 400, 
+            learner = learner, 
+            pomdp_env = pomdp_env, 
+            save_path='/data/bing/hendrik/Evaluate Baseline/',
+            bc_epochs = 400,
+            bc_logname = bc_logname,
+            device=device)
+        lr = lr * 0.6
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
@@ -351,5 +378,7 @@ if __name__ == '__main__':
         evaluate_GAIL_PPO(device=args.device)
     elif args.learner == 'GAIL_PPO_fast':
         evaluate_GAIL_PPO_Fast(device=args.device)
+    elif args.learner == 'GAIL_TQC_fast':
+        evaluate_GAIL_TQC_Fast(device=args.device)
     else:
         print('choose other algo')
