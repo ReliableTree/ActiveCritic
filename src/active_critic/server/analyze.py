@@ -89,7 +89,7 @@ def make_acl(device, logname,  seq_len , imitation_phase, total_training_epsiode
     acla.batch_size = 16
     number = 10
     acla.val_every = int(1000 / training_episodes)
-    acla.add_data_every = 100
+    acla.add_data_every = 200
     acla.validation_episodes = 25 #(*8)
     acla.validation_rep = 8
     acla.training_epsiodes = training_episodes
