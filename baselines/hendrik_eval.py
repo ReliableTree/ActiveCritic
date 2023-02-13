@@ -45,6 +45,8 @@ from active_critic.TQC.tqc import TQC
 from active_critic.TQC.tqc_policy import TQCPolicyEval
 
 global save_path
+global n_samples
+n_samples = 200
 save_path = '/data/bing/hendrik/Evaluate Baseline Fast/'
 if not os.path.exists(save_path):
    os.makedirs(save_path)
@@ -121,7 +123,7 @@ def run_eval_TQC(device, lr, demonstrations, seq_len):
     tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env, device=device, learning_rate=lr)
     logname = 'TQC ' + f'lr: {lr} demonstrations: {demonstrations} seq_len: {seq_len}'
     bc_logname = 'TQC ' + f'demonstrations: {demonstrations} seq_len: {seq_len}'
-    evaluate_learner(env_tag, logname=logname, save_path=save_path, seq_len=seq_len, n_demonstrations=demonstrations, bc_epochs=400, n_samples=400, device=device, learner=tqc_learner, bc_logname=bc_logname)
+    evaluate_learner(env_tag, logname=logname, save_path=save_path, seq_len=seq_len, n_demonstrations=demonstrations, bc_epochs=n_samples, n_samples=n_samples, device=device, learner=tqc_learner, bc_logname=bc_logname)
     
 
 def run_eval_PPO(device, lr, demonstrations, seq_len):
@@ -130,13 +132,13 @@ def run_eval_PPO(device, lr, demonstrations, seq_len):
     PPO_learner = PPO("MlpPolicy", pomdp_env, verbose=0, device=device, learning_rate=lr)
     logname = 'PPO ' + f'lr: {lr} demonstrations: {demonstrations} seq_len: {seq_len}'
     bc_logname = 'PPO ' + f'demonstrations: {demonstrations} seq_len: {seq_len}'
-    evaluate_learner(env_tag, logname=logname, save_path=save_path, seq_len=seq_len, n_demonstrations=demonstrations, bc_epochs=400, n_samples=400, device=device, learner=PPO_learner, bc_logname=bc_logname)
+    evaluate_learner(env_tag, logname=logname, save_path=save_path, seq_len=seq_len, n_demonstrations=demonstrations, bc_epochs=n_samples, n_samples=n_samples, device=device, learner=PPO_learner, bc_logname=bc_logname)
     
 def run_eval_BC(device):
     env_tag = 'pickplace'
     seq_len = 200
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=1000)
-    evaluate_learner(env_tag, 'BC 10', save_path=save_path, seq_len=seq_len, n_demonstrations=10, bc_epochs=400, n_samples=400, device=device)
+    evaluate_learner(env_tag, 'BC 10', save_path=save_path, seq_len=seq_len, n_demonstrations=10, bc_epochs=n_samples, n_samples=n_samples, device=device)
 
 def run_tune_TQC(device):
     lr = 1e-3
@@ -259,11 +261,11 @@ def run_tune_GAIL_PPO(device):
                     logname=logname, 
                     seq_len=seq_len, 
                     n_demonstrations=demonstrations, 
-                    n_samples = 400, 
+                    n_samples = n_samples, 
                     learner = learner, 
                     pomdp_env = pomdp_env, 
                     save_path=save_path,
-                    bc_epochs = 400,
+                    bc_epochs = n_samples,
                     bc_logname = bc_logname,
                     device=device)
                 demonstrations += 2
@@ -294,11 +296,11 @@ def evaluate_GAIL_PPO_Fast(device):
                 logname=logname, 
                 seq_len=seq_len, 
                 n_demonstrations=demonstrations, 
-                n_samples = 400, 
+                n_samples = n_samples, 
                 learner = learner, 
                 pomdp_env = pomdp_env, 
                 save_path=save_path,
-                bc_epochs = 400,
+                bc_epochs = n_samples,
                 bc_logname = bc_logname,
                 device=device)
             lr = lr * 0.6
@@ -321,11 +323,11 @@ def run_tune_GAIL_TQC(device):
                     logname=logname, 
                     seq_len=seq_len, 
                     n_demonstrations=demonstrations, 
-                    n_samples = 400, 
+                    n_samples = n_samples, 
                     learner = learner, 
                     pomdp_env = pomdp_env, 
                     save_path=save_path,
-                    bc_epochs = 400,
+                    bc_epochs = n_samples,
                     bc_logname = bc_logname,
                     device=device)
                 demonstrations
@@ -348,11 +350,11 @@ def evaluate_GAIL_TQC_Fast(device):
                 logname=logname, 
                 seq_len=seq_len, 
                 n_demonstrations=demonstrations, 
-                n_samples = 400, 
+                n_samples = n_samples, 
                 learner = learner, 
                 pomdp_env = pomdp_env, 
                 save_path=save_path,
-                bc_epochs = 400,
+                bc_epochs = n_samples,
                 bc_logname = bc_logname,
                 device=device)
             lr = lr * 0.6
@@ -384,11 +386,11 @@ def evaluate_GAIL_PPO_custom(device, lr, seq_len, demonstrations):
         logname=logname, 
         seq_len=seq_len, 
         n_demonstrations=demonstrations, 
-        n_samples = 400, 
+        n_samples = n_samples, 
         learner = learner, 
         pomdp_env = pomdp_env, 
         save_path=save_path,
-        bc_epochs = 400,
+        bc_epochs = n_samples,
         bc_logname = bc_logname,
         device=device)
 
