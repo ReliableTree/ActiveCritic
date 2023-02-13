@@ -69,11 +69,12 @@ def evaluate_learner(env_tag, logname, save_path, seq_len, n_demonstrations, bc_
 
     pomdp_env_val, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
     if (not os.path.isfile(save_path + bc_logname + ' BC best')):
-        tboard = TBoardGraphs(logname=logname + ' BC' , data_path='/data/bing/hendrik/gboard/')
+        tboard = TBoardGraphs(logname=logname + ' BC' , data_path=save_path + '/' + logname)
         best_succes_rate = -1
         best_model = None
-        runs_per_epoch = 20
-        for i in range(bc_epochs):
+        fac = 40
+        runs_per_epoch = 20 * 40
+        for i in range(int(bc_epochs/fac)):
             bc_learner.train(n_epochs=runs_per_epoch)
             success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=bc_learner.policy, epsiodes=200)
             success_rate = success.mean()
@@ -88,7 +89,7 @@ def evaluate_learner(env_tag, logname, save_path, seq_len, n_demonstrations, bc_
 
     if learner is not None:
 
-        tboard = TBoardGraphs(logname=logname + str(' Reinforcement') , data_path='/data/bing/hendrik/gboard/')
+        tboard = TBoardGraphs(logname=logname + str(' Reinforcement') , data_path=save_path + '/' + logname)
         learner.policy.load_state_dict(th.load(save_path + bc_logname + ' BC best'))
 
 
@@ -101,7 +102,7 @@ def evaluate_learner(env_tag, logname, save_path, seq_len, n_demonstrations, bc_
 
         while learner.env.envs[0].reset_count <= n_samples:
             print('before learn')
-            learner.learn(2000)
+            learner.learn(10000)
             print('after learn')
             print(learner.env.envs[0].reset_count)
             success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=200)
@@ -268,33 +269,34 @@ def evaluate_GAIL_PPO_Fast(device):
     lookup_freq = 1000
     lr = 1e-4
     seq_len = 100
-    for i in range(5):
-        demonstrations = 10
-        pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
-        learner = PPO(
-                env=pomdp_env,
-                policy=MlpPolicy,
-                batch_size=64,
-                ent_coef=0.0,
-                learning_rate=lr,
-                n_epochs=10,
-                device=device
-            )
-        logname = f'GAIL + PPO lr: {lr}, Demonstrations: {demonstrations}, seq_len: {seq_len}'
-        bc_logname = f'GAIL + PPO Demonstrations: {demonstrations}, seq_len: {seq_len}'
-        evaluate_GAIL(
-            env_tag=env_tag, 
-            logname=logname, 
-            seq_len=seq_len, 
-            n_demonstrations=demonstrations, 
-            n_samples = 400, 
-            learner = learner, 
-            pomdp_env = pomdp_env, 
-            save_path='/data/bing/hendrik/Evaluate Baseline/',
-            bc_epochs = 400,
-            bc_logname = bc_logname,
-            device=device)
-        lr = lr * 0.6
+    demonstrations_list = [10, 12, 14]
+    for demonstrations in demonstrations_list:
+        for i in range(5):
+            pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
+            learner = PPO(
+                    env=pomdp_env,
+                    policy=MlpPolicy,
+                    batch_size=64,
+                    ent_coef=0.0,
+                    learning_rate=lr,
+                    n_epochs=10,
+                    device=device
+                )
+            logname = f'GAIL + PPO lr: {lr}, Demonstrations: {demonstrations}, seq_len: {seq_len}'
+            bc_logname = f'GAIL + PPO Demonstrations: {demonstrations}, seq_len: {seq_len}'
+            evaluate_GAIL(
+                env_tag=env_tag, 
+                logname=logname, 
+                seq_len=seq_len, 
+                n_demonstrations=demonstrations, 
+                n_samples = 400, 
+                learner = learner, 
+                pomdp_env = pomdp_env, 
+                save_path='/data/bing/hendrik/Evaluate Baseline/',
+                bc_epochs = 400,
+                bc_logname = bc_logname,
+                device=device)
+            lr = lr * 0.6
 
 def evaluate_GAIL_TQC(device):
     env_tag = 'pickplace'
@@ -329,25 +331,26 @@ def evaluate_GAIL_TQC_Fast(device):
     lookup_freq = 1000
     lr = 1e-3
     seq_len = 100
-    demonstrations = 10
-    for i in range(5):
-        pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
-        learner = TQC(policy='MlpPolicy', env=pomdp_env, device=device, learning_rate=lr)
-        logname = f'GAIL + TQC lr: {lr}, Demonstrations: {demonstrations}, seq_len: {seq_len}'
-        bc_logname = f'GAIL + TQC Demonstrations: {demonstrations}, seq_len: {seq_len}'
-        evaluate_GAIL(
-            env_tag=env_tag, 
-            logname=logname, 
-            seq_len=seq_len, 
-            n_demonstrations=demonstrations, 
-            n_samples = 400, 
-            learner = learner, 
-            pomdp_env = pomdp_env, 
-            save_path='/data/bing/hendrik/Evaluate Baseline/',
-            bc_epochs = 400,
-            bc_logname = bc_logname,
-            device=device)
-        lr = lr * 0.6
+    demonstrations_list = [10, 12, 14]
+    for demonstrations in demonstrations_list:
+        for i in range(5):
+            pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
+            learner = TQC(policy='MlpPolicy', env=pomdp_env, device=device, learning_rate=lr)
+            logname = f'GAIL + TQC lr: {lr}, Demonstrations: {demonstrations}, seq_len: {seq_len}'
+            bc_logname = f'GAIL + TQC Demonstrations: {demonstrations}, seq_len: {seq_len}'
+            evaluate_GAIL(
+                env_tag=env_tag, 
+                logname=logname, 
+                seq_len=seq_len, 
+                n_demonstrations=demonstrations, 
+                n_samples = 400, 
+                learner = learner, 
+                pomdp_env = pomdp_env, 
+                save_path='/data/bing/hendrik/Evaluate Baseline/',
+                bc_epochs = 400,
+                bc_logname = bc_logname,
+                device=device)
+            lr = lr * 0.6
 
 def evaluate_GAIL_PPO_custom(device, lr, seq_len, demonstrations):
     env_tag = 'pickplace'
