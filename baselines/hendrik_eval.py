@@ -227,7 +227,7 @@ def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learne
         print(f'nsamples: {n_samples}')
         print(f'learner.env.envs[0].reset_count')
         print('before learn')
-        gail_trainer.train(200)
+        gail_trainer.train(2048)
         print('after learn')
         print(learner.env.envs[0].reset_count)
         success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=learner.policy, epsiodes=200)
