@@ -129,7 +129,7 @@ def run_eval(device):
                 for training_episodes in training_episodes_list:
                     for imitation_phase in imitation_phases:
                         if imitation_phase:
-                            total_training_epsiodes = 200
+                            total_training_epsiodes = 1000
                             logname = f'seq_len: {seq_len}, demonstrations: {demos}, training_episodes: {training_episodes}, min critic: {min_critic_threshold} BC'
                         else:
                             total_training_epsiodes = 200
