@@ -207,6 +207,8 @@ class ActiveCriticLearner(nn.Module):
                     self.policy.eval()
                     self.run_validation(optimize=True)
                     self.run_validation(optimize=False)
+                    if int(len(self.train_data) - self.network_args.num_expert_demos) >= self.network_args.total_training_epsiodes:
+                        return None
 
 
             if (not self.network_args.imitation_phase) and (epoch >= next_add):
@@ -366,7 +368,7 @@ class ActiveCriticLearner(nn.Module):
         debug_dict = {
             'Success Rate': success.mean(),
             'Reward': sparse_reward.mean(),
-            'Training Epochs': th.tensor(int(len(self.train_data)/self.policy.args_obj.epoch_len))
+            'Training Epochs': th.tensor(int(len(self.train_data)))
         }
         print(f'Success Rate: {success.mean()}' + fix)
         print(f'Reward: {sparse_reward.mean()}' + fix)
@@ -375,7 +377,7 @@ class ActiveCriticLearner(nn.Module):
         if self.network_args.imitation_phase:
             self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=self.global_step, optimize=optimize)
         else:
-            self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize)
+            self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize, step=int(len(self.train_data) - self.network_args.num_expert_demos))
         self.policy.args_obj.optimize = pre_opt
 
 

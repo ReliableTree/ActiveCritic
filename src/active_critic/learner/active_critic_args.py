@@ -21,3 +21,5 @@ class ActiveCriticLearnerArgs:
         self.num_cpu:int = None
         self.patients: int = None
         self.validation_rep:int = None
+        self.total_training_epsiodes:int =None
+        self.num_expert_demos:int = None
