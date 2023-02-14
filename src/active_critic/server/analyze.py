@@ -79,7 +79,7 @@ def setup_ac(seq_len, num_cpu, device, tag):
 def make_acl(device, logname,  seq_len , imitation_phase, total_training_epsiodes, training_episodes, min_critic_threshold):
     device = device
     acla = ActiveCriticLearnerArgs()
-    acla.data_path = '/data/bing/hendrik/EvalAC_Fast'
+    acla.data_path = '/data/bing/hendrik/EvalAC_Fast_Incline'
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = imitation_phase
@@ -119,8 +119,8 @@ def run_experiment_analyze(device):
 
 def run_eval(device):
     imitation_phases = [True, False]
-    seq_lens = [100, 200]
-    demonstrations = [14,16,18]
+    seq_lens = [100]
+    demonstrations = [20, 30, 40]
     training_episodes_list = [1, 10]
     min_critic_thresholds = [1e-4, 5e-5]
     for seq_len in seq_lens:
@@ -145,6 +145,28 @@ def run_eval(device):
                         acl.network_args.num_expert_demos = demos
                         acl.add_training_data(policy=expert, episodes=demos, seq_len=seq_len)
                         acl.train(epochs=100000)
+
+def run_eval_fast(device):
+    imitation_phase = False
+    seq_len = 100
+    demonstrations = [14, 16, 18]
+    training_episodes = 10
+    total_training_epsiodes = 220
+    min_critic_threshold = 5e-5
+    for demos in demonstrations:
+        logname = f'seq_len: {seq_len}, demonstrations: {demos}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}'
+        acl, env, expert, seq_len, epsiodes, device = make_acl(
+                device, seq_len=seq_len, 
+                logname=logname, 
+                imitation_phase=imitation_phase, 
+                total_training_epsiodes=total_training_epsiodes,
+                training_episodes=training_episodes,
+                min_critic_threshold=min_critic_threshold)
+        acl.network_args.num_expert_demos = demonstrations
+        acl.add_training_data(policy=expert, episodes=demos, seq_len=seq_len)
+        acl.train(epochs=100000)
+
+
 
 
 if __name__ == '__main__':

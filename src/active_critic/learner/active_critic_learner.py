@@ -77,6 +77,7 @@ class ActiveCriticLearner(nn.Module):
         self.last_trj_training = None
         self.best_success = -1
         self.train_critic = self.network_args.start_critic
+        self.virtual_step = 0
         
 
         if network_args_obj.tboard:
@@ -206,14 +207,15 @@ class ActiveCriticLearner(nn.Module):
         return loss_actor, loss_critic
 
     def get_num_training_samples(self):
-        return int(len(self.train_data) - self.network_args.num_expert_demos)
+        #return int(len(self.train_data) - self.network_args.num_expert_demos)
+        return self.virtual_step
 
     def train(self, epochs):
-        next_val = self.network_args.val_every
+        next_val = 0
         next_add = 0
         for epoch in range(epochs):
-            if epoch >= next_val:
-                next_val = epoch + self.network_args.val_every
+            if self.global_step >= next_val:
+                next_val = self.global_step + self.network_args.val_every
                 if self.network_args.tboard:
                     print('_____________________________________________________________')
                     self.policy.eval()
@@ -225,9 +227,14 @@ class ActiveCriticLearner(nn.Module):
                         return None
 
 
-            if (not self.network_args.imitation_phase) and (epoch >= next_add):
-                next_add += self.network_args.add_data_every
+            if (not self.network_args.imitation_phase) and (self.global_step >= next_add) and (self.train_critic):
+                next_add = self.global_step + self.network_args.add_data_every
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
+                self.virtual_step += self.network_args.training_epsiodes
+
+            elif (self.global_step >= next_add):
+                next_add = self.global_step + self.network_args.add_data_every
+                self.virtual_step += self.network_args.training_epsiodes
             if (self.network_args.imitation_phase) and (epoch >= next_add):
                 next_add += self.network_args.add_data_every
                 self.network_args.total_training_epsiodes -= self.network_args.training_epsiodes
@@ -239,55 +246,55 @@ class ActiveCriticLearner(nn.Module):
             max_actor = float('inf')
             max_critic = float('inf')
             current_patients = self.network_args.patients
-            while ((max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold and (not self.network_args.imitation_phase))) and current_patients > 0:
-                current_patients -= len(self.train_data)
+            #while ((max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold and (not self.network_args.imitation_phase))) and current_patients > 0:
+            current_patients -= len(self.train_data)
 
-                loss_actor = None
-                loss_critic = None
+            loss_actor = None
+            loss_critic = None
 
-                loss_actor, loss_critic = self.train_step(
-                    train_loader=self.train_loader,
-                    actor_step=self.actor_step,
-                    critic_step=self.critic_step,
-                    loss_actor=loss_actor,
-                    loss_critic=loss_critic,
-                    train_critic=self.train_critic
-                )
+            loss_actor, loss_critic = self.train_step(
+                train_loader=self.train_loader,
+                actor_step=self.actor_step,
+                critic_step=self.critic_step,
+                loss_actor=loss_actor,
+                loss_critic=loss_critic,
+                train_critic=self.train_critic
+            )
 
-                max_actor = th.max(loss_actor)
-                if loss_critic is not None:
-                    max_critic = th.max(loss_critic)
-                    self.scores.update_min_score(
-                    self.scores.mean_critic, max_critic)
-                    self.train_critic = (max_critic>self.network_args.min_critic_threshold)
-                else:
-                    max_critic = None
-
-                
+            max_actor = th.max(loss_actor)
+            if loss_critic is not None:
+                max_critic = th.max(loss_critic)
                 self.scores.update_min_score(
-                    self.scores.mean_actor, max_actor)
+                self.scores.mean_critic, max_critic)
+                self.train_critic = (max_critic>self.network_args.min_critic_threshold)
+            else:
+                max_critic = None
 
-                reward = self.train_data.reward
-                b, _ = th.max(reward, dim=1)
-                successfull_trj = (b == 1)
-                positive_examples = successfull_trj.sum()
+            
+            self.scores.update_min_score(
+                self.scores.mean_actor, max_actor)
 
-                debug_dict = {
-                    'Loss Actor': max_actor,
-                    'Examples': th.tensor(int(len(self.train_data))),
-                    'Positive Examples': positive_examples
-                }
-                if max_critic is not None:
-                    debug_dict['Loss Critic'] = max_critic
-                else:
-                    max_critic = 0
+            reward = self.train_data.reward
+            b, _ = th.max(reward, dim=1)
+            successfull_trj = (b == 1)
+            positive_examples = successfull_trj.sum()
 
-                self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
-                self.global_step += len(self.train_data)
-            if current_patients <= 0:
+            debug_dict = {
+                'Loss Actor': max_actor,
+                'Examples': th.tensor(int(len(self.train_data))),
+                'Positive Examples': positive_examples
+            }
+            if max_critic is not None:
+                debug_dict['Loss Critic'] = max_critic
+            else:
+                max_critic = 0
+
+            self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
+            self.global_step += len(self.train_data)
+            '''if current_patients <= 0:
                 self.policy.critic.init_model()
                 print('reinit critic')
-                self.network_args.patients *= 2
+                self.network_args.patients *= 2'''
 
 
 
@@ -409,10 +416,8 @@ class ActiveCriticLearner(nn.Module):
         print(f'Reward: {sparse_reward.mean()}' + fix)
         print(
             f'training samples: {int(len(self.train_data))}' + fix)
-        if self.network_args.imitation_phase:
-            self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=self.global_step, optimize=optimize)
-        else:
-            self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize, step=self.get_num_training_samples())
+        self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize, step=self.get_num_training_samples())
+
         self.policy.args_obj.optimize = pre_opt
 
 
@@ -455,11 +460,12 @@ class ActiveCriticLearner(nn.Module):
 
 
     def createGraphs(self, trjs:list([th.tensor]), trj_names:list([str]), plot_name:str):
-        np_trjs = []
+        pass
+        '''np_trjs = []
         trj_colors = ['forestgreen', 'orange', 'pink']
         for trj in trjs:
             np_trjs.append(trj.detach().cpu().numpy())
-        self.tboard.plot_graph(trjs=np_trjs, trj_names=trj_names, trj_colors=trj_colors, plot_name=plot_name, step=self.global_step)
+        self.tboard.plot_graph(trjs=np_trjs, trj_names=trj_names, trj_colors=trj_colors, plot_name=plot_name, step=self.global_step)'''
 
 
     def saveNetworkToFile(self, add, data_path):
