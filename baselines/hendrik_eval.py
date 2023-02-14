@@ -141,7 +141,7 @@ def run_eval_BC(device):
     evaluate_learner(env_tag, 'BC 10', save_path=save_path, seq_len=seq_len, n_demonstrations=10, bc_epochs=n_samples, n_samples=n_samples, device=device)
 
 def run_tune_TQC(device):
-    lr = 1e-3
+    lr = 1e-4
     seq_lens = [100, 200]
     for i in range(3):
         for seq_len in seq_lens:
@@ -149,10 +149,10 @@ def run_tune_TQC(device):
             for j in range(3):
                 run_eval_TQC(device=device, lr=lr, demonstrations=demonstrations, seq_len=seq_len)
                 demonstrations += 2
-        lr = lr * 0.6
+        lr = lr * 0.4
 
 def run_tune_PPO(device):
-    lr = 1e-3
+    lr = 1e-4
     seq_lens = [100, 200]
     for i in range(3):
         for seq_len in seq_lens:
@@ -160,7 +160,7 @@ def run_tune_PPO(device):
             for j in range(3):
                 run_eval_PPO(device=device, lr=lr, demonstrations=demonstrations, seq_len=seq_len)
                 demonstrations += 2
-        lr = lr * 0.6
+        lr = lr * 0.4
 
 
 def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learner, pomdp_env, save_path, bc_epochs, bc_logname, device):
@@ -238,7 +238,7 @@ def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learne
 def run_tune_GAIL_PPO(device):
     env_tag = 'pickplace'
     lookup_freq = 1000
-    lr = 1e-3
+    lr = 1e-4
     seq_lens = [100, 200]
     for i in range(3):
         for seq_len in seq_lens:
@@ -269,7 +269,7 @@ def run_tune_GAIL_PPO(device):
                     bc_logname = bc_logname,
                     device=device)
                 demonstrations += 2
-        lr = lr * 0.6
+        lr = lr * 0.4
 
 def evaluate_GAIL_PPO_Fast(device):
     env_tag = 'pickplace'
@@ -303,12 +303,12 @@ def evaluate_GAIL_PPO_Fast(device):
                 bc_epochs = n_samples,
                 bc_logname = bc_logname,
                 device=device)
-            lr = lr * 0.6
+            lr = lr * 0.4
 
 def run_tune_GAIL_TQC(device):
     env_tag = 'pickplace'
     lookup_freq = 1000
-    lr = 1e-3
+    lr = 1e-4
     seq_lens = [100, 200]
     for i in range(3):
         for seq_len in seq_lens:
@@ -331,7 +331,7 @@ def run_tune_GAIL_TQC(device):
                     bc_logname = bc_logname,
                     device=device)
                 demonstrations
-        lr = lr * 0.6
+        lr = lr * 0.4
 
 def evaluate_GAIL_TQC_Fast(device):
     env_tag = 'pickplace'
@@ -357,7 +357,7 @@ def evaluate_GAIL_TQC_Fast(device):
                 bc_epochs = n_samples,
                 bc_logname = bc_logname,
                 device=device)
-            lr = lr * 0.6
+            lr = lr * 0.4
 
 def evaluate_GAIL_PPO_custom(device, lr, seq_len, demonstrations):
     env_tag = 'pickplace'
