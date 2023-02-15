@@ -16,7 +16,7 @@ from active_critic.utils.tboard_graphs import TBoardGraphs
 from gym.envs.mujoco import MujocoEnv
 from torch.utils.data.dataloader import DataLoader
 import numpy as np
-
+import pickle
 
 class ACLScores:
     def __init__(self) -> None:
@@ -78,6 +78,10 @@ class ActiveCriticLearner(nn.Module):
         self.best_success = -1
         self.train_critic = self.network_args.start_critic
         self.virtual_step = 0
+
+        self.NPSuccessRate = None
+        self.NPExpectedSuccessRate = None
+        self.NPExpectedSuccessRateOptimized = None 
         
 
         if network_args_obj.tboard:
@@ -389,12 +393,18 @@ class ActiveCriticLearner(nn.Module):
 
         last_expected_rewards_before, _ = expected_rewards_before.max(dim=1)
         last_expected_reward_after, _ = expected_rewards_after.max(dim=1)
+            
+
         self.analyze_critic_scores(
             last_sparse_reward, last_expected_rewards_before,  fix)
         self.analyze_critic_scores(
             last_sparse_reward, last_expected_reward_after, ' optimized'+ fix)
         success = (sparse_reward == 1)
         success = success.type(th.float)
+
+        if optimize:
+            self.save_stat(success, last_expected_rewards_before, last_expected_reward_after)
+
         debug_dict = {
             'Success Rate': success.mean(),
             'Reward': sparse_reward.mean(),
@@ -420,6 +430,29 @@ class ActiveCriticLearner(nn.Module):
 
         self.policy.args_obj.optimize = pre_opt
 
+    def save_stat(self, success, expected_success, opt_exp):
+        if self.NPSuccessRate is None:
+            self.NPSuccessRate = success.mean().cpu().numpy()
+            self.NPExpectedSuccessRateOptimized = opt_exp.mean().cpu().numpy()
+            self.NPExpectedSuccessRate = expected_success.mean().cpu().numpy()
+            self.stats_steps= np.array(self.get_num_training_samples())
+        else:
+            self.NPSuccessRate = np.append(self.NPSuccessRate, success.mean().cpu().numpy())
+            self.NPExpectedSuccessRateOptimized = np.append(self.NPExpectedSuccessRateOptimized, opt_exp.mean().cpu().numpy())
+            self.NPExpectedSuccessRate = np.append(self.NPExpectedSuccessRate, expected_success.mean().cpu().numpy())
+            self.stats_steps = np.append(self.stats_steps, np.array(self.get_num_training_samples()))
+        exp_dict = {
+            'success_rate':self.NPSuccessRate,
+            'expected_success' : self.NPExpectedSuccessRate,
+            'optimized_expected': self.NPExpectedSuccessRateOptimized,
+            'step':self.stats_steps
+        }
+        path_to_stat = os.path.join(self.network_args.data_path, self.network_args.logname)
+        if not os.path.exists(path_to_stat):
+            os.makedirs(path_to_stat)
+
+        with open(path_to_stat + '/stats', 'wb') as handle:
+            pickle.dump(exp_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def analyze_critic_scores(self, reward: th.Tensor, expected_reward: th.Tensor, add: str):
         success = reward == 1

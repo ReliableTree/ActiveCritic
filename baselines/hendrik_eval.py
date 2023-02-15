@@ -47,7 +47,8 @@ from active_critic.TQC.tqc_policy import TQCPolicyEval
 global save_path
 global n_samples
 n_samples = 200
-save_path = '/data/bing/hendrik/Evaluate Baseline Fast/'
+save_path = '/data/bing/hendrik/Evaluate Baseline Correct/'
+
 if not os.path.exists(save_path):
    os.makedirs(save_path)
 
@@ -191,8 +192,8 @@ def evaluate_GAIL(env_tag, logname, seq_len, n_demonstrations, n_samples, learne
             bc_learner.train(n_epochs=runs_per_epoch)
             success, rews = get_avr_succ_rew_det(env=pomdp_env_val, learner=bc_learner.policy, epsiodes=50)
             success_rate = success.mean()
-            tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=i)
-            tboard.addValidationScalar('Success Rate', value=th.tensor(success_rate), stepid=i)
+            tboard.addValidationScalar('Reward', value=th.tensor(rews.mean()), stepid=i*fac)
+            tboard.addValidationScalar('Success Rate', value=th.tensor(success_rate), stepid=i*fac)
             if success_rate > best_succes_rate:
                 best_succes_rate = success_rate
                 th.save(bc_learner.policy.state_dict(), save_path + bc_logname + ' BC best')
@@ -381,6 +382,34 @@ def evaluate_GAIL_PPO_custom(device, lr, seq_len, demonstrations):
         )
     logname = f'GAIL + PPO lr: {lr}, Demonstrations: {demonstrations}, seq_len: {seq_len}'
     bc_logname = f'GAIL + PPO Demonstrations: {demonstrations}, seq_len: {seq_len}'
+    evaluate_GAIL(
+        env_tag=env_tag, 
+        logname=logname, 
+        seq_len=seq_len, 
+        n_demonstrations=demonstrations, 
+        n_samples = n_samples, 
+        learner = learner, 
+        pomdp_env = pomdp_env, 
+        save_path=save_path,
+        bc_epochs = n_samples,
+        bc_logname = bc_logname,
+        device=device)
+    
+def evaluate_GAIL_TQC_custom(device, lr, seq_len, demonstrations):
+    env_tag = 'pickplace'
+    lookup_freq = 1000
+    if lr is None:
+        lr = 1e-3
+    if seq_len is None:
+        seq_len = 100
+    if demonstrations is None:
+        demonstrations = 10
+
+    pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
+    learner = TQC(policy='MlpPolicy', env=pomdp_env, device=device, learning_rate=lr)
+
+    logname = f'GAIL + TQC lr: {lr}, Demonstrations: {demonstrations}, seq_len: {seq_len}'
+    bc_logname = f'GAIL + TQC Demonstrations: {demonstrations}, seq_len: {seq_len}'
     evaluate_GAIL(
         env_tag=env_tag, 
         logname=logname, 
