@@ -23,7 +23,7 @@ import random
 
 
 
-def make_wsm_setup(seq_len, d_output, device='cuda'):
+def make_wsm_setup(seq_len, d_output, weight_decay, device='cuda'):
     wsm = WholeSequenceModelSetup()
     wsm.model_setup = ModelSetup()
     seq_len = seq_len
@@ -38,7 +38,7 @@ def make_wsm_setup(seq_len, d_output, device='cuda'):
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
-    wsm.optimizer_kwargs = {}
+    wsm.optimizer_kwargs = {'weight_decay':weight_decay}
     return wsm
 
 
@@ -61,13 +61,13 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     return acps
 
 
-def setup_ac(seq_len, num_cpu, device, tag):
+def setup_ac(seq_len, num_cpu, device, tag, weight_decay):
     env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
     wsm_actor_setup = make_wsm_setup(
-        seq_len=seq_len, d_output=d_output, device=device)
+        seq_len=seq_len, d_output=d_output, device=device, weight_decay=weight_decay)
     wsm_critic_setup = make_wsm_setup(
-        seq_len=seq_len, d_output=1, device=device)
+        seq_len=seq_len, d_output=1, device=device, weight_decay=weight_decay)
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
     actor = WholeSequenceModel(wsm_actor_setup)
@@ -77,7 +77,7 @@ def setup_ac(seq_len, num_cpu, device, tag):
     return ac, acps, env, expert
 
 
-def make_acl(device, logname,  seq_len , imitation_phase, total_training_epsiodes, training_episodes, min_critic_threshold, data_path):
+def make_acl(device, logname,  seq_len , imitation_phase, total_training_epsiodes, training_episodes, min_critic_threshold, data_path, weight_decay):
     device = device
     acla = ActiveCriticLearnerArgs()
     acla.data_path = data_path
@@ -103,7 +103,7 @@ def make_acl(device, logname,  seq_len , imitation_phase, total_training_epsiode
     acla.start_critic = False
 
     epsiodes = 30
-    ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, tag=tag)
+    ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, tag=tag, weight_decay=weight_decay)
     eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
     return acl, env, expert, seq_len, epsiodes, device
@@ -140,7 +140,7 @@ def make_acl_fast(device, logname,  seq_len , imitation_phase, total_training_ep
     return acl, env, expert, seq_len, epsiodes, device
 
 
-def run_experiment(device, data_path, logname, demos=14, imitation_phase=False, total_training_epsiodes=20, training_episodes=10, min_critic_threshold=1e-4, fast=False):
+def run_experiment(device, data_path, logname, weight_decay=1e-2, demos=14, imitation_phase=False, total_training_epsiodes=20, training_episodes=10, min_critic_threshold=1e-4, fast=False):
     seq_len = 100
     if fast:
         acl, env, expert, seq_len, epsiodes, device = make_acl_fast(
@@ -151,7 +151,8 @@ def run_experiment(device, data_path, logname, demos=14, imitation_phase=False, 
             imitation_phase=imitation_phase, 
             total_training_epsiodes=total_training_epsiodes,
             training_episodes=training_episodes,
-            min_critic_threshold=min_critic_threshold)    
+            min_critic_threshold=min_critic_threshold,
+            weight_decay=weight_decay)    
     else:
         acl, env, expert, seq_len, epsiodes, device = make_acl(
                                 device,
@@ -161,7 +162,8 @@ def run_experiment(device, data_path, logname, demos=14, imitation_phase=False, 
                                 imitation_phase=imitation_phase, 
                                 total_training_epsiodes=total_training_epsiodes,
                                 training_episodes=training_episodes,
-                                min_critic_threshold=min_critic_threshold)    
+                                min_critic_threshold=min_critic_threshold,
+                                weight_decay=weight_decay)    
     acl.network_args.num_expert_demos = demos
 
     path_to_expert_trjs = acl.network_args.data_path + '/demonstrations'
@@ -260,9 +262,9 @@ def run_eval_stats(device):
                         acl.add_training_data(policy=expert, episodes=demos, seq_len=seq_len)
                         acl.train(epochs=100000)
 
-def run_eval_stats(device):
+def run_eval_stats(device, demos, weight_decay):
     imitation_phase = False
-    demonstrations = 14
+    demonstrations = demos
     run_ids = [0,1,2,3,4,6]
     training_episodes = 10
     total_training_epsiodes = 400
@@ -278,6 +280,7 @@ def run_eval_stats(device):
                        total_training_epsiodes=total_training_epsiodes,
                        training_episodes=training_episodes,
                        min_critic_threshold=min_critic_threshold,
+                       weight_decay = weight_decay,
                        fast=False)
 
 
