@@ -14,6 +14,8 @@ import gym
 import copy
 import torch.nn as nn
 import math
+import pickle
+import os
 
 class PositionalEncoding(nn.Module):
 
@@ -416,7 +418,22 @@ def make_pomdp_rollouts(rollouts, lookup_frq, count_dim):
             obs = ro
     return rollouts
 
-def get_avr_succ_rew_det(env, learner, epsiodes):
+def save_stat(success, history, step, path):
+    if history is None:
+        history = {
+            'success_rate':success.mean(),
+            'step': np.array(step)
+        }
+    else:
+        history['success_rate'] = np.append(history['success_rate'], success.mean())
+        history['step'] = np.append(history['step'], np.array(step))
+
+    with open(path, 'wb') as handle:
+        pickle.dump(history, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    return history
+
+
+def get_avr_succ_rew_det(env, learner, epsiodes, path, history, step):
     success = []
     rews = []
     for i in range(epsiodes):
@@ -431,4 +448,7 @@ def get_avr_succ_rew_det(env, learner, epsiodes):
                 break
             if done:
                 success.append(0)
-    return np.array(success), np.array(rews)
+    success = np.array(success)
+    rews = np.array(rews)
+    history = save_stat(success=success, history=history, step=step, path=path)
+    return success, rews, history
