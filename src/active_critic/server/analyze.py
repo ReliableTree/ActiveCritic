@@ -89,8 +89,8 @@ def make_acl(device, logname,  seq_len , imitation_phase, total_training_epsiode
     acla.tboard = True
     acla.batch_size = 16
     number = 10
-    acla.val_every = 5000
-    acla.add_data_every = 5000
+    acla.val_every = 10000
+    acla.add_data_every = 10000
     acla.validation_episodes = 25 #(*8)
     acla.validation_rep = 8
     acla.training_epsiodes = training_episodes
@@ -267,9 +267,9 @@ def run_eval_stats(device, demos, weight_decay):
     demonstrations = demos
     run_ids = [0,1,2,3,4,6]
     training_episodes = 10
-    total_training_epsiodes = 400
+    total_training_epsiodes = 200
     min_critic_threshold = 5e-5
-    data_path = '/data/bing/hendrik/AC_var_test'
+    data_path = '/data/bing/hendrik/AC_var_test_200'
     for run_id in run_ids:
         logname = f'demonstrations: {demonstrations}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, run id: {run_id}'
         run_experiment(device=device,
