@@ -88,6 +88,8 @@ class ActiveCriticLearner(nn.Module):
 
         self.train_data = DatasetAC(device=self.network_args.device)
         self.train_data.onyl_positiv = False
+        self.exp_dict_opt = None
+        self.exp_dict = None
 
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
@@ -326,6 +328,39 @@ class ActiveCriticLearner(nn.Module):
         labels = rewards.max(1).values.squeeze().reshape([-1, 1, 1]) == 1
         labels = labels.type(th.float)
         return labels
+    
+    def save_stat(self, success, expected_success, opt_exp, exp_dict):
+
+        if exp_dict is None:
+            exp_dict = {
+            'success_rate':success.mean().cpu().numpy(),
+            'expected_success' : expected_success.mean().cpu().numpy(),
+            'step':np.array(self.get_num_training_samples())
+            }
+            if opt_exp is not None:
+                exp_dict['optimized_expected'] =  opt_exp.mean().cpu().numpy()
+
+        else:
+            exp_dict['success_rate'] = np.append(exp_dict['success_rate'], success.mean().cpu().numpy())
+            exp_dict['expected_success'] = np.append(exp_dict['expected_success'], expected_success.mean().cpu().numpy())
+            exp_dict['step'] = np.append(exp_dict['step'], np.array(self.get_num_training_samples()))
+            if opt_exp is not None:
+                exp_dict['optimized_expected'] = np.append(exp_dict['optimized_expected'], opt_exp.mean().cpu().numpy())
+
+        path_to_stat = os.path.join(self.network_args.data_path, self.network_args.logname)
+
+        if not os.path.exists(path_to_stat):
+            os.makedirs(path_to_stat)
+
+        add = ''
+        if opt_exp is not None:
+            add = 'optimized'
+
+        with open(path_to_stat + '/stats'+add, 'wb') as handle:
+            pickle.dump(exp_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        return exp_dict
+
 
     def run_validation(self, optimize):
         if optimize:
@@ -414,6 +449,21 @@ class ActiveCriticLearner(nn.Module):
         else:
             self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize, step=self.get_num_training_samples())
         self.policy.args_obj.optimize = pre_opt
+
+        if optimize:
+            exp_after = expected_rewards_after
+            exp_dict = self.exp_dict_opt
+        else:
+            exp_after = None
+            exp_dict = self.exp_dict
+
+        exp_dict = self.save_stat(success=success, expected_success=expected_rewards_before, opt_exp=exp_after, exp_dict=exp_dict)
+
+        if optimize:
+            self.exp_dict_opt = exp_dict
+        else:
+            self.exp_dict = exp_dict
+
 
 
     def analyze_critic_scores(self, reward: th.Tensor, expected_reward: th.Tensor, add: str):
