@@ -125,14 +125,14 @@ class ActiveCriticPolicy(BaseModel):
                 stop_opt=self.args_obj.stop_opt
                 )
 
-        '''if self.args_obj.optimize:
-            self.history.add_value(
-                history=self.history.opt_scores, 
-                value=self.current_result.expected_succes_after[:, 0].detach(), 
-                current_step=self.current_step
-            )
-        self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
-'''
+        if self.current_step == 0:
+            if self.args_obj.optimize:
+                self.history.add_value(
+                    history=self.history.opt_scores, 
+                    value=self.current_result.expected_succes_after[:, 0].detach(), 
+                    current_step=self.current_step
+                )
+            self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
         return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
 
     def forward(self, 
