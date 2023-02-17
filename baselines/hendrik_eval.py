@@ -416,4 +416,4 @@ if __name__ == '__main__':
             for lr in lrs:
                 stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200)    
     else:
-        print('choose other algo')
+        print('choose others algo')
