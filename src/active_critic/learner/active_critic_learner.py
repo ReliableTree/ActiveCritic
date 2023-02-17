@@ -31,8 +31,8 @@ class ACLScores:
         return new_min
 
     def update_max_score(self, old_score, new_score):
-        new_max = old_score[0] < new_score
-        if old_score[0] < new_score:
+        new_max = old_score[0] <= new_score
+        if new_max:
             old_score[0] = new_score
         return new_max
 
@@ -421,9 +421,6 @@ class ActiveCriticLearner(nn.Module):
 
         best_model = self.scores.update_max_score(
             self.scores.mean_reward, sparse_reward.mean())
-        if best_model:
-            self.saveNetworkToFile(add='best_validation', data_path=os.path.join(
-                self.network_args.data_path, self.logname))
             
 
         last_expected_rewards_before, _ = expected_rewards_before.max(dim=1)
@@ -436,9 +433,6 @@ class ActiveCriticLearner(nn.Module):
             last_sparse_reward, last_expected_reward_after, ' optimized'+ fix)
         success = (sparse_reward == 1)
         success = success.type(th.float)
-
-        if optimize:
-            self.save_stat(success, last_expected_rewards_before, last_expected_reward_after)
 
         debug_dict = {
             'Success Rate': success.mean(),
