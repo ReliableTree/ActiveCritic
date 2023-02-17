@@ -251,14 +251,14 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
                             data_path=logname_save_path)
 
     best_succes_rate = -1
-    fac = bc_epochs#40
-    runs_per_epoch = 1#20 * fac
+    fac = 40
+    runs_per_epoch = 20 * fac
     for i in range(int(bc_epochs/fac)):
         bc_learner.train(n_epochs=runs_per_epoch)
         success, rews, history = get_avr_succ_rew_det(
             env=pomdp_env_val, 
             learner=bc_learner.policy, 
-            epsiodes=20,#200,
+            epsiodes=200,
             path=bc_stats_path,
             history=history,
             step=i)
@@ -300,7 +300,7 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
         success, rews, history = get_avr_succ_rew_det(
             env=pomdp_env_val, 
             learner=learner.policy, 
-            epsiodes=20,#200,
+            epsiodes=200,
             path=learner_stats_path,
             history=history,
             step=0)
@@ -317,13 +317,13 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
 
         while learner.env.envs[0].reset_count <= n_samples:
             print('before learn')
-            gail_trainer.train(10000)
+            gail_trainer.train(1000)
             print('after learn')
             print(learner.env.envs[0].reset_count)
             success, rews, history = get_avr_succ_rew_det(
                 env=pomdp_env_val, 
                 learner=learner.policy, 
-                epsiodes=20,#200,
+                epsiodes=200,
                 path=learner_stats_path,
                 history=history,
                 step=learner.env.envs[0].reset_count)
@@ -406,7 +406,7 @@ if __name__ == '__main__':
         lrs = [1e-4, 1e-5, 0]
         for demonstrations in list_demonstrations:
             for lr in lrs:
-                stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=10)
+                stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200)
 
     elif args.learner == 'stats_GAIL_PPO':
         print('running GAIL + PPO')
@@ -414,6 +414,6 @@ if __name__ == '__main__':
         lrs = [1e-4]
         for demonstrations in list_demonstrations:
             for lr in lrs:
-                stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=10)    
+                stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200)    
     else:
         print('choose other algo')
