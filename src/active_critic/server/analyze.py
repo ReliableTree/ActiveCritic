@@ -296,7 +296,7 @@ def run_eval_stats(device, demos, weight_decay):
                        training_episodes=training_episodes,
                        min_critic_threshold=min_critic_threshold,
                        weight_decay = weight_decay,
-                       fast=False)
+                       fast=True)
 
 
 
