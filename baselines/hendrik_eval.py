@@ -352,7 +352,7 @@ def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id):
     logname = f'TQC_GAIL_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
-        name=env_tag, seq_len=seq_len, lookup_freq=5000)
+        name=env_tag, seq_len=seq_len, lookup_freq=50000)
     TQC_learner = TQC(policy='MlpPolicy', env=pomdp_env,
         device=device, learning_rate=lr)
 
