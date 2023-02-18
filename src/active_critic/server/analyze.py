@@ -101,8 +101,8 @@ def make_acl(device, env_tag, data_path, logname,  seq_len , imitation_phase, to
         acla.min_critic_threshold = min_critic_threshold
         acla.num_cpu = 2
     else:
-        acla.val_every = 1000
-        acla.add_data_every = 1000
+        acla.val_every = 10000
+        acla.add_data_every = 10000
         acla.validation_episodes = 25 #(*8)
         acla.validation_rep = 8
         acla.training_epsiodes = training_episodes
