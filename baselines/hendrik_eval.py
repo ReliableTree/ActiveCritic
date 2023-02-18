@@ -357,7 +357,7 @@ def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id):
         device=device, learning_rate=lr)
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=n_samples, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=100)
+                     bc_epochs=n_samples, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=1000)
 
 def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples):
     ids = [0,1,2,3,4]
