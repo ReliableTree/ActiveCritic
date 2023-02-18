@@ -258,7 +258,7 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
         success, rews, history = get_avr_succ_rew_det(
             env=pomdp_env_val, 
             learner=bc_learner.policy, 
-            epsiodes=200,
+            epsiodes=50,
             path=bc_stats_path,
             history=history,
             step=i)
@@ -300,7 +300,7 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
         success, rews, history = get_avr_succ_rew_det(
             env=pomdp_env_val, 
             learner=learner.policy, 
-            epsiodes=200,
+            epsiodes=50,
             path=learner_stats_path,
             history=history,
             step=0)
@@ -323,7 +323,7 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
             success, rews, history = get_avr_succ_rew_det(
                 env=pomdp_env_val, 
                 learner=learner.policy, 
-                epsiodes=200,
+                epsiodes=50,
                 path=learner_stats_path,
                 history=history,
                 step=learner.env.envs[0].reset_count)
@@ -339,7 +339,7 @@ def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id):
     logname = f'PPO_GAIL_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
-        name=env_tag, seq_len=seq_len, lookup_freq=1000)
+        name=env_tag, seq_len=seq_len, lookup_freq=2048)
     PPO_learner = PPO("MlpPolicy", pomdp_env, verbose=0,
                       device=device, learning_rate=lr)
 
@@ -352,7 +352,7 @@ def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id):
     logname = f'TQC_GAIL_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
-        name=env_tag, seq_len=seq_len, lookup_freq=1000)
+        name=env_tag, seq_len=seq_len, lookup_freq=5000)
     TQC_learner = TQC(policy='MlpPolicy', env=pomdp_env,
         device=device, learning_rate=lr)
 
