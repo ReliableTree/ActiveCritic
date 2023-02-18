@@ -77,14 +77,14 @@ def setup_ac(seq_len, num_cpu, device, tag, weight_decay):
     return ac, acps, env, expert
 
 
-def make_acl(device, data_path, logname,  seq_len , imitation_phase, total_training_epsiodes, training_episodes, min_critic_threshold, weight_decay, fast=False):
+def make_acl(device, env_tag, data_path, logname,  seq_len , imitation_phase, total_training_epsiodes, training_episodes, min_critic_threshold, weight_decay, fast=False):
     device = device
     acla = ActiveCriticLearnerArgs()
     acla.data_path = data_path
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = imitation_phase
-    tag = 'pickplace'
+    tag = env_tag
     acla.logname = tag + logname
     acla.tboard = True
     acla.batch_size = 16
@@ -122,11 +122,12 @@ def make_acl(device, data_path, logname,  seq_len , imitation_phase, total_train
     return acl, env, expert, seq_len, epsiodes, device
 
 
-def run_experiment(device, data_path, logname, fast, weight_decay=1e-2, demos=14, imitation_phase=False, total_training_epsiodes=20, training_episodes=10, min_critic_threshold=1e-4):
+def run_experiment(device, data_path, env_tag, logname, fast, weight_decay=1e-2, demos=14, imitation_phase=False, total_training_epsiodes=20, training_episodes=10, min_critic_threshold=1e-4):
     seq_len = 100
 
     acl, env, expert, seq_len, epsiodes, device = make_acl(
                             device,
+                            env_tag=env_tag,
                             data_path=data_path, 
                             seq_len=seq_len, 
                             logname=logname, 
@@ -184,25 +185,29 @@ def run_eval(device):
                             acl.train(epochs=100000)
 
 def run_eval_stats(device, demos, weight_decay):
-    imitation_phase = False
+    imitation_phases = [True, False]
     demonstrations = demos
-    run_ids = [0,1,2,3,4,6]
+    run_ids = [0,1,2,3,4]
     training_episodes = 10
-    total_training_epsiodes = 30
+    total_training_epsiodes = 200
     min_critic_threshold = 5e-5
-    data_path = '/data/bing/hendrik/AC_var_test'
-    for run_id in run_ids:
-        logname = f'demonstrations: {demonstrations}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, run id: {run_id}'
-        run_experiment(device=device,
-                       logname=logname,
-                       data_path=data_path,
-                       demos=demonstrations,
-                       imitation_phase=imitation_phase,
-                       total_training_epsiodes=total_training_epsiodes,
-                       training_episodes=training_episodes,
-                       min_critic_threshold=min_critic_threshold,
-                       weight_decay = weight_decay,
-                       fast=True)
+    data_path = '/data/bing/hendrik/AC_var_test_18'
+    env_tags = ['push', 'reach', 'pickplace']
+    for env_tag in env_tags:
+        for im_ph in imitation_phases:
+            for run_id in run_ids:
+                logname = f'env_tag: {env_tag}, demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, run id: {run_id}'
+                run_experiment(device=device,
+                            env_tag=env_tag,
+                            logname=logname,
+                            data_path=data_path,
+                            demos=demonstrations,
+                            imitation_phase=im_ph,
+                            total_training_epsiodes=total_training_epsiodes,
+                            training_episodes=training_episodes,
+                            min_critic_threshold=min_critic_threshold,
+                            weight_decay = weight_decay,
+                            fast=False)
 
 
 

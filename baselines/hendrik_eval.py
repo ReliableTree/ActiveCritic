@@ -333,9 +333,8 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
             tboard.addValidationScalar('Success Rate', value=th.tensor(
                 success_rate), stepid=learner.env.envs[0].reset_count)
             
-def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id):
+def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     seq_len=100
-    env_tag = 'pickplace'
     logname = f'PPO_GAIL_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
@@ -402,15 +401,16 @@ if __name__ == '__main__':
         run_tune_PPO(device=args.device)
     elif args.learner == 'stats_GAIL_TQC':
         print('running GAIL + TQC')
-        list_demonstrations = [14, 25]
-        lrs = [1e-4, 1e-5, 0]
+        list_demonstrations = [10, 14]
+        lrs = [1e-6, 1e-7]
         for demonstrations in list_demonstrations:
             for lr in lrs:
                 stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200)
 
     elif args.learner == 'stats_GAIL_PPO':
         print('running GAIL + PPO')
-        list_demonstrations = [14, 25]
+        list_demonstrations = [6, 10, 14]
+        list_env_tags = ['pickplace', 'push', 'reach']
         lrs = [1e-4]
         for demonstrations in list_demonstrations:
             for lr in lrs:
