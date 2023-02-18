@@ -101,8 +101,8 @@ def make_acl(device, env_tag, data_path, logname,  seq_len , imitation_phase, to
         acla.min_critic_threshold = min_critic_threshold
         acla.num_cpu = 2
     else:
-        acla.val_every = int(1000 / training_episodes)
-        acla.add_data_every = 100
+        acla.val_every = 1000
+        acla.add_data_every = 1000
         acla.validation_episodes = 25 #(*8)
         acla.validation_rep = 8
         acla.training_epsiodes = training_episodes
@@ -185,14 +185,14 @@ def run_eval(device):
                             acl.train(epochs=100000)
 
 def run_eval_stats(device, demos, weight_decay):
-    imitation_phases = [True, False]
+    imitation_phases = [True]
     demonstrations = demos
     run_ids = [0,1,2,3,4]
     training_episodes = 10
     total_training_epsiodes = 200
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_test_18'
-    env_tags = ['push', 'reach', 'pickplace']
+    env_tags = ['push']
     for env_tag in env_tags:
         for im_ph in imitation_phases:
             for run_id in run_ids:
