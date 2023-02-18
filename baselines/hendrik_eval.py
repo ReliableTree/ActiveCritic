@@ -317,7 +317,7 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
 
         while learner.env.envs[0].reset_count <= n_samples:
             print('before learn')
-            gail_trainer.train(1000)
+            gail_trainer.train(2048)
             print('after learn')
             print(learner.env.envs[0].reset_count)
             success, rews, history = get_avr_succ_rew_det(
@@ -414,6 +414,6 @@ if __name__ == '__main__':
         lrs = [1e-4]
         for demonstrations in list_demonstrations:
             for lr in lrs:
-                stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200)    
+                stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200)   
     else:
         print('choose others algo')
