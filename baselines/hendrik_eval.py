@@ -345,9 +345,8 @@ def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
                      bc_epochs=n_samples, n_samples=n_samples, device=device, learner=PPO_learner, pomdp_env=pomdp_env, eval_every=2048)
     
-def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id):
+def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     seq_len=100
-    env_tag = 'pickplace'
     logname = f'TQC_GAIL_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
@@ -358,15 +357,15 @@ def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id):
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
                      bc_epochs=n_samples, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=1000)
 
-def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples):
+def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples, env_tag):
     ids = [0,1,2,3,4]
     for id in ids:
-        run_eval_PPO_GAIL(device=device, lr=lr, demonstrations=demonstrations, save_path=save_path, n_samples=n_samples, id=id)
+        run_eval_PPO_GAIL(device=device, lr=lr, demonstrations=demonstrations, save_path=save_path, n_samples=n_samples, id=id, env_tag=env_tag)
 
-def stats_GAIL_TQC(device, lr, demonstrations, save_path, n_samples):
+def stats_GAIL_TQC(device, lr, demonstrations, save_path, n_samples, env_tag):
     ids = [0,1,2,3,4]
     for id in ids:
-        run_eval_TQC_GAIL(device=device, lr=lr, demonstrations=demonstrations, save_path=save_path, n_samples=n_samples, id=id)
+        run_eval_TQC_GAIL(device=device, lr=lr, demonstrations=demonstrations, save_path=save_path, n_samples=n_samples, id=id, env_tag=env_tag)
 
 if __name__ == '__main__':
     import argparse
@@ -402,18 +401,20 @@ if __name__ == '__main__':
     elif args.learner == 'stats_GAIL_TQC':
         print('running GAIL + TQC')
         list_demonstrations = [10, 14]
+        env_tag = 'pickplace'
         lrs = [1e-6, 1e-7]
         for demonstrations in list_demonstrations:
             for lr in lrs:
-                stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200)
+                stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200, env_tag=env_tag)
 
     elif args.learner == 'stats_GAIL_PPO':
         print('running GAIL + PPO')
         list_demonstrations = [6, 10, 14]
         list_env_tags = ['pickplace', 'push', 'reach']
         lrs = [1e-4]
-        for demonstrations in list_demonstrations:
-            for lr in lrs:
-                stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200)   
+        for env_tag in list_env_tags:
+            for demonstrations in list_demonstrations:
+                for lr in lrs:
+                    stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200, env_tag=env_tag)   
     else:
         print('choose others algo')
