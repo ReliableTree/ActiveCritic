@@ -213,7 +213,7 @@ def run_tune_PPO(device):
                 demonstrations += 2
         lr = lr * 0.4
 
-def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, logname, learner, pomdp_env):
+def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, logname, learner, pomdp_env, eval_every):
     history = None
     lookup_freq = 1000
     if not os.path.exists(logname_save_path):
@@ -317,7 +317,7 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
 
         while learner.env.envs[0].reset_count <= n_samples:
             print('before learn')
-            gail_trainer.train(2048)
+            gail_trainer.train(eval_every)
             print('after learn')
             print(learner.env.envs[0].reset_count)
             success, rews, history = get_avr_succ_rew_det(
@@ -344,7 +344,7 @@ def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id):
                       device=device, learning_rate=lr)
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=n_samples, n_samples=n_samples, device=device, learner=PPO_learner, pomdp_env=pomdp_env)
+                     bc_epochs=n_samples, n_samples=n_samples, device=device, learner=PPO_learner, pomdp_env=pomdp_env, eval_every=2048)
     
 def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id):
     seq_len=100
@@ -357,7 +357,7 @@ def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id):
         device=device, learning_rate=lr)
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=n_samples, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env)
+                     bc_epochs=n_samples, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=100)
 
 def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples):
     ids = [0,1,2,3,4]
@@ -384,7 +384,7 @@ if __name__ == '__main__':
                         help='pick num expert demos')
 
     args = parser.parse_args()
-    path = '/data/bing/hendrik/Baselines_Stats_GAIL/'    
+    path = '/data/bing/hendrik/Baselines_Stats_GAIL_18/'    
     if args.learner == 'TQC':
         print('running TQC')
         run_eval_TQC(device=args.device)
