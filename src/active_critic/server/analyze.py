@@ -101,8 +101,12 @@ def make_acl(device, env_tag, data_path, logname,  seq_len , imitation_phase, to
         acla.min_critic_threshold = min_critic_threshold
         acla.num_cpu = 2
     else:
-        acla.val_every = 10000
-        acla.add_data_every = 10000
+        if imitation_phase:
+            acla.val_every = 10000
+            acla.add_data_every = 10000
+        else:
+            acla.val_every = int(1000 / training_episodes)
+            acla.add_data_every = 100
         acla.validation_episodes = 25 #(*8)
         acla.validation_rep = 8
         acla.training_epsiodes = training_episodes
@@ -185,18 +189,18 @@ def run_eval(device):
                             acl.train(epochs=100000)
 
 def run_eval_stats(device, demos, weight_decay):
-    imitation_phases = [True]
+    imitation_phases = [True, False]
     demonstrations = demos
     run_ids = [0,1,2,3,4]
     training_episodes = 10
     total_training_epsiodes = 200
     min_critic_threshold = 5e-5
-    data_path = '/data/bing/hendrik/AC_var_test_18'
+    data_path = '/data/bing/hendrik/AC_var_test_19'
     env_tags = ['push']
     for env_tag in env_tags:
         for im_ph in imitation_phases:
             for run_id in run_ids:
-                logname = f'env_tag: {env_tag}, demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, run id: {run_id}'
+                logname = f' demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, run id: {run_id}'
                 run_experiment(device=device,
                             env_tag=env_tag,
                             logname=logname,
@@ -209,7 +213,32 @@ def run_eval_stats(device, demos, weight_decay):
                             weight_decay = weight_decay,
                             fast=False)
 
+def run_eval_stats_demos(device, weight_decay):
+    imitation_phases = [False, True]
+    demonstrations_list = [14, 20, 25]
+    run_ids = [0,1,2,3,4]
 
+    training_episodes = 10
+    total_training_epsiodes = 200
+    min_critic_threshold = 5e-5
+    data_path = '/data/bing/hendrik/AC_var_test_19'
+    env_tags = ['push']
+    for demonstrations in demonstrations_list:
+        for env_tag in env_tags:
+            for im_ph in imitation_phases:
+                for run_id in run_ids:
+                    logname = f' demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, run id: {run_id}'
+                    run_experiment(device=device,
+                                env_tag=env_tag,
+                                logname=logname,
+                                data_path=data_path,
+                                demos=demonstrations,
+                                imitation_phase=im_ph,
+                                total_training_epsiodes=total_training_epsiodes,
+                                training_episodes=training_episodes,
+                                min_critic_threshold=min_critic_threshold,
+                                weight_decay = weight_decay,
+                                fast=False)
 
 
 if __name__ == '__main__':
