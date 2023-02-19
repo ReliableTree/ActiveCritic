@@ -382,7 +382,7 @@ if __name__ == '__main__':
                         help='pick num expert demos')
 
     args = parser.parse_args()
-    path = '/data/bing/hendrik/Baselines_Stats_GAIL_18/'    
+    path = '/data/bing/hendrik/Baselines_Stats_GAIL_19/'    
     if args.learner == 'TQC':
         print('running TQC')
         run_eval_TQC(device=args.device)
