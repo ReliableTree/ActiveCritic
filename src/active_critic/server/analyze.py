@@ -21,6 +21,7 @@ import numpy as np
 from gym import Env
 import random
 
+from datetime import datetime
 
 
 def make_wsm_setup(seq_len, d_output, weight_decay, device='cuda'):
@@ -217,11 +218,13 @@ def run_eval_stats_demos(device, weight_decay):
     imitation_phases = [False, True]
     demonstrations_list = [14, 20, 25]
     run_ids = [0,1,2,3,4]
+    s = datetime.today().strftime('%Y-%m-%d')
+
 
     training_episodes = 10
     total_training_epsiodes = 200
     min_critic_threshold = 5e-5
-    data_path = '/data/bing/hendrik/AC_var_test_19'
+    data_path = '/data/bing/hendrik/AC_var_test_' + s
     env_tags = ['push']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:

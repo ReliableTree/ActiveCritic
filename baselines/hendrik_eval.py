@@ -43,6 +43,7 @@ import copy
 
 from active_critic.TQC.tqc import TQC
 from active_critic.TQC.tqc_policy import TQCPolicyEval
+from datetime import datetime
 
 '''global save_path
 global n_samples
@@ -382,7 +383,9 @@ if __name__ == '__main__':
                         help='pick num expert demos')
 
     args = parser.parse_args()
-    path = '/data/bing/hendrik/Baselines_Stats_GAIL_19/'    
+    s = datetime.today().strftime('%Y-%m-%d')
+
+    path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
     if args.learner == 'TQC':
         print('running TQC')
         run_eval_TQC(device=args.device)
