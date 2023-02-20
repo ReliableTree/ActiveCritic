@@ -403,17 +403,18 @@ if __name__ == '__main__':
         run_tune_PPO(device=args.device)
     elif args.learner == 'stats_GAIL_TQC':
         print('running GAIL + TQC')
-        list_demonstrations = [14, 25]
-        env_tag = 'push'
+        list_demonstrations = [6,10,14]
+        list_env_tags = ['push, reach, windowopen, pickplace']
         lrs = [1e-7]
-        for demonstrations in list_demonstrations:
-            for lr in lrs:
-                stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200, env_tag=env_tag)
+        for env_tag in list_env_tags:
+            for demonstrations in list_demonstrations:
+                for lr in lrs:
+                    stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200, env_tag=env_tag)
 
     elif args.learner == 'stats_GAIL_PPO':
         print('running GAIL + PPO')
-        list_demonstrations = [14, 25]
-        list_env_tags = ['push', 'reach']
+        list_demonstrations = [6,10,14]
+        list_env_tags = ['push, reach, windowopen, pickplace']
         lrs = [1e-4]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
