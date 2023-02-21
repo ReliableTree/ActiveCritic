@@ -404,7 +404,7 @@ if __name__ == '__main__':
     elif args.learner == 'stats_GAIL_TQC':
         print('running GAIL + TQC')
         list_demonstrations = [6,10,14]
-        list_env_tags = ['push, reach, windowopen, pickplace']
+        list_env_tags = ['push', 'reach', 'windowopen', 'pickplace']
         lrs = [1e-7]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
@@ -414,7 +414,7 @@ if __name__ == '__main__':
     elif args.learner == 'stats_GAIL_PPO':
         print('running GAIL + PPO')
         list_demonstrations = [6,10,14]
-        list_env_tags = ['push, reach, windowopen, pickplace']
+        list_env_tags = ['push', 'reach', 'windowopen', 'pickplace']
         lrs = [1e-4]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
