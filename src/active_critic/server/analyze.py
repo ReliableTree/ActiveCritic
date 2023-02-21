@@ -222,7 +222,7 @@ def run_eval_stats_demos(device, weight_decay):
     total_training_epsiodes = 200
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_test_' + s
-    env_tags = ['push, reach, windowopen, pickplace']
+    env_tags = ['push', 'reach', 'windowopen', 'pickplace']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
