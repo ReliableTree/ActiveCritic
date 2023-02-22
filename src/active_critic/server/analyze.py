@@ -78,7 +78,7 @@ def setup_ac(seq_len, num_cpu, device, tag, weight_decay):
     return ac, acps, env, expert
 
 
-def make_acl(device, env_tag, data_path, logname,  seq_len , imitation_phase, total_training_epsiodes, training_episodes, min_critic_threshold, weight_decay, fast=False):
+def make_acl(device, env_tag, data_path, logname,  seq_len, val_every, imitation_phase, total_training_epsiodes, training_episodes, min_critic_threshold, weight_decay, fast=False):
     device = device
     acla = ActiveCriticLearnerArgs()
     acla.data_path = data_path
@@ -92,8 +92,8 @@ def make_acl(device, env_tag, data_path, logname,  seq_len , imitation_phase, to
     number = 10
 
     if fast:
-        acla.val_every = 20
-        acla.add_data_every = 20
+        acla.val_every = val_every
+        acla.add_data_every = val_every
         acla.validation_episodes = 2 #(*8)
         acla.validation_rep = 1
         acla.training_epsiodes = training_episodes
@@ -102,8 +102,8 @@ def make_acl(device, env_tag, data_path, logname,  seq_len , imitation_phase, to
         acla.min_critic_threshold = min_critic_threshold
         acla.num_cpu = 2
     else:
-        acla.val_every = 1000
-        acla.add_data_every = 1000
+        acla.val_every = val_every
+        acla.add_data_every = val_every
 
         acla.validation_episodes = 25 #(*8)
         acla.validation_rep = 8
@@ -124,7 +124,7 @@ def make_acl(device, env_tag, data_path, logname,  seq_len , imitation_phase, to
     return acl, env, expert, seq_len, epsiodes, device
 
 
-def run_experiment(device, data_path, env_tag, logname, fast, weight_decay=1e-2, demos=14, imitation_phase=False, total_training_epsiodes=20, training_episodes=10, min_critic_threshold=1e-4):
+def run_experiment(device, data_path, env_tag, logname, fast, val_every, weight_decay=1e-2, demos=14, imitation_phase=False, total_training_epsiodes=20, training_episodes=10, min_critic_threshold=1e-4):
     seq_len = 100
 
     acl, env, expert, seq_len, epsiodes, device = make_acl(
@@ -138,6 +138,7 @@ def run_experiment(device, data_path, env_tag, logname, fast, weight_decay=1e-2,
                             training_episodes=training_episodes,
                             min_critic_threshold=min_critic_threshold,
                             weight_decay=weight_decay,
+                            val_every=val_every,
                             fast=fast)    
     acl.network_args.num_expert_demos = demos
 
@@ -213,7 +214,7 @@ def run_eval_stats(device, demos, weight_decay):
 
 def run_eval_stats_demos(device, weight_decay):
     imitation_phases = [False, True]
-    demonstrations_list = [10,15,20]
+    demonstrations_list = [10, 20]
     run_ids = [i for i in range(10)]
     s = datetime.today().strftime('%Y-%m-%d')
 
@@ -223,22 +224,25 @@ def run_eval_stats_demos(device, weight_decay):
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['push']
-    for demonstrations in demonstrations_list:
-        for env_tag in env_tags:
-            for im_ph in imitation_phases:
-                for run_id in run_ids:
-                    logname = f' demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, run id: {run_id}'
-                    run_experiment(device=device,
-                                env_tag=env_tag,
-                                logname=logname,
-                                data_path=data_path,
-                                demos=demonstrations,
-                                imitation_phase=im_ph,
-                                total_training_epsiodes=total_training_epsiodes,
-                                training_episodes=training_episodes,
-                                min_critic_threshold=min_critic_threshold,
-                                weight_decay = weight_decay,
-                                fast=False)
+    val_everys = [2000, 5000, 10000] 
+    for val_every in val_everys:
+        for demonstrations in demonstrations_list:
+            for env_tag in env_tags:
+                for im_ph in imitation_phases:
+                    for run_id in run_ids:
+                        logname = f' demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                        run_experiment(device=device,
+                                    env_tag=env_tag,
+                                    logname=logname,
+                                    data_path=data_path,
+                                    demos=demonstrations,
+                                    imitation_phase=im_ph,
+                                    total_training_epsiodes=total_training_epsiodes,
+                                    training_episodes=training_episodes,
+                                    min_critic_threshold=min_critic_threshold,
+                                    weight_decay = weight_decay,
+                                    val_every=val_every,
+                                    fast=False)
 
 
 if __name__ == '__main__':
