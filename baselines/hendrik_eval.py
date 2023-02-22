@@ -384,7 +384,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
-
+    list_demonstrations = [4,8,12]
+    list_env_tags = ['windowopen']
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
     if args.learner == 'TQC':
         print('running TQC')
@@ -403,8 +404,7 @@ if __name__ == '__main__':
         run_tune_PPO(device=args.device)
     elif args.learner == 'stats_GAIL_TQC':
         print('running GAIL + TQC')
-        list_demonstrations = [10,15,20]
-        list_env_tags = ['push']
+        
         lrs = [1e-7, 1e-6]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
@@ -413,8 +413,7 @@ if __name__ == '__main__':
 
     elif args.learner == 'stats_GAIL_PPO':
         print('running GAIL + PPO')
-        list_demonstrations = [10,15,20]
-        list_env_tags = ['push']
+
         lrs = [1e-4, 1e-3]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
