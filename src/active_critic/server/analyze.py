@@ -214,7 +214,7 @@ def run_eval_stats(device, demos, weight_decay):
 
 def run_eval_stats_demos(device, weight_decay):
     imitation_phases = [False, True]
-    demonstrations_list = [10, 20]
+    demonstrations_list = [4, 8, 12]
     run_ids = [i for i in range(10)]
     s = datetime.today().strftime('%Y-%m-%d')
 
@@ -223,7 +223,7 @@ def run_eval_stats_demos(device, weight_decay):
     total_training_epsiodes = 200
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['push']
+    env_tags = ['windowopen']
     val_everys = [2000, 5000, 10000] 
     for val_every in val_everys:
         for demonstrations in demonstrations_list:
