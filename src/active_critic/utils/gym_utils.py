@@ -16,6 +16,8 @@ import torch.nn as nn
 import math
 import pickle
 import os
+from active_critic.utils.dataset import DatasetAC
+from torch.utils.data.dataloader import DataLoader
 
 class PositionalEncoding(nn.Module):
 
@@ -359,6 +361,46 @@ class POMDP_Wrapper(gym.Wrapper):
 
         return obsv, rew, done, info
     
+class REC_POMDP_Wrapper(gym.Wrapper):
+    def __init__(self, env) -> None:
+        super().__init__(env)
+        self.current_step = 0
+
+    def reset(self):
+        obsv =  super().reset()
+        self.current_step = 0
+        self.current_obv = np.copy(obsv)
+        return obsv
+
+    def step(self, action):
+        self.current_step += 1
+        obsv, rew, done, info = super().step(action)
+        obsv = np.copy(self.current_obv)
+        if done and info['success'] > 0:
+            rew = 10.
+        else:
+            rew = 0.
+
+        return obsv, rew, done, info
+    
+def make_dummy_vec_env_rec_pomdp(name, seq_len):
+    policy_dict = make_policy_dict()
+
+    env_tag = name
+    max_episode_steps = seq_len
+    env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
+    env._freeze_rand_vec = False
+    timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
+    strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+    reset_env = ResetCounterWrapper(env=strict_time)
+
+    rec_pomdp = REC_POMDP_Wrapper(env=reset_env)
+
+    dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(rec_pomdp)])
+    vec_expert = ImitationLearningWrapper(
+        policy=policy_dict[env_tag][0], env=dv1)
+    return dv1, vec_expert
+
 def make_dummy_vec_env_pomdp(name, seq_len, lookup_freq):
     policy_dict = make_policy_dict()
 
@@ -453,3 +495,40 @@ def get_avr_succ_rew_det(env, learner, epsiodes, path, history, step):
     rews = np.array(rews)
     history = save_stat(success=success, history=history, step=step, path=path)
     return success, rews, history
+
+def get_avr_succ_rew_det_rec(env, learner, epsiodes, path, history, step):
+    success = []
+    rews = []
+    for i in range(epsiodes):
+        obs = env.reset()
+        done = False
+        lstm_states = None
+        episode_start_c = 1
+
+        while not done:
+            action, lstm_states = learner.predict(observation=obs, deterministic=True, episode_start=np.array([episode_start_c]), state=lstm_states)
+            episode_start_c = 0
+            obs, rew, done, info = env.step(action)
+            rews.append(rew)
+            if info[0]['success'] > 0:
+                success.append(info[0]['success'])
+                break
+            if done:
+                success.append(0)
+                
+    success = np.array(success)
+    rews = np.array(rews)
+    history = save_stat(success=success, history=history, step=step, path=path)
+    return success, rews, history
+
+def make_ppo_rec_data_loader(env, vec_expert, n_demonstrations, seq_len, device):
+    transitions, rollouts = sample_expert_transitions_rollouts(
+        vec_expert.predict, env, n_demonstrations)
+    actions, observations, rewards = parse_sampled_transitions(transitions=transitions, extractor=DummyExtractor(), seq_len=seq_len, device='cuda')
+    inpt_obsv = observations[:,:1].repeat([1, observations.shape[1], 1])
+    train_data = DatasetAC(device=device)
+    train_data.add_data(obsv=inpt_obsv, actions=actions, reward=rewards)
+    train_data.onyl_positiv = False
+
+    dataloader = DataLoader(dataset=train_data, batch_size=16, shuffle=True)
+    return dataloader

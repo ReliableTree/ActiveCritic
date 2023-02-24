@@ -4,7 +4,10 @@ from active_critic.utils.gym_utils import (
     sample_expert_transitions_rollouts,
     make_pomdp_rollouts,
     make_dummy_vec_env_pomdp,
-    get_avr_succ_rew_det
+    get_avr_succ_rew_det,
+    get_avr_succ_rew_det_rec,
+    make_ppo_rec_data_loader,
+    make_dummy_vec_env_rec_pomdp
 )
 import gym
 from stable_baselines3 import PPO
@@ -44,14 +47,8 @@ import copy
 from active_critic.TQC.tqc import TQC
 from active_critic.TQC.tqc_policy import TQCPolicyEval
 from datetime import datetime
-
-'''global save_path
-global n_samples
-n_samples = 200
-save_path = '/data/bing/hendrik/Evaluate Baseline Correct/'
-
-if not os.path.exists(save_path):
-    os.makedirs(save_path)'''
+from sb3_contrib import RecurrentPPO
+from active_critic.PPO_Recurrent.ppo_recurrent_bc import Rec_PPO_BC
 
 
 def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, logname, learner: TQC = None):
@@ -334,6 +331,126 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
             tboard.addValidationScalar('Success Rate', value=th.tensor(
                 success_rate), stepid=learner.env.envs[0].reset_count)
             
+def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, logname, eval_every, lr):
+    history = None
+    if not os.path.exists(logname_save_path):
+        os.makedirs(logname_save_path)
+
+    env, vec_expert = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
+    dataloader = make_ppo_rec_data_loader(env=env, vec_expert=vec_expert, n_demonstrations=n_demonstrations, seq_len=seq_len, device=device)
+
+    ppo_env, _ = make_dummy_vec_env_rec_pomdp(name=env_tag, seq_len=seq_len)
+    learner = RecurrentPPO("MlpLstmPolicy", env=ppo_env, verbose=0, learning_rate=lr)
+
+    bc_learner = Rec_PPO_BC(model=learner, dataloader=dataloader, device=device)
+
+    pomdp_env_val, _ = make_dummy_vec_env_rec_pomdp(
+        name=env_tag, seq_len=seq_len)
+    bc_file_path = logname_save_path+'bc_best'
+    bc_stats_path = logname_save_path + 'bc_stats_rec_PPO'
+    #if (not os.path.isfile(bc_file_path)):
+    print('BC Phase')
+    tboard = TBoardGraphs(logname=logname + '_BC',
+                            data_path=logname_save_path)
+
+    best_succes_rate = -1
+    fac = 40
+    runs_per_epoch = 40 * fac
+    for i in range(int(1000/fac)):
+        print(f'BC: {runs_per_epoch}')
+        bc_learner.train(n_epochs=runs_per_epoch, verbose=True)
+        success, rews, history = get_avr_succ_rew_det_rec(
+            env=pomdp_env_val, 
+            learner=bc_learner.policy,
+            epsiodes=50,
+            path=bc_stats_path,
+            history=history,
+            step=i)
+        print(f'success: {success.shape}')
+        success_rate = success.mean()
+        tboard.addValidationScalar(
+            'Reward', value=th.tensor(rews.mean()), stepid=i*fac)
+        tboard.addValidationScalar(
+            'Success Rate', value=th.tensor(success_rate), stepid=i*fac)
+        if success_rate > best_succes_rate:
+            best_succes_rate = success_rate
+            th.save(bc_learner.policy.state_dict(),
+                    bc_file_path)
+
+    learner_stats_path = logname_save_path + 'learner_stats_rec_PPO'
+    tboard = TBoardGraphs(
+        logname=logname + str(' Reinforcement'), data_path=logname_save_path)
+
+    learner.policy.load_state_dict(
+        th.load(bc_file_path))
+
+    history = None
+
+    success, rews, history = get_avr_succ_rew_det_rec(
+        env=pomdp_env_val, 
+        learner=learner.policy, 
+        epsiodes=50,
+        path=learner_stats_path,
+        history=history,
+        step=0)
+    
+    tboard.addValidationScalar(
+        'Reloaded Success Rate', value=th.tensor(success.mean()), stepid=0)
+    tboard.addValidationScalar(
+        'Reloaded Reward', value=th.tensor(rews.mean()), stepid=0)
+
+    tboard.addValidationScalar('Reward', value=th.tensor(
+        rews.mean()), stepid=learner.env.envs[0].reset_count)
+    tboard.addValidationScalar('Success Rate', value=th.tensor(
+        success.mean()), stepid=learner.env.envs[0].reset_count)
+
+    while learner.env.envs[0].reset_count <= n_samples:
+        learner.learn(eval_every)
+        print(learner.env.envs[0].reset_count)
+        success, rews, history = get_avr_succ_rew_det_rec(
+            env=pomdp_env_val, 
+            learner=learner.policy, 
+            epsiodes=50,
+            path=learner_stats_path,
+            history=history,
+            step=learner.env.envs[0].reset_count)
+        success_rate = success.mean()
+        tboard.addValidationScalar('Reward', value=th.tensor(
+            rews.mean()), stepid=learner.env.envs[0].reset_count)
+        tboard.addValidationScalar('Success Rate', value=th.tensor(
+            success_rate), stepid=learner.env.envs[0].reset_count)
+            
+def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
+    seq_len=100
+    logname = f'RPPO_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
+    logname_save_path = os.path.join(save_path, logname + '/')
+
+    evaluate_Rec_PPO(
+        env_tag=env_tag,
+        logname_save_path=logname_save_path,
+        seq_len=seq_len,
+        n_demonstrations=demonstrations,
+        bc_epochs=n_samples,
+        n_samples=n_samples,
+        device=device,
+        logname=logname,
+        eval_every=2000,
+        lr=lr
+    )
+
+def stats_RPPO(device, lr, demonstrations, save_path, n_samples, env_tag):
+    ids = [i for i in range(10)]
+    for id in ids:
+        run_eval_RPPO(
+            device=device,
+            lr=lr,
+            demonstrations=demonstrations,
+            save_path=save_path,
+            n_samples=n_samples,
+            id=id,
+            env_tag=env_tag
+        )
+            
 def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     seq_len=100
     logname = f'PPO_GAIL_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
@@ -419,5 +536,29 @@ if __name__ == '__main__':
             for demonstrations in list_demonstrations:
                 for lr in lrs:
                     stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200, env_tag=env_tag)
+    elif args.learner == 'RPPO':
+        print('running RPPO')
+        run_eval_RPPO(
+            device=args.device,
+            lr=3e-4,
+            demonstrations=10,
+            save_path=path,
+            n_samples=200,
+            id=0,
+            env_tag='push'
+        )
+    elif args.learner == 'stats_RPPO':
+        print('running RPPO')
+        for lr in [3e-6, 3e-5, 3e-4]:
+            for env_tag in ['pickplace', 'push']:
+                for demos in [6, 10, 14]:
+                    stats_RPPO(
+                        device=args.device,
+                        lr=lr,
+                        demonstrations=demos,
+                        save_path=path,
+                        n_samples=200,
+                        env_tag=env_tag
+                    )
     else:
         print('choose others algo')
