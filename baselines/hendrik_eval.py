@@ -439,7 +439,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag)
     )
 
 def stats_RPPO(device, lr, demonstrations, save_path, n_samples, env_tag):
-    ids = [i for i in range(10)]
+    ids = [i for i in range(5)]
     for id in ids:
         run_eval_RPPO(
             device=device,
@@ -549,8 +549,8 @@ if __name__ == '__main__':
         )
     elif args.learner == 'stats_RPPO':
         print('running RPPO')
-        for lr in [3e-6, 3e-5, 3e-4]:
-            for env_tag in ['pickplace', 'push']:
+        for lr in [3e-4]:
+            for env_tag in ['push']:
                 for demos in [6, 10, 14]:
                     stats_RPPO(
                         device=args.device,
