@@ -89,14 +89,14 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
                               data_path=logname_save_path)
 
         best_succes_rate = -1
-        fac = 1#40
+        fac = 40
         runs_per_epoch = 20 * fac
         for i in range(int(bc_epochs/fac)):
             bc_learner.train(n_epochs=runs_per_epoch)
             success, rews, history = get_avr_succ_rew_det(
                 env=pomdp_env_val, 
                 learner=bc_learner.policy, 
-                epsiodes=200,
+                epsiodes=50,
                 path=bc_stats_path,
                 history=history,
                 step=i)
@@ -159,9 +159,9 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
                 success_rate), stepid=learner.env.envs[0].reset_count)
 
 
-def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id):
+def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     seq_len=100
-    env_tag = 'pickplace'
+    env_tag = env_tag
     logname = f'TQC_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
@@ -172,9 +172,9 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id):
                      bc_epochs=n_samples, n_samples=n_samples, device=device, learner=tqc_learner)
 
 
-def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id):
+def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     seq_len=100
-    env_tag = 'pickplace'
+    env_tag = env_tag
     logname = f'PPO_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
@@ -198,6 +198,15 @@ def run_tune_TQC(device):
                 demonstrations += 2
         lr = lr * 0.4
 
+def stats_PPO(device, path, demonstration, lr, env_tag):
+    ids = [i for i in range(5)]
+    for id in ids:
+        run_eval_PPO(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=200, id=id, env_tag=env_tag)
+
+def stats_TQC(device, path, demonstration, lr, env_tag):
+    ids = [i for i in range(5)]
+    for id in ids:
+        run_eval_TQC(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=200, id=id, env_tag=env_tag)
 
 def run_tune_PPO(device):
     lr = 1e-4
@@ -536,6 +545,7 @@ if __name__ == '__main__':
             for demonstrations in list_demonstrations:
                 for lr in lrs:
                     stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200, env_tag=env_tag)
+
     elif args.learner == 'RPPO':
         print('running RPPO')
         run_eval_RPPO(
@@ -549,15 +559,40 @@ if __name__ == '__main__':
         )
     elif args.learner == 'stats_RPPO':
         print('running RPPO')
-        for lr in [3e-4]:
+        for lr in [1e-4, 5e-5]:
             for env_tag in ['push']:
-                for demos in [6, 10, 14]:
+                for demos in [10]:
                     stats_RPPO(
                         device=args.device,
                         lr=lr,
                         demonstrations=demos,
                         save_path=path,
                         n_samples=200,
+                        env_tag=env_tag
+                    )
+
+    elif args.learner == 'stats_PPO':
+        print('running stats PPO')
+        for lr in [5e-4, 1e-4]:
+            for env_tag in ['push']:
+                for demos in [10]:
+                    stats_PPO(
+                        device=args.device,
+                        path=path,
+                        demonstration=demos,
+                        lr=lr,
+                        env_tag=env_tag
+                    )
+    elif args.learner == 'stats_TQC':
+        print('running stats PPO')
+        for lr in [1e-4, 5e-5]:
+            for env_tag in ['push']:
+                for demos in [10]:
+                    stats_TQC(
+                        device=args.device,
+                        path=path,
+                        demonstration=demos,
+                        lr=lr,
                         env_tag=env_tag
                     )
     else:
