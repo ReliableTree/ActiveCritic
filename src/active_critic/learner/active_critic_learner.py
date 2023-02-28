@@ -15,6 +15,7 @@ from active_critic.utils.tboard_graphs import TBoardGraphs
 from gym.envs.mujoco import MujocoEnv
 from torch.utils.data.dataloader import DataLoader
 import time
+import numpy as np
 
 class ACLScores:
     def __init__(self) -> None:
@@ -61,6 +62,9 @@ class ActiveCriticLearner(nn.Module):
 
         self.train_data = DatasetAC(device='cpu')
         self.train_data.onyl_positiv = False
+
+        self.exp_dict_opt = None
+        self.exp_dict = None
 
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
@@ -204,7 +208,45 @@ class ActiveCriticLearner(nn.Module):
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
+        exp_after = expected_rewards_after
+        exp_dict = self.exp_dict_opt
 
+
+        exp_dict = self.save_stat(success=success, expected_success=expected_rewards_before, opt_exp=exp_after, exp_dict=exp_dict)
+
+        self.exp_dict_opt = exp_dict
+
+    def save_stat(self, success, expected_success, opt_exp, exp_dict):
+
+        if exp_dict is None:
+            exp_dict = {
+            'success_rate':success.mean().cpu().numpy(),
+            'expected_success' : expected_success.mean().cpu().numpy(),
+            'step':np.array(self.get_num_training_samples())
+            }
+            if opt_exp is not None:
+                exp_dict['optimized_expected'] =  opt_exp.mean().cpu().numpy()
+
+        else:
+            exp_dict['success_rate'] = np.append(exp_dict['success_rate'], success.mean().cpu().numpy())
+            exp_dict['expected_success'] = np.append(exp_dict['expected_success'], expected_success.mean().cpu().numpy())
+            exp_dict['step'] = np.append(exp_dict['step'], np.array(self.get_num_training_samples()))
+            if opt_exp is not None:
+                exp_dict['optimized_expected'] = np.append(exp_dict['optimized_expected'], opt_exp.mean().cpu().numpy())
+
+        path_to_stat = os.path.join(self.network_args.data_path, self.network_args.logname)
+
+        if not os.path.exists(path_to_stat):
+            os.makedirs(path_to_stat)
+
+        add = ''
+        if opt_exp is not None:
+            add = 'optimized'
+
+        with open(path_to_stat + '/stats'+add, 'wb') as handle:
+            pickle.dump(exp_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        return exp_dict
 
     def torch2tf(self, inpt):
         if inpt is not None:
