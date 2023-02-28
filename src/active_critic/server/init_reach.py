@@ -14,7 +14,7 @@ from active_critic.model_src.transformer import (
     ModelSetup, generate_square_subsequent_mask)
 from active_critic.policy.active_critic_policy import ActiveCriticPolicySetup, ActiveCriticPolicy
 import argparse
-
+from datetime import datetime
 
 from gym import Env
 th.manual_seed(0)
@@ -73,10 +73,11 @@ def setup_ac_reach(seq_len, num_cpu, device):
     return ac, acps, env, expert
 
 
-def make_acl(device):
+def make_acl(device, id):
     device = device
     acla = ActiveCriticLearnerArgs()
-    acla.data_path = '/data/bing/hendrik/'
+    date = datetime.today().strftime('%Y-%m-%d')
+    acla.data_path = f'/data/bing/hendrik/reach_0_imitation/{date}_id:{id}/'
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
@@ -85,11 +86,12 @@ def make_acl(device):
     acla.batch_size = 32
     acla.val_every = 1
     acla.add_data_every = 1
-    acla.validation_episodes = 10
+    acla.validation_episodes = 20
     acla.training_epsiodes = 1
     acla.actor_threshold = 5e-1
     acla.critic_threshold = 5e-1
     acla.num_cpu = 8
+    acla.num_training_samples = 300
 
     seq_len = 100
     epsiodes = 30
@@ -100,5 +102,6 @@ def make_acl(device):
 
 
 def run_experiment_init_reach(device):
-    acl, env, expert, seq_len, epsiodes, device = make_acl(device)
-    acl.train(epochs=10000)
+    for id in [i for i in range(5)]:
+        acl, env, expert, seq_len, epsiodes, device = make_acl(device=device, id=id)
+        acl.train(epochs=10000)

@@ -19,3 +19,4 @@ class ActiveCriticLearnerArgs:
         self.actor_threshold:float = None
         self.critic_threshold:float = None
         self.num_cpu:int = None
+        self.num_training_samples: int = None
