@@ -80,7 +80,7 @@ def make_acl(device):
     acla.device = device
     acla.extractor = DummyExtractor()
     acla.imitation_phase = False
-    acla.logname = 'exponential pain'
+    acla.logname = 'reach 0 imitation'
     acla.tboard = True
     acla.batch_size = 32
     acla.val_every = 1

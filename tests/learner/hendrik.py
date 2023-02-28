@@ -9,4 +9,4 @@ if __name__ == '__main__':
     parser.add_argument('device', type=str,
                     help='Choose free GPU')
     args = parser.parse_args()
-    run_experiment_analyze(device=args.device)
+    run_experiment_init_reach(device=args.device)
