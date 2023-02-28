@@ -213,36 +213,35 @@ def run_eval_stats(device, demos, weight_decay):
                             fast=False)
 
 def run_eval_stats_demos(device, weight_decay):
-    imitation_phases = [False, True]
-    demonstrations_list = [4, 8, 12]
-    run_ids = [i for i in range(10)]
+    imitation_phases = [False]
+    demonstrations_list = [10, 10, 6, 6]
+    run_ids = [i for i in range(5)]
     s = datetime.today().strftime('%Y-%m-%d')
-
-
     training_episodes = 10
     total_training_epsiodes = 200
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
-    val_everys = [2000, 5000, 10000] 
-    for val_every in val_everys:
-        for demonstrations in demonstrations_list:
-            for env_tag in env_tags:
-                for im_ph in imitation_phases:
-                    for run_id in run_ids:
-                        logname = f' demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
-                        run_experiment(device=device,
-                                    env_tag=env_tag,
-                                    logname=logname,
-                                    data_path=data_path,
-                                    demos=demonstrations,
-                                    imitation_phase=im_ph,
-                                    total_training_epsiodes=total_training_epsiodes,
-                                    training_episodes=training_episodes,
-                                    min_critic_threshold=min_critic_threshold,
-                                    weight_decay = weight_decay,
-                                    val_every=val_every,
-                                    fast=False)
+    env_tags = ['pickplace', 'push', 'reach', 'windowopen']
+    val_everys = [5000, 10000]
+    for i in range(len(env_tags)):
+        demonstrations = demonstrations_list[i]
+        env_tag = env_tags[i]
+        im_ph = False
+        for val_every in val_everys:
+            for run_id in run_ids:
+                logname = f' demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                run_experiment(device=device,
+                            env_tag=env_tag,
+                            logname=logname,
+                            data_path=data_path,
+                            demos=demonstrations,
+                            imitation_phase=im_ph,
+                            total_training_epsiodes=total_training_epsiodes,
+                            training_episodes=training_episodes,
+                            min_critic_threshold=min_critic_threshold,
+                            weight_decay = weight_decay,
+                            val_every=val_every,
+                            fast=False)
 
 
 if __name__ == '__main__':
