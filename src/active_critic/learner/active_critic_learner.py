@@ -66,6 +66,8 @@ class ActiveCriticLearner(nn.Module):
         self.exp_dict_opt = None
         self.exp_dict = None
 
+        self.virtual_step = 0
+
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
         if len(train_data) > 0:
@@ -114,7 +116,7 @@ class ActiveCriticLearner(nn.Module):
             observations=observations,
             rewards=rewards
         )
-
+        self.virtual_step += self.network_args.training_epsiodes
 
     def train(self, epochs):
         next_val = self.network_args.val_every
@@ -154,6 +156,9 @@ class ActiveCriticLearner(nn.Module):
                 next_val = epoch + self.network_args.val_every
                 if self.network_args.tboard:
                     self.run_validation() 
+
+            if self.get_num_training_samples() > self.network_args.num_training_samples:
+                return
 
 
     def write_tboard_scalar(self, debug_dict, train, step=None):
@@ -206,6 +211,9 @@ class ActiveCriticLearner(nn.Module):
             'Reward': last_reward.mean(),
             'Training Epochs' : th.tensor(int(len(self.train_data)/self.policy.args_obj.epoch_len))
         }
+        print(f'success: {success.mean()}')
+        print(f'reward: {last_reward.mean()}')
+        print(F'step: {self.get_num_training_samples()}')
         self.write_tboard_scalar(debug_dict=debug_dict, train=False)
 
         exp_after = expected_rewards_after
@@ -215,6 +223,9 @@ class ActiveCriticLearner(nn.Module):
         exp_dict = self.save_stat(success=success, expected_success=expected_rewards_before, opt_exp=exp_after, exp_dict=exp_dict)
 
         self.exp_dict_opt = exp_dict
+
+    def get_num_training_samples(self):
+        return self.virtual_step
 
     def save_stat(self, success, expected_success, opt_exp, exp_dict):
 
@@ -337,7 +348,7 @@ class ActiveCriticLearner(nn.Module):
 
 
     def saveNetworkToFile(self, add, data_path):
-
+        return
         path_to_file = os.path.join(data_path, add)
         if not os.path.exists(path_to_file):
             os.makedirs(path_to_file)
