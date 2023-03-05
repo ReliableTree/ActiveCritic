@@ -169,7 +169,7 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env,
                       device=device, learning_rate=lr)
     evaluate_learner(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=n_samples, n_samples=n_samples, device=device, learner=tqc_learner)
+                     bc_epochs=10*n_samples, n_samples=n_samples, device=device, learner=tqc_learner)
 
 
 def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
@@ -183,7 +183,7 @@ def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
                       device=device, learning_rate=lr)
 
     evaluate_learner(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=n_samples, n_samples=n_samples, device=device, learner=PPO_learner)
+                     bc_epochs=10*n_samples, n_samples=n_samples, device=device, learner=PPO_learner)
 
 
 def run_tune_TQC(device):
@@ -365,7 +365,7 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
     best_succes_rate = -1
     fac = 40
     runs_per_epoch = 40 * fac
-    for i in range(int(1000/fac)):
+    for i in range(int(bc_epochs/fac)):
         print(f'BC: {runs_per_epoch}')
         bc_learner.train(n_epochs=runs_per_epoch, verbose=True)
         success, rews, history = get_avr_succ_rew_det_rec(
@@ -439,7 +439,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag)
         logname_save_path=logname_save_path,
         seq_len=seq_len,
         n_demonstrations=demonstrations,
-        bc_epochs=n_samples,
+        bc_epochs=10*n_samples,
         n_samples=n_samples,
         device=device,
         logname=logname,
@@ -470,7 +470,7 @@ def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
                       device=device, learning_rate=lr)
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=int(n_samples/5), n_samples=n_samples, device=device, learner=PPO_learner, pomdp_env=pomdp_env, eval_every=2048)
+                     bc_epochs=10*n_samples, n_samples=n_samples, device=device, learner=PPO_learner, pomdp_env=pomdp_env, eval_every=2048)
     
 def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     seq_len=100
@@ -482,15 +482,15 @@ def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
         device=device, learning_rate=lr)
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=int(n_samples/5), n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=1000)
+                     bc_epochs=10*n_samples, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=1000)
 
 def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples, env_tag):
-    ids = [i for i in range(10)]
+    ids = [i for i in range(5)]
     for id in ids:
         run_eval_PPO_GAIL(device=device, lr=lr, demonstrations=demonstrations, save_path=save_path, n_samples=n_samples, id=id, env_tag=env_tag)
 
 def stats_GAIL_TQC(device, lr, demonstrations, save_path, n_samples, env_tag):
-    ids = [i for i in range(10)]
+    ids = [i for i in range(5)]
     for id in ids:
         run_eval_TQC_GAIL(device=device, lr=lr, demonstrations=demonstrations, save_path=save_path, n_samples=n_samples, id=id, env_tag=env_tag)
 
@@ -511,7 +511,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
     list_demonstrations = [4,8,12]
-    list_env_tags = ['windowopen']
+    list_env_tags = ['pickplace']
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
     if args.learner == 'TQC':
         print('running TQC')
@@ -531,7 +531,7 @@ if __name__ == '__main__':
     elif args.learner == 'stats_GAIL_TQC':
         print('running GAIL + TQC')
         
-        lrs = [1e-7, 1e-6]
+        lrs = [5e-7]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
@@ -540,7 +540,7 @@ if __name__ == '__main__':
     elif args.learner == 'stats_GAIL_PPO':
         print('running GAIL + PPO')
 
-        lrs = [1e-4, 1e-3]
+        lrs = [1e-4]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
@@ -559,9 +559,9 @@ if __name__ == '__main__':
         )
     elif args.learner == 'stats_RPPO':
         print('running RPPO')
-        for lr in [1e-4, 5e-5]:
-            for env_tag in ['push']:
-                for demos in [10]:
+        for lr in [5e-5]:
+            for env_tag in list_env_tags:
+                for demos in list_demonstrations:
                     stats_RPPO(
                         device=args.device,
                         lr=lr,
