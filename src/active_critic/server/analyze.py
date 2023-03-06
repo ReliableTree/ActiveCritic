@@ -35,7 +35,25 @@ def make_wsm_setup(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 200
     wsm.model_setup.nlayers = 5
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout = 0.2
+    wsm.model_setup.dropout = 0
+    wsm.lr = 1e-4
+    wsm.model_setup.device = device
+    wsm.optimizer_class = th.optim.AdamW
+    wsm.optimizer_kwargs = {'weight_decay':weight_decay}
+    return wsm
+
+def make_wsm_setup_small(seq_len, d_output, weight_decay, device='cuda'):
+    wsm = WholeSequenceModelSetup()
+    wsm.model_setup = ModelSetup()
+    seq_len = seq_len
+    d_output = d_output
+    wsm.model_setup.d_output = d_output
+    wsm.model_setup.nhead = 1
+    wsm.model_setup.d_hid = 64
+    wsm.model_setup.d_model = 64
+    wsm.model_setup.nlayers = 3
+    wsm.model_setup.seq_len = seq_len
+    wsm.model_setup.dropout = 0
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -65,9 +83,9 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
 def setup_ac(seq_len, num_cpu, device, tag, weight_decay):
     env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
-    wsm_actor_setup = make_wsm_setup(
+    wsm_actor_setup = make_wsm_setup_small(
         seq_len=seq_len, d_output=d_output, device=device, weight_decay=weight_decay)
-    wsm_critic_setup = make_wsm_setup(
+    wsm_critic_setup = make_wsm_setup_small(
         seq_len=seq_len, d_output=1, device=device, weight_decay=weight_decay)
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
@@ -243,6 +261,37 @@ def run_eval_stats_demos(device, weight_decay):
                                 val_every=val_every,
                                 fast=False)
 
+
+def run_eval_stats_pp(device, weight_decay):
+    imitation_phases = [True]
+    demonstrations_list = [4, 8, 12]
+    run_ids = [i for i in range(5)]
+    s = datetime.today().strftime('%Y-%m-%d')
+    training_episodes = 10
+    total_training_epsiodes = 200
+    min_critic_threshold = 5e-5
+    data_path = '/data/bing/hendrik/AC_var_' + s
+    env_tags = ['pickplace']
+    val_everys = [10000]
+    for i in range(len(env_tags)):
+        demonstrations = demonstrations_list[i]
+        env_tag = env_tags[i]
+        for im_ph in imitation_phases:
+            for val_every in val_everys:
+                for run_id in run_ids:
+                    logname = f' demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                    run_experiment(device=device,
+                                env_tag=env_tag,
+                                logname=logname,
+                                data_path=data_path,
+                                demos=demonstrations,
+                                imitation_phase=im_ph,
+                                total_training_epsiodes=total_training_epsiodes,
+                                training_episodes=training_episodes,
+                                min_critic_threshold=min_critic_threshold,
+                                weight_decay = weight_decay,
+                                val_every=val_every,
+                                fast=False)
 
 if __name__ == '__main__':
     run_eval(device='cuda')
