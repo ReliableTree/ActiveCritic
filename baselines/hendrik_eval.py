@@ -433,7 +433,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag)
     seq_len=100
     logname = f'RPPO_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
     logname_save_path = os.path.join(save_path, logname + '/')
-    print(f'learner: RPPO, env: {env_tag}, demos: {n_samples}')
+    print(f'learner: RPPO, env: {env_tag}, demos: {demonstrations}')
     evaluate_Rec_PPO(
         env_tag=env_tag,
         logname_save_path=logname_save_path,
