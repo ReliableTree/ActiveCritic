@@ -83,9 +83,9 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
 def setup_ac(seq_len, num_cpu, device, tag, weight_decay):
     env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
-    wsm_actor_setup = make_wsm_setup(
+    wsm_actor_setup = make_wsm_setup_small(
         seq_len=seq_len, d_output=d_output, device=device, weight_decay=weight_decay)
-    wsm_critic_setup = make_wsm_setup(
+    wsm_critic_setup = make_wsm_setup_small(
         seq_len=seq_len, d_output=1, device=device, weight_decay=weight_decay)
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
