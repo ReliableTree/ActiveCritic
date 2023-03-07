@@ -51,7 +51,7 @@ from sb3_contrib import RecurrentPPO
 from active_critic.PPO_Recurrent.ppo_recurrent_bc import Rec_PPO_BC
 
 
-def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, logname, learner: TQC = None):
+def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, logname, eval_every,  learner: TQC = None):
     history = None
     lookup_freq = 1000
     if not os.path.exists(logname_save_path):
@@ -142,7 +142,7 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
 
         while learner.env.envs[0].reset_count <= n_samples:
             print('before learn')
-            learner.learn(2000)
+            learner.learn(eval_every)
             print('after learn')
             print(learner.env.envs[0].reset_count)
             success, rews, history = get_avr_succ_rew_det(
@@ -169,7 +169,7 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env,
                       device=device, learning_rate=lr)
     evaluate_learner(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=10*n_samples, n_samples=n_samples, device=device, learner=tqc_learner)
+                     bc_epochs=10*n_samples, n_samples=n_samples, device=device, eval_every=200, learner=tqc_learner)
 
 
 def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
@@ -183,7 +183,7 @@ def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
                       device=device, learning_rate=lr)
 
     evaluate_learner(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=10*n_samples, n_samples=n_samples, device=device, learner=PPO_learner)
+                     bc_epochs=10*n_samples, n_samples=n_samples, device=device, eval_every=2000, learner=PPO_learner)
 
 
 def run_tune_TQC(device):
@@ -383,8 +383,8 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
             'Success Rate', value=th.tensor(success_rate), stepid=i*fac)
         if success_rate > best_succes_rate:
             best_succes_rate = success_rate
-            th.save(bc_learner.policy.state_dict(),
-                    bc_file_path)
+    th.save(bc_learner.policy.state_dict(),
+            bc_file_path)
 
     learner_stats_path = logname_save_path + 'learner_stats_rec_PPO'
     tboard = TBoardGraphs(
@@ -433,7 +433,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag)
     seq_len=100
     logname = f'RPPO_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
     logname_save_path = os.path.join(save_path, logname + '/')
-
+    print(f'learner: RPPO, env: {env_tag}, demos: {n_samples}')
     evaluate_Rec_PPO(
         env_tag=env_tag,
         logname_save_path=logname_save_path,
@@ -443,7 +443,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag)
         n_samples=n_samples,
         device=device,
         logname=logname,
-        eval_every=2000,
+        eval_every=200,
         lr=lr
     )
 
@@ -482,7 +482,7 @@ def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
         device=device, learning_rate=lr)
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=10*n_samples, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=1000)
+                     bc_epochs=10*n_samples, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=200)
 
 def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples, env_tag):
     ids = [i for i in range(5)]
@@ -511,7 +511,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
     list_demonstrations = [4,8,12]
-    list_env_tags = ['pickplace']
+    list_env_tags = ['reach']
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
     if args.learner == 'TQC':
         print('running TQC')
@@ -574,8 +574,8 @@ if __name__ == '__main__':
     elif args.learner == 'stats_PPO':
         print('running stats PPO')
         for lr in [5e-4, 1e-4]:
-            for env_tag in ['push']:
-                for demos in [10]:
+            for env_tag in list_env_tags:
+                for demos in list_demonstrations:
                     stats_PPO(
                         device=args.device,
                         path=path,
@@ -586,8 +586,8 @@ if __name__ == '__main__':
     elif args.learner == 'stats_TQC':
         print('running stats PPO')
         for lr in [1e-4, 5e-5]:
-            for env_tag in ['push']:
-                for demos in [10]:
+            for env_tag in list_env_tags:
+                for demos in list_demonstrations:
                     stats_TQC(
                         device=args.device,
                         path=path,
