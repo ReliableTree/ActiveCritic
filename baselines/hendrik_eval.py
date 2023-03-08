@@ -587,7 +587,7 @@ if __name__ == '__main__':
                     )
     elif args.learner == 'stats_TQC':
         print('running stats PPO')
-        for lr in [1e-4, 5e-5]:
+        for lr in [1e-5]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_TQC(
