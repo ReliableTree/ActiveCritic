@@ -510,7 +510,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
-    list_demonstrations = [4,8,12]
+    list_demonstrations = [8,12]
     list_env_tags = ['reach']
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
     if args.learner == 'TQC':
