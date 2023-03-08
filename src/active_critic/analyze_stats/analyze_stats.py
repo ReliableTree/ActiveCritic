@@ -36,7 +36,7 @@ def plot_experiment_data(timesteps, experiments, names, plot_name, path=None):
     ax.set_xlabel('Number Sampled Trajectories')
     ax.set_ylabel('Success Rate')
     ax.set_title(plot_name)
-    ax.legend()
+    ax.legend(loc = 'upper left')
 
     if path is not None:
         # create directory if it doesn't exist

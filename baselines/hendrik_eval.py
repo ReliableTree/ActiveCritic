@@ -163,19 +163,21 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     seq_len=100
     env_tag = env_tag
     logname = f'TQC_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
+    print(logname)
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
         name=env_tag, seq_len=seq_len, lookup_freq=1000)
     tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env,
                       device=device, learning_rate=lr)
     evaluate_learner(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=10*n_samples, n_samples=n_samples, device=device, eval_every=200, learner=tqc_learner)
+                     bc_epochs=200, n_samples=n_samples, device=device, eval_every=200, learner=tqc_learner)
 
 
 def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     seq_len=100
     env_tag = env_tag
     logname = f'PPO_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
+    print(logname)
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
         name=env_tag, seq_len=seq_len, lookup_freq=1000)
@@ -183,7 +185,7 @@ def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
                       device=device, learning_rate=lr)
 
     evaluate_learner(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=10*n_samples, n_samples=n_samples, device=device, eval_every=2000, learner=PPO_learner)
+                     bc_epochs=200, n_samples=n_samples, device=device, eval_every=2000, learner=PPO_learner)
 
 
 def run_tune_TQC(device):
@@ -201,12 +203,12 @@ def run_tune_TQC(device):
 def stats_PPO(device, path, demonstration, lr, env_tag):
     ids = [i for i in range(5)]
     for id in ids:
-        run_eval_PPO(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=200, id=id, env_tag=env_tag)
+        run_eval_PPO(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=20000, id=id, env_tag=env_tag)
 
 def stats_TQC(device, path, demonstration, lr, env_tag):
     ids = [i for i in range(5)]
     for id in ids:
-        run_eval_TQC(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=200, id=id, env_tag=env_tag)
+        run_eval_TQC(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=20000, id=id, env_tag=env_tag)
 
 def run_tune_PPO(device):
     lr = 1e-4
@@ -510,7 +512,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
-    list_demonstrations = [8,12]
+    list_demonstrations = [8]
     list_env_tags = ['reach']
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
     if args.learner == 'TQC':
@@ -573,7 +575,7 @@ if __name__ == '__main__':
 
     elif args.learner == 'stats_PPO':
         print('running stats PPO')
-        for lr in [5e-4, 1e-4]:
+        for lr in [5e-4]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_PPO(
