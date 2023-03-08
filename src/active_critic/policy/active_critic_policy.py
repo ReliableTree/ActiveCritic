@@ -145,13 +145,8 @@ class ActiveCriticPolicy(BaseModel):
         # In inference, we want the maximum eventual reward.
         actor_input = self.get_actor_input(
             obs=observation_seq, actions=action_seq, rew=self.gl[:observation_seq.shape[0]])
-        actions = self.actor.forward(actor_input)
-        if self.args_obj.clip:
-            actions = th.clamp(actions, min=self.clip_min, max=self.clip_max)
-
-        if action_seq is not None:
-            actions = self.proj_actions(
-                action_seq, actions, current_step)
+        
+        actions = self.make_action(actor_input=actor_input, action_seq=action_seq, current_step=current_step)
 
         for step in range(actions.shape[1]):
             self.history.add_value(self.history.gen_trj, actions[:, step].detach(), current_step=step)
@@ -181,6 +176,16 @@ class ActiveCriticPolicy(BaseModel):
                 gen_trj=actions.detach(),
                 expected_succes_before=expected_success,
                 expected_succes_after=expected_success_opt)
+
+    def make_action(self, actor_input, action_seq, current_step):
+        actions = self.actor.forward(actor_input)
+        if self.args_obj.clip:
+            actions = th.clamp(actions, min=self.clip_min, max=self.clip_max)
+
+        if action_seq is not None:
+            actions = self.proj_actions(
+                action_seq, actions, current_step)
+        return actions
 
     def optimize_act_sequence(self, 
             actions: th.Tensor, 
