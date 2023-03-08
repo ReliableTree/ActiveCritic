@@ -308,7 +308,7 @@ def run_eval_stats_pp(device, weight_decay):
                                     fast=False)
 
 def run_eval_stats_env(device, weight_decay):
-    imitation_phases = [True, False]
+    imitation_phases = [False, True]
     demonstrations_list = [14]
     run_ids = [i for i in range(5)]
     s = datetime.today().strftime('%Y-%m-%d')
