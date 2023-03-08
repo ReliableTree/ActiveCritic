@@ -60,7 +60,23 @@ def make_wsm_setup_small(seq_len, d_output, weight_decay, device='cuda'):
     wsm.optimizer_kwargs = {'weight_decay':weight_decay}
     return wsm
 
-
+def make_wsm_setup_large(seq_len, d_output, weight_decay, device='cuda'):
+    wsm = WholeSequenceModelSetup()
+    wsm.model_setup = ModelSetup()
+    seq_len = seq_len
+    d_output = d_output
+    wsm.model_setup.d_output = d_output
+    wsm.model_setup.nhead = 8
+    wsm.model_setup.d_hid = 512
+    wsm.model_setup.d_model = 512
+    wsm.model_setup.nlayers = 3
+    wsm.model_setup.seq_len = seq_len
+    wsm.model_setup.dropout = 0
+    wsm.lr = 5e-5
+    wsm.model_setup.device = device
+    wsm.optimizer_class = th.optim.AdamW
+    wsm.optimizer_kwargs = {'weight_decay':weight_decay}
+    return wsm
 
 def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps = ActiveCriticPolicySetup()
@@ -79,11 +95,10 @@ def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
     acps.clip = False
     return acps
 
-
 def setup_ac(seq_len, num_cpu, device, tag, weight_decay):
     env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
-    wsm_actor_setup = make_wsm_setup(
+    wsm_actor_setup = make_wsm_setup_large(
         seq_len=seq_len, d_output=d_output, device=device, weight_decay=weight_decay)
     wsm_critic_setup = make_wsm_setup(
         seq_len=seq_len, d_output=1, device=device, weight_decay=weight_decay)
@@ -124,7 +139,7 @@ def make_acl(device, env_tag, data_path, logname,  seq_len, val_every, imitation
         acla.add_data_every = val_every
 
         acla.validation_episodes = 25 #(*8)
-        acla.validation_rep = 8
+        acla.validation_rep = 2
         acla.training_epsiodes = training_episodes
         acla.actor_threshold = 1e-2
         acla.critic_threshold = 1e-2
@@ -272,7 +287,7 @@ def run_eval_stats_pp(device, weight_decay):
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['pickplace']
-    val_everys = [10000]
+    val_everys = [2000]
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
@@ -292,17 +307,17 @@ def run_eval_stats_pp(device, weight_decay):
                                     val_every=val_every,
                                     fast=False)
 
-def run_eval_stats_reach(device, weight_decay):
+def run_eval_stats_env(device, weight_decay):
     imitation_phases = [True, False]
-    demonstrations_list = [4,8,12]
+    demonstrations_list = [14]
     run_ids = [i for i in range(5)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
     total_training_epsiodes = 200
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['reach']
-    val_everys = [2000]
+    env_tags = ['pickplace']
+    val_everys = [20000]
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
