@@ -368,7 +368,7 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
     fac = 40
     runs_per_epoch = 40 * fac
     for i in range(int(bc_epochs/fac)):
-        print(f'BC: {runs_per_epoch}')
+        print(f'BC: {i} from {int(bc_epochs/fac)}')
         bc_learner.train(n_epochs=runs_per_epoch, verbose=True)
         success, rews, history = get_avr_succ_rew_det_rec(
             env=pomdp_env_val, 
@@ -377,7 +377,7 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
             path=bc_stats_path,
             history=history,
             step=i)
-        print(f'success: {success.shape}')
+        print(f'success: {success.mean()}')
         success_rate = success.mean()
         tboard.addValidationScalar(
             'Reward', value=th.tensor(rews.mean()), stepid=i*fac)
@@ -441,7 +441,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag)
         logname_save_path=logname_save_path,
         seq_len=seq_len,
         n_demonstrations=demonstrations,
-        bc_epochs=50 * n_samples,
+        bc_epochs=15 * n_samples,
         n_samples=n_samples,
         device=device,
         logname=logname,
