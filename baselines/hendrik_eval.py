@@ -441,7 +441,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag)
         logname_save_path=logname_save_path,
         seq_len=seq_len,
         n_demonstrations=demonstrations,
-        bc_epochs=n_samples,
+        bc_epochs=50 * n_samples,
         n_samples=n_samples,
         device=device,
         logname=logname,
