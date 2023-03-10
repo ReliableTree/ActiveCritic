@@ -512,8 +512,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
-    list_demonstrations = [4]
-    list_env_tags = ['reach']
+
+    list_demonstrations = [14]
+    list_env_tags = ['pickplace']
+    
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
     if args.learner == 'TQC':
         print('running TQC')
@@ -533,7 +535,7 @@ if __name__ == '__main__':
     elif args.learner == 'stats_GAIL_TQC':
         print('running GAIL + TQC')
         
-        lrs = [1e-5]
+        lrs = [1e-6, 1e-7]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
@@ -561,7 +563,7 @@ if __name__ == '__main__':
         )
     elif args.learner == 'stats_RPPO':
         print('running RPPO')
-        for lr in [5e-5]:
+        for lr in [1e-5, 1e-6, 1e-7]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_RPPO(
@@ -587,7 +589,7 @@ if __name__ == '__main__':
                     )
     elif args.learner == 'stats_TQC':
         print('running stats TQC')
-        for lr in [1e-5]:
+        for lr in [1e-6, 1e-7]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_TQC(
