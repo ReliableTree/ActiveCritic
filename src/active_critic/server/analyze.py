@@ -293,16 +293,16 @@ def run_eval_stats_pp(device, weight_decay):
                                     fast=False)
 
 def run_eval_stats_env(device, weight_decay):
-    imitation_phases = [True, False]
-    demonstrations_list = [4]
+    imitation_phases = [False]
+    demonstrations_list = [14]
     run_ids = [i for i in range(5)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
     total_training_epsiodes = 200
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
-    val_everys = [2000]
+    env_tags = ['pickplace']
+    val_everys = [5000, 10000]
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
