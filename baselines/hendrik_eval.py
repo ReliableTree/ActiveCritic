@@ -170,7 +170,7 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env,
                       device=device, learning_rate=lr)
     evaluate_learner(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=100, n_samples=n_samples, device=device, eval_every=1000, learner=tqc_learner)
+                     bc_epochs=500, n_samples=n_samples, device=device, eval_every=1000, learner=tqc_learner)
 
 
 def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
@@ -185,7 +185,7 @@ def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
                       device=device, learning_rate=lr)
 
     evaluate_learner(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=200, n_samples=n_samples, device=device, eval_every=2000, learner=PPO_learner)
+                     bc_epochs=500, n_samples=n_samples, device=device, eval_every=1000, learner=PPO_learner)
 
 
 def run_tune_TQC(device):
@@ -513,7 +513,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [14]
+    list_demonstrations = [30]
     list_env_tags = ['pickplace']
     
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
