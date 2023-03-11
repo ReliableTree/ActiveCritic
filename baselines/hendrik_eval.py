@@ -484,7 +484,7 @@ def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
         device=device, learning_rate=lr)
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=n_samples, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=200)
+                     bc_epochs=2000, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=200)
 
 def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples, env_tag):
     ids = [i for i in range(5)]
@@ -513,7 +513,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [30]
+    list_demonstrations = [14]
     list_env_tags = ['pickplace']
     
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
@@ -535,7 +535,7 @@ if __name__ == '__main__':
     elif args.learner == 'stats_GAIL_TQC':
         print('running GAIL + TQC')
         
-        lrs = [1e-6, 1e-7]
+        lrs = [5e-7, 1e-7]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
