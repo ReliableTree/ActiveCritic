@@ -544,7 +544,7 @@ if __name__ == '__main__':
     elif args.learner == 'stats_GAIL_PPO':
         print('running GAIL + PPO')
 
-        lrs = [1e-4]
+        lrs = [1e-5]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
@@ -563,7 +563,7 @@ if __name__ == '__main__':
         )
     elif args.learner == 'stats_RPPO':
         print('running RPPO')
-        for lr in [1e-5, 1e-6, 1e-7]:
+        for lr in [1e-6, 1e-7]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_RPPO(
