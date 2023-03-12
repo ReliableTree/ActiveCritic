@@ -79,6 +79,9 @@ def apply_triu(inpt:th.Tensor, diagonal:th.Tensor):
 
 def make_part_obs_data(actions:th.Tensor, observations:th.Tensor, rewards:th.Tensor):
     obsv = observations[:, :1, :].repeat([1, observations.shape[1], 1]).reshape([-1, observations.shape[1], observations.shape[2]])
+    obsv = th.cat((obsv[:, :1], obsv), dim=1)
+    actions = th.cat((th.zeros([actions.shape[0], 1, actions.shape[2]], device=actions.device, dtype=actions.dtype), actions), dim=1)
+    rewards = th.cat((th.zeros([rewards.shape[0], 1, rewards.shape[2]], device=rewards.device, dtype=rewards.dtype), rewards), dim=1)
     return actions, obsv, rewards
 
 def make_inf_seq(obs:th.Tensor, seq_len:th.Tensor):
@@ -97,8 +100,21 @@ def get_seq_end_mask(inpt, current_step):
 def get_rew_mask(reward):
     return (reward.squeeze()>=0)
 
-def pain_boundaries(self, actions:th.Tensor, min_bound:float, max_bound:float):
+def pain_boundaries(actions:th.Tensor, min_bound:float, max_bound:float):
     pain = (th.exp((actions[actions < min_bound] - min_bound)**2)).nan_to_num().sum()
     pain += (th.exp((actions[actions > max_bound] - max_bound)**2)).nan_to_num().sum()
     pain = pain / actions.numel()
     return pain
+
+def generate_square_subsequent_mask(sz: int) -> th.Tensor:
+    """Generates an upper-triangular matrix of -inf, with zeros on diag."""
+    return th.triu(th.ones(sz, sz) * float('-inf'), diagonal=1)
+
+def round_to_bins(input, bins, min, max):
+    amp_inpt = input * (bins / (max - min))
+    amp_out = amp_inpt + th.round(amp_inpt, decimals=0)
+
+    with th.no_grad():
+        amp_out -= amp_inpt
+    out = amp_out * ((max - min) / bins)
+    return out

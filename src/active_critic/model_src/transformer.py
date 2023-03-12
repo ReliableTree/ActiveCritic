@@ -12,7 +12,6 @@ class ModelSetup:
         self.d_hid = 512
         self.d_model = 512
         self.nlayers = 4
-        self.seq_len = 100
         self.ntoken = -1
         self.dropout = 0.2
         self.device = 'cuda'

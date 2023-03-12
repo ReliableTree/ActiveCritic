@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel, CriticSequenceModel
-from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq
+from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq, pain_boundaries, generate_square_subsequent_mask, round_to_bins
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -32,6 +32,7 @@ class ActiveCriticPolicySetup:
         self.batch_size: int = None
         self.stop_opt: bool = None
         self.optimizer_mode : str = None
+        self.n_bins:int = None
         self.clip:bool = True
 
 
@@ -94,11 +95,11 @@ class ActiveCriticPolicy(BaseModel):
         self.history.new_epoch(self.history.gen_scores, size=scores_size, device=self.args_obj.device)
         self.history.new_epoch(self.history.opt_scores, size=scores_size, device=self.args_obj.device)
 
-        trj_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.action_space.shape[0]]
+        trj_size = [vec_obsv.shape[0], self.args_obj.epoch_len +1, self.action_space.shape[0]]
         self.history.new_epoch(self.history.gen_trj, size=trj_size, device=self.args_obj.device)
         
         self.obs_seq = th.zeros(
-            size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
+            size=[vec_obsv.shape[0], self.args_obj.epoch_len +1, vec_obsv.shape[-1]], device=self.args_obj.device)
             
 
     def predict(
@@ -112,15 +113,15 @@ class ActiveCriticPolicy(BaseModel):
             observation).to(self.args_obj.device).unsqueeze(1)
         if (self.last_goal is None) or (self.args_obj.new_epoch(self.last_goal, vec_obsv)):
             self.reset_epoch(vec_obsv=vec_obsv)
-            action_seq = None
+            action_seq = th.zeros([observation.shape[0], 1, self.action_space.shape[0]], dtype=th.float32, device=self.args_obj.device)
+            self.zero_action = th.clone(action_seq.detach())
         else:
             self.current_step += 1
             action_seq = self.current_result.gen_trj
 
 
-        #self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
         self.obs_seq = vec_obsv.repeat([1, self.obs_seq.shape[1], 1]).type(th.float)
-        if action_seq is None:
+        if self.current_step == 0:
             self.current_result = self.forward(
                 observation_seq=self.obs_seq, action_seq=action_seq, 
                 optimize=self.args_obj.optimize, 
@@ -136,6 +137,7 @@ class ActiveCriticPolicy(BaseModel):
                     current_step=self.current_step
                 )
             self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
+            self.current_step = 1
         return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
 
     def forward(self, 
@@ -180,15 +182,28 @@ class ActiveCriticPolicy(BaseModel):
 
     def make_action(self, action_seq, observation_seq, current_step):
         actor_input = self.get_actor_input(
-            obs=observation_seq, actions=action_seq, rew=self.gl[:observation_seq.shape[0]])
-        actions = self.actor.forward(actor_input)
+            obs=observation_seq, actions=action_seq, rew=None)
+        attention_mask = generate_square_subsequent_mask(actor_input.shape[1]).to(actor_input.device)
+        actor_result = self.actor.forward(actor_input, mask=attention_mask)
+        rounded_actor_result = round_to_bins(input=actor_result, bins=self.args_obj.n_bins, min=self.clip_min, max=self.clip_max)
+        actions = th.cat((action_seq[:, :1], rounded_actor_result), dim=1)
+
+        while actions.shape[1] < self.args_obj.epoch_len +1:
+            actor_input = self.get_actor_input(
+            obs=observation_seq.detach(), actions=actions.detach(), rew=None)
+            attention_mask = generate_square_subsequent_mask(actor_input.shape[1]).to(actor_input.device)
+            actor_result = self.actor.forward(actor_input, mask=attention_mask)
+            rounded_actor_result = round_to_bins(input=actor_result, bins=self.args_obj.n_bins, min=self.clip_min, max=self.clip_max)
+            actions = th.cat((actions, rounded_actor_result[:, -1:]), dim=1)            
         if self.args_obj.clip:
             actions = th.clamp(actions, min=self.clip_min, max=self.clip_max)
 
         if action_seq is not None:
             actions = self.proj_actions(
                 action_seq, actions, current_step)
-        return actions
+        actions = actions[:, :self.args_obj.epoch_len + 1]
+        rounded_actions = round_to_bins(input=actions, bins=self.args_obj.n_bins, min=self.clip_min, max=self.clip_max)
+        return rounded_actions
 
     def optimize_act_sequence(self, 
             actions: th.Tensor, 
@@ -257,14 +272,17 @@ class ActiveCriticPolicy(BaseModel):
             current_step: int
             ):
         
+        pain = pain_boundaries(opt_actions, th.tensor(-1, device=opt_actions.device), th.tensor(1, device=opt_actions.device))
 
         critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
+        print(f'critic score: {obs_seq[0,0, -3:]}, scroe: {critic_result}, pain: {pain}')
 
 
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
+        loss = pain + critic_loss
         optimizer.zero_grad()
-        critic_loss.backward()
+        loss.backward()
         optimizer.step()
 
         if self.args_obj.optimizer_mode == 'actor':
@@ -274,15 +292,19 @@ class ActiveCriticPolicy(BaseModel):
     
 
     def get_critic_input(self, acts, obs_seq):
+
         critic_input = make_partially_observed_seq(
-            obs=obs_seq, acts=acts, seq_len=self.args_obj.epoch_len, act_space=self.action_space)
+            obs=obs_seq, acts=acts, seq_len=self.args_obj.epoch_len +1, act_space=self.action_space)
         return critic_input
 
     def get_actor_input(self, obs: th.Tensor, actions: th.Tensor, rew: th.Tensor):
         '''mean_reward = rew.squeeze().mean(1)
         mean_reward = mean_reward.reshape([-1, 1, 1]).repeat([1, rew.shape[1], 1])
         actor_inpt = th.cat((obs, mean_reward), dim=-1)'''
-        return obs
+        rounded_actions = round_to_bins(input=actions, bins=self.args_obj.n_bins, min=self.clip_min, max=self.clip_max)
+        actor_input = th.cat((obs[:, :actions.shape[1]], rounded_actions), dim=2)
+
+        return actor_input
 
     def proj_actions(self, org_actions: th.Tensor, new_actions: th.Tensor, current_step: int):
         with th.no_grad():
