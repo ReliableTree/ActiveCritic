@@ -37,8 +37,6 @@ class DatasetAC(torch.utils.data.Dataset):
                 (self.reward, reward.to(self.device)), dim=0)
             
             success = reward.squeeze().max(-1).values == 1
-            print(f'success shape: {success.shape}')
-            print(f'reward shape: {reward.shape}')
             self.success = torch.cat(
                 (self.success, (success).to(self.device)), dim=0)
 
