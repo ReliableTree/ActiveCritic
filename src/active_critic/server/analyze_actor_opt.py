@@ -232,5 +232,5 @@ def run_eval_stats_env_actor_opt(device, weight_decay):
                                         min_critic_threshold=min_critic_threshold,
                                         weight_decay = weight_decay,
                                         val_every=val_every,
-                                        n_bins=n_bins,
+                                        n_bins=bin,
                                         fast=False)
