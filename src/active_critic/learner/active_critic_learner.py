@@ -202,12 +202,19 @@ class ActiveCriticLearner(nn.Module):
             self.policy.args_obj.optimize = opt_before
 
     def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic):
+        self.train_data.onyl_positiv = True
         for data in train_loader:
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
             loss_actor = actor_step(device_data, loss_actor)
-            if train_critic:
+
+        if train_critic:
+            self.train_data.onyl_positiv = False
+            for data in train_loader:
+                device_data = []
+                for dat in data:
+                    device_data.append(dat.to(self.network_args.device))
                 loss_critic = critic_step(device_data, loss_critic)
 
         return loss_actor, loss_critic
@@ -296,7 +303,7 @@ class ActiveCriticLearner(nn.Module):
                 max_critic = 0
 
             self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
-            self.global_step += len(self.train_data)
+            self.global_step += int(self.train_data.success.sum().detach().cpu())            
             '''if current_patients <= 0:
                 self.policy.critic.init_model()
                 print('reinit critic')

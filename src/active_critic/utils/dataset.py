@@ -1,6 +1,5 @@
 import torch
 
-
 class DatasetAC(torch.utils.data.Dataset):
     def __init__(self, device='cpu'):
         self.device = device
@@ -23,7 +22,8 @@ class DatasetAC(torch.utils.data.Dataset):
         self.reward = reward.to(self.device)
         self.obsv = obsv.to(self.device)
         self.actions = actions.to(self.device)
-        self.success = self.reward[:, -1] == 1
+        success = self.reward.squeeze().max(-1).values
+        self.success = (success == 1)
 
     def add_data(self, obsv: torch.Tensor, actions: torch.Tensor, reward: torch.Tensor):
         if self.obsv is None:
@@ -34,8 +34,10 @@ class DatasetAC(torch.utils.data.Dataset):
                 (self.actions, actions.to(self.device)), dim=0)
             self.reward = torch.cat(
                 (self.reward, reward.to(self.device)), dim=0)
+            
+            success = reward.squeeze().max(-1).values == 1
             self.success = torch.cat(
-                (self.success, (reward[:, -1] == 1).to(self.device)), dim=0)
+                (self.success, (success).to(self.device)), dim=0)
 
     def __getitem__(self, index):
         assert self.onyl_positiv is not None, 'traindata only positiv not set'
