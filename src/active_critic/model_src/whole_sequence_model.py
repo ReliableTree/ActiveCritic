@@ -76,5 +76,5 @@ class CriticSequenceModel(WholeSequenceModel):
             self.result_decoder = nn.Linear(self.wsms.model_setup.d_output * self.wsms.model_setup.seq_len, 1, device=inputs.device)
         trans_result = super().forward(inputs)
         pre_sm = self.result_decoder.forward(trans_result.reshape([trans_result.shape[0], -1]))
-        result = self.sm(pre_sm)
-        return result
+        #result = self.sm(pre_sm)
+        return pre_sm

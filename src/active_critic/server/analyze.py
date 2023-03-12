@@ -62,25 +62,30 @@ def make_wsm_setup_small(seq_len, d_output, weight_decay, device='cuda'):
 
 
 
-def make_acps(seq_len, extractor, new_epoch, device, batch_size=32):
+def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
     acps = ActiveCriticPolicySetup()
     acps.device = device
     acps.epoch_len = seq_len
     acps.extractor = extractor
     acps.new_epoch = new_epoch
-    acps.opt_steps = 5
     acps.optimisation_threshold = 1
-    acps.inference_opt_lr = 5e-3
-    acps.inference_opt_lr = 1e-2
-    
+    if opt_mode == 'actor':
+        acps.inference_opt_lr = 1e-6
+        acps.opt_steps = 30
+    else:
+        acps.inference_opt_lr = 1e-3
+        acps.opt_steps = 5
+
     acps.optimize = True
     acps.batch_size = 32
-    acps.stop_opt = False
-    acps.clip = False
+    acps.stop_opt = True
+    acps.clip = True
+
+    acps.optimizer_mode = opt_mode
     return acps
 
 
-def setup_ac(seq_len, num_cpu, device, tag, weight_decay):
+def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode):
     env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
     wsm_actor_setup = make_wsm_setup(
@@ -88,7 +93,7 @@ def setup_ac(seq_len, num_cpu, device, tag, weight_decay):
     wsm_critic_setup = make_wsm_setup(
         seq_len=seq_len, d_output=1, device=device, weight_decay=weight_decay)
     acps = make_acps(
-        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device)
+        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device, opt_mode=opt_mode)
     actor = WholeSequenceModel(wsm_actor_setup)
     critic = CriticSequenceModel(wsm_critic_setup)
     ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
@@ -96,7 +101,7 @@ def setup_ac(seq_len, num_cpu, device, tag, weight_decay):
     return ac, acps, env, expert
 
 
-def make_acl(device, env_tag, data_path, logname,  seq_len, val_every, imitation_phase, total_training_epsiodes, training_episodes, min_critic_threshold, weight_decay, fast=False):
+def make_acl(device, env_tag, data_path, logname,  seq_len, val_every, imitation_phase, total_training_epsiodes, opt_mode, training_episodes, min_critic_threshold, weight_decay, fast=False):
     device = device
     acla = ActiveCriticLearnerArgs()
     acla.data_path = data_path
@@ -136,13 +141,13 @@ def make_acl(device, env_tag, data_path, logname,  seq_len, val_every, imitation
     acla.start_critic = False
 
     epsiodes = 30
-    ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, tag=tag, weight_decay=weight_decay)
+    ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, opt_mode=opt_mode, tag=tag, weight_decay=weight_decay)
     eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
     return acl, env, expert, seq_len, epsiodes, device
 
 
-def run_experiment(device, data_path, env_tag, logname, fast, val_every, weight_decay=1e-2, demos=14, imitation_phase=False, total_training_epsiodes=20, training_episodes=10, min_critic_threshold=1e-4):
+def run_experiment(device, data_path, env_tag, logname, fast, val_every, opt_mode, weight_decay=1e-2, demos=14, imitation_phase=False, total_training_epsiodes=20, training_episodes=10, min_critic_threshold=1e-4):
     seq_len = 100
 
     acl, env, expert, seq_len, epsiodes, device = make_acl(
@@ -157,6 +162,7 @@ def run_experiment(device, data_path, env_tag, logname, fast, val_every, weight_
                             min_critic_threshold=min_critic_threshold,
                             weight_decay=weight_decay,
                             val_every=val_every,
+                            opt_mode=opt_mode,
                             fast=fast)    
     acl.network_args.num_expert_demos = demos
 
@@ -293,7 +299,7 @@ def run_eval_stats_pp(device, weight_decay):
                                     fast=False)
 
 def run_eval_stats_env(device, weight_decay):
-    imitation_phases = [False, True]
+    imitation_phases = [False]
     demonstrations_list = [30]
     run_ids = [i for i in range(5)]
     s = datetime.today().strftime('%Y-%m-%d')
@@ -302,25 +308,28 @@ def run_eval_stats_env(device, weight_decay):
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['pickplace']
-    val_everys = [2000, 5000]
+    val_everys = [5000]
+    opt_modes = ['actor', 'actions']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
                 for val_every in val_everys:
                     for run_id in run_ids:
-                        logname = f' demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
-                        run_experiment(device=device,
-                                    env_tag=env_tag,
-                                    logname=logname,
-                                    data_path=data_path,
-                                    demos=demonstrations,
-                                    imitation_phase=im_ph,
-                                    total_training_epsiodes=total_training_epsiodes,
-                                    training_episodes=training_episodes,
-                                    min_critic_threshold=min_critic_threshold,
-                                    weight_decay = weight_decay,
-                                    val_every=val_every,
-                                    fast=False)
+                        for opt_mode in opt_modes:
+                            logname = f' opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            run_experiment(device=device,
+                                        env_tag=env_tag,
+                                        logname=logname,
+                                        data_path=data_path,
+                                        demos=demonstrations,
+                                        imitation_phase=im_ph,
+                                        total_training_epsiodes=total_training_epsiodes,
+                                        training_episodes=training_episodes,
+                                        min_critic_threshold=min_critic_threshold,
+                                        weight_decay = weight_decay,
+                                        val_every=val_every,
+                                        opt_mode=opt_mode,
+                                        fast=False)
 
 if __name__ == '__main__':
     run_eval(device='cuda')
