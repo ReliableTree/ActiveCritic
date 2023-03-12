@@ -113,25 +113,16 @@ class ActiveCriticLearner(nn.Module):
     def actor_step(self, data, loss_actor):
         obsv, actions, reward = data
 
-        b, _ = th.max(reward, dim=1)
-        successfull_trj = (b == 1).reshape([-1])
-
-        if successfull_trj.sum() > 0:
-            obsv = obsv[successfull_trj]
-            actions = actions[successfull_trj]
-            reward = reward[successfull_trj]
-
-            actor_input = self.policy.get_actor_input(
-                obs=obsv, actions=actions, rew=reward)
-            #mask = get_rew_mask(reward)
-            debug_dict = self.policy.actor.optimizer_step(
-                inputs=actor_input, label=actions)
-            if loss_actor is None:
-                loss_actor = debug_dict['Loss '].unsqueeze(0)
-            else:
-                loss_actor = th.cat(
-                    (loss_actor, debug_dict['Loss '].unsqueeze(0)), dim=0)
-            self.write_tboard_scalar(debug_dict={'lr actor': debug_dict['Learning Rate'].mean()}, train=True)
+        actor_input = self.policy.get_actor_input(
+            obs=obsv, actions=actions, rew=reward)
+        debug_dict = self.policy.actor.optimizer_step(
+            inputs=actor_input, label=actions)
+        if loss_actor is None:
+            loss_actor = debug_dict['Loss '].unsqueeze(0)
+        else:
+            loss_actor = th.cat(
+                (loss_actor, debug_dict['Loss '].unsqueeze(0)), dim=0)
+        self.write_tboard_scalar(debug_dict={'lr actor': debug_dict['Learning Rate'].mean()}, train=True)
         return loss_actor
 
 
@@ -202,12 +193,20 @@ class ActiveCriticLearner(nn.Module):
             self.policy.args_obj.optimize = opt_before
 
     def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic):
+        self.train_data.onyl_positiv = True
         for data in train_loader:
+            print(f'in training: {data[0].shape}')
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
             loss_actor = actor_step(device_data, loss_actor)
-            if train_critic:
+
+        if train_critic:
+            self.train_data.onyl_positiv = False
+            for data in train_loader:
+                device_data = []
+                for dat in data:
+                    device_data.append(dat.to(self.network_args.device))
                 loss_critic = critic_step(device_data, loss_critic)
 
         return loss_actor, loss_critic
@@ -232,15 +231,17 @@ class ActiveCriticLearner(nn.Module):
                     if self.get_num_training_samples()>= self.network_args.total_training_epsiodes:
                         return None
 
+                print(f'positive examples: {self.train_data.success.sum()}')
+
 
             if (not self.network_args.imitation_phase) and (self.global_step >= next_add) and (self.train_critic):
-                next_add = self.global_step + self.network_args.add_data_every
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
+                
+
+            if (self.global_step >= next_add):
+                next_add = self.global_step + self.network_args.add_data_every
                 self.virtual_step += self.network_args.training_epsiodes
 
-            elif (self.global_step >= next_add):
-                next_add = self.global_step + self.network_args.add_data_every
-                self.virtual_step += self.network_args.training_epsiodes
             if (self.network_args.imitation_phase) and (epoch >= next_add):
                 next_add += self.network_args.add_data_every
                 self.network_args.total_training_epsiodes -= self.network_args.training_epsiodes
