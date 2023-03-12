@@ -9,6 +9,7 @@ from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
 import pickle
+import copy
 
 class ACPOptResult:
     def __init__(self, gen_trj: th.Tensor, inpt_trj: th.Tensor = None, expected_succes_before: th.Tensor = None, expected_succes_after: th.Tensor = None) -> None:
@@ -30,6 +31,7 @@ class ActiveCriticPolicySetup:
         self.optimize: bool = None
         self.batch_size: int = None
         self.stop_opt: bool = None
+        self.optimizer_mode : str = None
         self.clip:bool = True
 
 
@@ -115,6 +117,7 @@ class ActiveCriticPolicy(BaseModel):
             self.current_step += 1
             action_seq = self.current_result.gen_trj
 
+
         #self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
         self.obs_seq = vec_obsv.repeat([1, self.obs_seq.shape[1], 1]).type(th.float)
         if action_seq is None:
@@ -143,10 +146,8 @@ class ActiveCriticPolicy(BaseModel):
             stop_opt: bool
             ):
         # In inference, we want the maximum eventual reward.
-        actor_input = self.get_actor_input(
-            obs=observation_seq, actions=action_seq, rew=self.gl[:observation_seq.shape[0]])
         
-        actions = self.make_action(actor_input=actor_input, action_seq=action_seq, current_step=current_step)
+        actions = self.make_action(action_seq=action_seq, observation_seq=observation_seq, current_step=current_step)
 
         for step in range(actions.shape[1]):
             self.history.add_value(self.history.gen_trj, actions[:, step].detach(), current_step=step)
@@ -177,7 +178,9 @@ class ActiveCriticPolicy(BaseModel):
                 expected_succes_before=expected_success,
                 expected_succes_after=expected_success_opt)
 
-    def make_action(self, actor_input, action_seq, current_step):
+    def make_action(self, action_seq, observation_seq, current_step):
+        actor_input = self.get_actor_input(
+            obs=observation_seq, actions=action_seq, rew=self.gl[:observation_seq.shape[0]])
         actions = self.actor.forward(actor_input)
         if self.args_obj.clip:
             actions = th.clamp(actions, min=self.clip_min, max=self.clip_max)
@@ -193,11 +196,24 @@ class ActiveCriticPolicy(BaseModel):
             current_step: int, 
             stop_opt:bool
             ):
-        optimized_actions = th.clone(actions.detach())
-        final_actions = th.clone(optimized_actions)
-        optimized_actions.requires_grad_(True)
-        optimizer = th.optim.AdamW(
-            [optimized_actions], lr=self.args_obj.inference_opt_lr, weight_decay=0)
+        if self.args_obj.optimizer_mode == 'actions':
+            optimized_actions = th.clone(actions.detach())
+            final_actions = th.clone(optimized_actions)
+            optimized_actions.requires_grad_(True)
+            optimizer = th.optim.AdamW(
+                [optimized_actions], lr=self.args_obj.inference_opt_lr, weight_decay=0)
+        elif self.args_obj.optimizer_mode == 'actor':
+            print('use actor opt mode')
+            actions = actions.detach()
+            observations = observations.detach()
+            init_actor = copy.deepcopy(self.actor.state_dict())
+            optimizer = th.optim.AdamW(
+                self.actor.parameters(), lr=self.args_obj.inference_opt_lr, weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
+                )
+            optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, current_step=self.current_step)
+        else:
+            print('Choose other optimizer mode')
+            1/0
         expected_success = th.zeros(
             size=[actions.shape[0], 1], dtype=th.float, device=actions.device)
         final_exp_success = th.clone(expected_success)
@@ -228,7 +244,8 @@ class ActiveCriticPolicy(BaseModel):
         if self.args_obj.clip:
             with th.no_grad():
                 th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
-
+        if self.args_obj.optimizer_mode == 'actor':
+            self.actor.load_state_dict(init_actor)
         return final_actions, final_exp_success
 
     def inference_opt_step(self, 
@@ -239,6 +256,8 @@ class ActiveCriticPolicy(BaseModel):
             goal_label: th.Tensor, 
             current_step: int
             ):
+        
+
         critic_inpt = self.get_critic_input(acts=opt_actions, obs_seq=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
 
@@ -248,7 +267,11 @@ class ActiveCriticPolicy(BaseModel):
         critic_loss.backward()
         optimizer.step()
 
+        if self.args_obj.optimizer_mode == 'actor':
+            opt_actions = self.make_action(action_seq=org_actions.detach(), observation_seq=obs_seq.detach(), current_step=self.current_step)
+
         return opt_actions, critic_result
+    
 
     def get_critic_input(self, acts, obs_seq):
         critic_input = make_partially_observed_seq(
