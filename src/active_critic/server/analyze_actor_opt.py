@@ -135,7 +135,7 @@ def make_acl(device, env_tag, data_path, logname,  seq_len, val_every, imitation
     acla.start_critic = False
 
     epsiodes = 30
-    ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, tag=tag, weight_decay=weight_decay, n_bins)
+    ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, tag=tag, weight_decay=weight_decay, n_bins=n_bins)
     eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
     return acl, env, expert, seq_len, epsiodes, device

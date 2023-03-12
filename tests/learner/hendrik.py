@@ -17,3 +17,4 @@ if __name__ == '__main__':
     #run_experiment_analyze(device=args.device)
     #run_eval_stats(device=args.device, demos=args.demos, weight_decay=args.wd)
     run_eval_env_actor_opt(device=args.device, weight_decay=args.wd)
+    run_eval_stats_env_actor_opt(device=args.device, weight_decay=args.wd)
