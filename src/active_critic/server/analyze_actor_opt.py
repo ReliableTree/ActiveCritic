@@ -218,18 +218,19 @@ def run_eval_stats_env_actor_opt(device, weight_decay):
         for env_tag in env_tags:
             for im_ph in imitation_phases:
                 for val_every in val_everys:
-                    for run_id in run_ids:
-                        logname = f' quantized actions n_bins: {n_bins}, {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
-                        run_experiment(device=device,
-                                    env_tag=env_tag,
-                                    logname=logname,
-                                    data_path=data_path,
-                                    demos=demonstrations,
-                                    imitation_phase=im_ph,
-                                    total_training_epsiodes=total_training_epsiodes,
-                                    training_episodes=training_episodes,
-                                    min_critic_threshold=min_critic_threshold,
-                                    weight_decay = weight_decay,
-                                    val_every=val_every,
-                                    n_bins=n_bins,
-                                    fast=False)
+                    for bin in n_bins:
+                        for run_id in run_ids:
+                            logname = f' quantized actions n_bins: {n_bins}, {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            run_experiment(device=device,
+                                        env_tag=env_tag,
+                                        logname=logname,
+                                        data_path=data_path,
+                                        demos=demonstrations,
+                                        imitation_phase=im_ph,
+                                        total_training_epsiodes=total_training_epsiodes,
+                                        training_episodes=training_episodes,
+                                        min_critic_threshold=min_critic_threshold,
+                                        weight_decay = weight_decay,
+                                        val_every=val_every,
+                                        n_bins=n_bins,
+                                        fast=False)
