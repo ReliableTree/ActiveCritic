@@ -138,7 +138,7 @@ def make_acl(device, env_tag, data_path, logname,  seq_len, val_every, imitation
 
     acla.patients = 40000
     acla.total_training_epsiodes = total_training_epsiodes
-    acla.start_critic = False
+    acla.start_critic = True
 
     epsiodes = 30
     ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, opt_mode=opt_mode, tag=tag, weight_decay=weight_decay)
