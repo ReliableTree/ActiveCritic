@@ -162,7 +162,7 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
 def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     seq_len=100
     env_tag = env_tag
-    logname = f'TQC_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
+    logname = f'TQC_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_n_samples_{n_samples}_id_{id}'
     print(logname)
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
@@ -176,7 +176,7 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag):
 def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     seq_len=100
     env_tag = env_tag
-    logname = f'PPO_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
+    logname = f'PPO_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_n_samples_{n_samples}_id_{id}'
     print(logname)
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
@@ -203,7 +203,7 @@ def run_tune_TQC(device):
 def stats_PPO(device, path, demonstration, lr, env_tag):
     ids = [i for i in range(5)]
     for id in ids:
-        run_eval_PPO(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=200, id=id, env_tag=env_tag)
+        run_eval_PPO(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=20000, id=id, env_tag=env_tag)
 
 def stats_TQC(device, path, demonstration, lr, env_tag):
     ids = [i for i in range(5)]
@@ -513,8 +513,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [14]
-    list_env_tags = ['pickplace']
+    list_demonstrations = [4]
+    list_env_tags = ['reach']
     
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
     if args.learner == 'TQC':
@@ -577,7 +577,7 @@ if __name__ == '__main__':
 
     elif args.learner == 'stats_PPO':
         print('running stats PPO')
-        for lr in [5e-4]:
+        for lr in [1e-5]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_PPO(
