@@ -59,7 +59,7 @@ def add_max_val_to_dict(dict, key, val, tm):
 
 
 def calcMSE(a, b):
-    return ((a.squeeze() - b.squeeze())**2).mean()
+    return ((a.reshape([-1]) - b.reshape([-1]))**2).mean()
 
 
 def apply_triu(inpt:th.Tensor, diagonal:th.Tensor):

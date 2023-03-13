@@ -14,7 +14,7 @@ class WholeSequenceModelSetup:
         self.lr:float = None
         self.name:str = None
 
-class WholeSequenceModel(nn.Module, ABC):
+class WholeSequenceModel(nn.Module):
     def __init__(self, wsms: WholeSequenceModelSetup) -> None:
         super().__init__()
         self.wsms = wsms
@@ -72,9 +72,16 @@ class CriticSequenceModel(WholeSequenceModel):
         self.sm = th.nn.Sigmoid()
 
     def forward(self, inputs: th.Tensor) -> th.Tensor:
-        if self.result_decoder is None:
-            self.result_decoder = nn.Linear(self.wsms.model_setup.d_output * self.wsms.model_setup.seq_len, 1, device=inputs.device)
-        trans_result = super().forward(inputs)
-        pre_sm = self.result_decoder.forward(trans_result.reshape([trans_result.shape[0], -1]))
+        reinit = False
+        if self.model is None:
+            reinit = True
+        trans_result = super().forward(inputs).reshape([inputs.shape[0], -1])
+
+        if (self.result_decoder is None) or reinit:
+            self.result_decoder = nn.Linear(trans_result.shape[-1], 1, device=inputs.device)
+            self.optimizer = self.wsms.optimizer_class(
+                self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
+            self.scheduler = th.optim.lr_scheduler.StepLR(self.optimizer, int(100000/32), gamma=0.97)
+        pre_sm = self.result_decoder.forward(trans_result)
         #result = self.sm(pre_sm)
         return pre_sm
