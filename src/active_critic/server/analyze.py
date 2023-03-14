@@ -171,7 +171,21 @@ def make_acl(
     return acl, env, expert, seq_len, epsiodes, device
 
 
-def run_experiment(device, data_path, env_tag, logname, fast, val_every, opt_mode, weight_decay=1e-2, demos=14, imitation_phase=False, total_training_epsiodes=20, training_episodes=10, min_critic_threshold=1e-4):
+def run_experiment(
+        device, 
+        data_path, 
+        env_tag, 
+        logname, 
+        fast, 
+        val_every, 
+        opt_mode, 
+        weight_decay=1e-2, 
+        demos=14, 
+        make_graph=False,
+        imitation_phase=False, 
+        total_training_epsiodes=20, 
+        training_episodes=10, 
+        min_critic_threshold=1e-4):
     seq_len = 100
 
     acl, env, expert, seq_len, epsiodes, device = make_acl(
@@ -187,7 +201,7 @@ def run_experiment(device, data_path, env_tag, logname, fast, val_every, opt_mod
                             weight_decay=weight_decay,
                             val_every=val_every,
                             opt_mode=opt_mode,
-                            make_graphs=False,
+                            make_graphs=make_graph,
                             fast=fast)    
     acl.network_args.num_expert_demos = demos
 
