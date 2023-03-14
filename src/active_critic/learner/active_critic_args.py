@@ -25,3 +25,4 @@ class ActiveCriticLearnerArgs:
         self.total_training_epsiodes:int =None
         self.num_expert_demos:int = None
         self.start_critic:int = None
+        self.make_graphs:bool = None

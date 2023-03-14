@@ -119,9 +119,7 @@ class ActiveCriticLearner(nn.Module):
 
     def actor_step(self, data, loss_actor):
         obsv, actions, reward, expert_trjs = data
-
-        planner_inpt = self.policy.get_planner_input(acts=actions, obsvs=obsv)
-        plans = self.policy.planner.forward(planner_inpt)
+        plans = self.policy.make_plans(acts=actions, obsvs=obsv)
         plans[expert_trjs] = 0
 
         actor_input = self.policy.get_actor_input(plans=plans, obsvs=obsv)
@@ -533,11 +531,12 @@ class ActiveCriticLearner(nn.Module):
 
 
     def createGraphs(self, trjs:list([th.tensor]), trj_names:list([str]), plot_name:str):
-        np_trjs = []
-        trj_colors = ['forestgreen', 'orange', 'pink']
-        for trj in trjs:
-            np_trjs.append(trj.detach().cpu().numpy())
-        self.tboard.plot_graph(trjs=np_trjs, trj_names=trj_names, trj_colors=trj_colors, plot_name=plot_name, step=self.global_step)
+        if self.network_args.make_graphs:
+            np_trjs = []
+            trj_colors = ['forestgreen', 'orange', 'pink']
+            for trj in trjs:
+                np_trjs.append(trj.detach().cpu().numpy())
+            self.tboard.plot_graph(trjs=np_trjs, trj_names=trj_names, trj_colors=trj_colors, plot_name=plot_name, step=self.global_step)
 
 
     def saveNetworkToFile(self, add, data_path):

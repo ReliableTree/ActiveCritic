@@ -71,10 +71,10 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
     acps.optimisation_threshold = 1
     if opt_mode == 'actor':
         acps.inference_opt_lr = 1e-6
-        acps.opt_steps = 30
+        acps.opt_steps = 100
     elif opt_mode == 'plan':
         acps.inference_opt_lr = 1e-3
-        acps.opt_steps = 30
+        acps.opt_steps = 100
     elif opt_mode == 'actions':
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
@@ -110,7 +110,20 @@ def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode):
     return ac, acps, env, expert
 
 
-def make_acl(device, env_tag, data_path, logname,  seq_len, val_every, imitation_phase, total_training_epsiodes, opt_mode, training_episodes, min_critic_threshold, weight_decay, fast=False):
+def make_acl(
+        device, 
+        env_tag, 
+        data_path, 
+        logname,  
+        seq_len, 
+        val_every, 
+        imitation_phase, 
+        total_training_epsiodes, 
+        opt_mode, training_episodes, 
+        min_critic_threshold, 
+        weight_decay, 
+        make_graphs,
+        fast=False):
     device = device
     acla = ActiveCriticLearnerArgs()
     acla.data_path = data_path
@@ -121,6 +134,7 @@ def make_acl(device, env_tag, data_path, logname,  seq_len, val_every, imitation
     acla.logname = tag + logname
     acla.tboard = True
     acla.batch_size = 16
+    acla.make_graphs = make_graphs
     number = 10
 
     if fast:
@@ -173,6 +187,7 @@ def run_experiment(device, data_path, env_tag, logname, fast, val_every, opt_mod
                             weight_decay=weight_decay,
                             val_every=val_every,
                             opt_mode=opt_mode,
+                            make_graphs=False,
                             fast=fast)    
     acl.network_args.num_expert_demos = demos
 
@@ -313,16 +328,16 @@ def run_eval_stats_pp(device, weight_decay):
                                     fast=False)
 
 def run_eval_stats_env(device, weight_decay):
-    imitation_phases = [False, True]
-    demonstrations_list = [20, 50]
+    imitation_phases = [False]
+    demonstrations_list = [20]
     run_ids = [i for i in range(5)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 200
+    total_training_epsiodes = 6000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['pickplace']
-    val_everys = [10000, 20000]
+    val_everys = [50000]
     opt_modes = ['plan']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
@@ -343,6 +358,7 @@ def run_eval_stats_env(device, weight_decay):
                                         weight_decay = weight_decay,
                                         val_every=val_every,
                                         opt_mode=opt_mode,
+                                        make_graphs = False,
                                         fast=False)
 
 if __name__ == '__main__':

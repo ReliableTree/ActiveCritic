@@ -78,7 +78,7 @@ class CriticSequenceModel(WholeSequenceModel):
         trans_result = super().forward(inputs).reshape([inputs.shape[0], -1])
 
         if (self.result_decoder is None) or reinit:
-            self.result_decoder = nn.Linear(trans_result.shape[-1], 1, device=inputs.device)
+            self.result_decoder = nn.Linear(trans_result.shape[-1], self.wsms.model_setup.d_output, device=inputs.device)
             self.optimizer = self.wsms.optimizer_class(
                 self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
             self.scheduler = th.optim.lr_scheduler.StepLR(self.optimizer, int(100000/32), gamma=0.97)

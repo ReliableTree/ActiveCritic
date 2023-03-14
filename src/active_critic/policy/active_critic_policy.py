@@ -198,6 +198,7 @@ class ActiveCriticPolicy(BaseModel):
     def make_plans(self, acts, obsvs):
         planner_input = self.get_planner_input(acts=acts, obsvs=obsvs)
         plans = self.planner.forward(planner_input)
+        #plans = plans.reshape([acts.shape[0], 1, self.planner.wsms.model_setup.d_output]).repeat([1, acts.shape[1], 1])
         return plans
 
     def optimize_act_sequence(self, 
@@ -301,6 +302,7 @@ class ActiveCriticPolicy(BaseModel):
     
     def get_planner_input(self, acts, obsvs):
         return th.cat((acts, obsvs), dim=-1)
+
 
     def get_actor_input(self, plans, obsvs):
         return th.cat((plans, obsvs), dim=-1)
