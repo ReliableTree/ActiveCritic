@@ -181,7 +181,7 @@ def run_experiment(
         opt_mode, 
         weight_decay=1e-2, 
         demos=14, 
-        make_graph=False,
+        make_graphs=False,
         imitation_phase=False, 
         total_training_epsiodes=20, 
         training_episodes=10, 
@@ -201,7 +201,7 @@ def run_experiment(
                             weight_decay=weight_decay,
                             val_every=val_every,
                             opt_mode=opt_mode,
-                            make_graphs=make_graph,
+                            make_graphs=make_graphs,
                             fast=fast)    
     acl.network_args.num_expert_demos = demos
 
