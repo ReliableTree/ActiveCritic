@@ -72,9 +72,14 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
     if opt_mode == 'actor':
         acps.inference_opt_lr = 1e-6
         acps.opt_steps = 30
-    else:
+    elif opt_mode == 'plan':
+        acps.inference_opt_lr = 1e-3
+        acps.opt_steps = 30
+    elif opt_mode == 'actions':
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
+    else:
+        1/0
 
     acps.optimize = True
     acps.batch_size = 32
@@ -88,16 +93,20 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
 def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode):
     env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
+    d_plan = 10
     wsm_actor_setup = make_wsm_setup(
         seq_len=seq_len, d_output=d_output, device=device, weight_decay=weight_decay)
     wsm_critic_setup = make_wsm_setup(
         seq_len=seq_len, d_output=1, device=device, weight_decay=weight_decay)
+    wsm_planner_setup = make_wsm_setup(
+        seq_len=seq_len, d_output=d_plan, weight_decay=weight_decay, device=device)
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device, opt_mode=opt_mode)
     actor = WholeSequenceModel(wsm_actor_setup)
     critic = CriticSequenceModel(wsm_critic_setup)
+    planner = WholeSequenceModel(wsm_planner_setup)
     ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
-                            actor=actor, critic=critic, acps=acps)
+                            actor=actor, critic=critic, planner=planner, acps=acps)
     return ac, acps, env, expert
 
 
@@ -144,6 +153,7 @@ def make_acl(device, env_tag, data_path, logname,  seq_len, val_every, imitation
     ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, opt_mode=opt_mode, tag=tag, weight_decay=weight_decay)
     eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
+    ac.write_tboard_scalar = acl.write_tboard_scalar
     return acl, env, expert, seq_len, epsiodes, device
 
 
@@ -172,10 +182,14 @@ def run_experiment(device, data_path, env_tag, logname, fast, val_every, opt_mod
         env=acl.env,
         extractor=acl.network_args.extractor,
         device=acl.network_args.device,
-        episodes=20,
+        episodes=demos,
         seq_len=seq_len)
+    
+    exp_trjs = th.ones([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
 
-    acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos])
+
+
+    acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos])
 
     acl.train(epochs=100000)
 
@@ -299,17 +313,17 @@ def run_eval_stats_pp(device, weight_decay):
                                     fast=False)
 
 def run_eval_stats_env(device, weight_decay):
-    imitation_phases = [False, True]
-    demonstrations_list = [50]
+    imitation_phases = [False]
+    demonstrations_list = [4, 10]
     run_ids = [i for i in range(5)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
     total_training_epsiodes = 200
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['pickplace']
-    val_everys = [10000]
-    opt_modes = ['actor', 'actions']
+    env_tags = ['reach']
+    val_everys = [10000, 20000]
+    opt_modes = ['plan']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
