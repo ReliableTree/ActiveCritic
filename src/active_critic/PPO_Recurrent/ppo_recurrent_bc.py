@@ -21,7 +21,7 @@ class Rec_PPO_BC:
     def train(self, n_epochs, verbose = False):
         self.model.policy.train()
         for epoch in range(n_epochs):
-            for obs, act, rew in self.dataloader:
+            for obs, act, rew, _ in self.dataloader:
                 batch_size = obs.shape[0]
                 lstm = self.model.policy.lstm_actor
                 self.model.policy.train()
