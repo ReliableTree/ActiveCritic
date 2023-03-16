@@ -527,7 +527,7 @@ def make_ppo_rec_data_loader(env, vec_expert, n_demonstrations, seq_len, device)
     actions, observations, rewards = parse_sampled_transitions(transitions=transitions, extractor=DummyExtractor(), seq_len=seq_len, device='cuda')
     inpt_obsv = observations[:,:1].repeat([1, observations.shape[1], 1])
     train_data = DatasetAC(device=device)
-    train_data.add_data(obsv=inpt_obsv, actions=actions, reward=rewards)
+    train_data.add_data(obsv=inpt_obsv, actions=actions, reward=rewards, expert_trjs=rewards)
     train_data.onyl_positiv = False
 
     dataloader = DataLoader(dataset=train_data, batch_size=16, shuffle=True)
