@@ -34,7 +34,7 @@ class WholeSequenceModel(nn.Module):
         if self.optimizer is None:
             self.optimizer = self.wsms.optimizer_class(
                 self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
-            self.scheduler = th.optim.lr_scheduler.StepLR(self.optimizer, int(100000/32), gamma=0.97)
+            self.scheduler = th.optim.lr_scheduler.StepLR(self.optimizer, int(100000/32), gamma=1)
 
         return result
 

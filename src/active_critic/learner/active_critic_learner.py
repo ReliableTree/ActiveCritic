@@ -17,6 +17,7 @@ from gym.envs.mujoco import MujocoEnv
 from torch.utils.data.dataloader import DataLoader
 import numpy as np
 import pickle
+import copy
 
 from active_critic.learner.higher_learning import actor_step, critic_step
 
@@ -105,6 +106,7 @@ class ActiveCriticLearner(nn.Module):
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
     def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor, expert_trjs:th.Tensor):
+        print(f'')
         acts, obsv, rews = make_part_obs_data(
             actions=actions, observations=observations, rewards=rewards)
         self.train_data.add_data(
@@ -193,10 +195,16 @@ class ActiveCriticLearner(nn.Module):
         success = rewards.squeeze().max(-1).values
         success = (success == 1).type(th.float).mean()
 
-        if ((self.last_scores is None) or (self.last_scores < success)) and (policy == self.policy):
+        '''if ((self.last_scores is None) or (self.last_scores < success)) and (policy == self.policy):
             self.last_scores = success
-            self.policy.args_obj.opt_steps *= 1.1
-            print(f'new opt_steps = {self.policy.args_obj.opt_steps}')
+            th.save(self.policy.actor.state_dict(), 'actor')
+            th.save(self.policy.actor.optimizer.state_dict(), 'optm')
+            print('new actor')
+        elif ((self.last_scores is not None) and (self.last_scores > success)) and (policy == self.policy):
+            self.policy.actor.load_state_dict(th.load('actor'))
+            self.policy.actor.optimizer.load_state_dict(th.load('optm'))
+
+            print('loaded old actor')'''
         print(f'last rewards: {rewards.mean()}')
         print(f'last success: {success}')
         print(f'self.last_scores: {self.last_scores}')
@@ -249,7 +257,7 @@ class ActiveCriticLearner(nn.Module):
                         return None
 
 
-            if (not self.network_args.imitation_phase) and (self.global_step >= next_add) and (self.train_critic):
+            if (not self.network_args.imitation_phase) and (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
                 self.virtual_step += self.network_args.training_epsiodes

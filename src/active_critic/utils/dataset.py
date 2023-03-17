@@ -22,7 +22,7 @@ class DatasetAC(torch.utils.data.Dataset):
         self.reward = reward.to(self.device)
         self.obsv = obsv.to(self.device)
         self.actions = actions.to(self.device)
-        success = self.reward.squeeze().max(-1).values
+        success = self.reward.reshape([obsv.shape[0], obsv.shape[1]]).max(-1).values
         self.success = (success == 1)
         self.expert_trjs = expert_trjs.to(self.device)
 
@@ -36,7 +36,7 @@ class DatasetAC(torch.utils.data.Dataset):
             self.reward = torch.cat(
                 (self.reward, reward.to(self.device)), dim=0)
             
-            success = reward.squeeze().max(-1).values == 1
+            success = reward.reshape([obsv.shape[0], obsv.shape[1]]).max(-1).values == 1
             self.success = torch.cat(
                 (self.success, (success).to(self.device)), dim=0)
             self.expert_trjs = torch.cat((

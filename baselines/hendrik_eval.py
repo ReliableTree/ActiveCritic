@@ -513,7 +513,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [30]
+    list_demonstrations = [20]
     list_env_tags = ['pickplace']
     
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
@@ -538,7 +538,7 @@ if __name__ == '__main__':
     elif args.learner == 'stats_GAIL_TQC':
         print('running GAIL + TQC')
         
-        lrs = [5e-7, 1e-7]
+        lrs = [1e-7]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
@@ -566,7 +566,7 @@ if __name__ == '__main__':
         )
     elif args.learner == 'stats_RPPO':
         print('running RPPO')
-        for lr in [1e-6, 1e-7]:
+        for lr in [1e-7]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_RPPO(
