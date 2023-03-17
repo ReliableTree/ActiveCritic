@@ -209,6 +209,8 @@ class ActiveCriticPolicy(BaseModel):
             stop_opt:bool
             ):
 
+        goals = None
+
         if self.args_obj.optimizer_mode == 'actions':
             optimized_actions = th.clone(actions.detach())
             optimized_actions.requires_grad_(True)
@@ -233,6 +235,16 @@ class ActiveCriticPolicy(BaseModel):
             plans.requires_grad = True
             optimizer = th.optim.AdamW(
                 [plans], lr=self.args_obj.inference_opt_lr, weight_decay=0)
+        elif self.args_obj.optimizer_mode == 'goal':
+            print('use goal opt mode')
+            optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
+            actions = actions.detach()
+            observations = observations.detach()
+            plans = plans.detach()
+            goals = th.clone(observations[:, :, -3:])
+            goals.requires_grad = True
+            optimizer = th.optim.AdamW(
+                [goals], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         else:
             print('Choose other optimizer mode')
             1/0
@@ -255,7 +267,8 @@ class ActiveCriticPolicy(BaseModel):
                 optimizer=optimizer,
                 goal_label=goal_label,
                 current_step=current_step,
-                plans=plans
+                plans=plans,
+                goals=goals
                 )
             if self.write_tboard_scalar is not None:
                 debug_dict = {
@@ -265,8 +278,8 @@ class ActiveCriticPolicy(BaseModel):
             step += 1
 
             if stop_opt:
-                final_actions[mask] = optimized_actions[mask]
-                final_exp_success[mask] = expected_success[mask]
+                final_actions[mask] = th.clone(optimized_actions[mask]).detach()
+                final_exp_success[mask] = th.clone(expected_success[mask]).detach()
             else:
                 final_actions = optimized_actions
                 final_exp_success = expected_success
@@ -285,9 +298,18 @@ class ActiveCriticPolicy(BaseModel):
             optimizer: th.optim.Optimizer, 
             goal_label: th.Tensor, 
             plans:th.Tensor,
-            current_step: int
+            current_step: int,
+            goals:th.Tensor
             ):
-        
+        if (self.args_obj.optimizer_mode == 'goal'):
+            current_obs_seq = th.cat((obs_seq[:, :, :-3], goals), dim=-1)
+        else:
+            current_obs_seq = obs_seq
+            assert goals is None, 'Kinda the wrong mode or smth.'
+
+        if (self.args_obj.optimizer_mode in ['actor', 'plan', 'goal']):
+            opt_actions = self.make_action(action_seq=org_actions, observation_seq=current_obs_seq, plans=plans, current_step=current_step)
+
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
@@ -295,8 +317,7 @@ class ActiveCriticPolicy(BaseModel):
         critic_loss.backward()
         optimizer.step()
 
-        if (self.args_obj.optimizer_mode == 'actor') or (self.args_obj.optimizer_mode == 'plan'):
-            opt_actions = self.make_action(action_seq=org_actions.detach(), observation_seq=obs_seq.detach(), plans=plans, current_step=current_step)
+
 
         return opt_actions, critic_result, plans
     

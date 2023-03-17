@@ -78,6 +78,9 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
     elif opt_mode == 'actions':
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
+    elif opt_mode == 'goal':
+        acps.inference_opt_lr = 1e-3
+        acps.opt_steps = 100
     else:
         1/0
 
@@ -343,7 +346,7 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False, True]
-    demonstrations_list = [30, 50]
+    demonstrations_list = [20]
     run_ids = [i for i in range(5)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
@@ -351,8 +354,8 @@ def run_eval_stats_env(device, weight_decay):
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['pickplace']
-    val_everys = [2000, 5000]
-    opt_modes = ['actions', 'plan', 'actor']
+    val_everys = [5000]
+    opt_modes = ['goal']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
@@ -360,6 +363,7 @@ def run_eval_stats_env(device, weight_decay):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             logname = f' opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            print(f'____________________________________logname: {logname}')
                             run_experiment(device=device,
                                         env_tag=env_tag,
                                         logname=logname,
@@ -372,7 +376,7 @@ def run_eval_stats_env(device, weight_decay):
                                         weight_decay = weight_decay,
                                         val_every=val_every,
                                         opt_mode=opt_mode,
-                                        make_graphs = False,
+                                        make_graphs = True,
                                         fast=False)
 
 if __name__ == '__main__':
