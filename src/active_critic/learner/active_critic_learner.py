@@ -290,7 +290,7 @@ class ActiveCriticLearner(nn.Module):
                         self.policy.planner.load_state_dict(th.load('planner_before'))
                     except:
                         print('actor not reloaded')
-                    #self.scores.reset_min_score(self.scores.mean_actor)
+                    self.scores.reset_min_score(self.scores.mean_actor)
 
                     if self.get_num_training_samples()>= self.network_args.total_training_epsiodes:
                         return None
@@ -298,7 +298,19 @@ class ActiveCriticLearner(nn.Module):
 
             if (not self.network_args.imitation_phase) and (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every
+                th.save(self.policy.actor.state_dict(), 'actor_before')
+                th.save(self.policy.planner.state_dict(), 'planner_before')
+                try:
+                    self.policy.actor.load_state_dict(th.load('best_actor'))
+                    self.policy.planner.load_state_dict(th.load('best_planner'))
+                except:
+                    print('no actor loaded')
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
+                try:
+                    self.policy.actor.load_state_dict(th.load('actor_before'))
+                    self.policy.planner.load_state_dict(th.load('planner_before'))
+                except:
+                    print('actor not reloaded')
                 self.virtual_step += self.network_args.training_epsiodes
 
             elif (self.global_step >= next_add):

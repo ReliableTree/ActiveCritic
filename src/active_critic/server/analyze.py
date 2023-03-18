@@ -60,6 +60,24 @@ def make_wsm_setup_small(seq_len, d_output, weight_decay, device='cuda'):
     wsm.optimizer_kwargs = {'weight_decay':weight_decay}
     return wsm
 
+def make_wsm_setup_tiny(seq_len, d_output, weight_decay, device='cuda'):
+    wsm = WholeSequenceModelSetup()
+    wsm.model_setup = ModelSetup()
+    seq_len = seq_len
+    d_output = d_output
+    wsm.model_setup.d_output = d_output
+    wsm.model_setup.nhead = 1
+    wsm.model_setup.d_hid = 1
+    wsm.model_setup.d_model = 1
+    wsm.model_setup.nlayers = 1
+    wsm.model_setup.seq_len = seq_len
+    wsm.model_setup.dropout = 0
+    wsm.lr = 1e-4
+    wsm.model_setup.device = device
+    wsm.optimizer_class = th.optim.AdamW
+    wsm.optimizer_kwargs = {'weight_decay':weight_decay}
+    return wsm
+
 
 
 def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
@@ -80,7 +98,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
         acps.opt_steps = 5
     elif opt_mode == 'goal':
         acps.inference_opt_lr = 1e-3
-        acps.opt_steps = 50
+        acps.opt_steps = 5
     else:
         1/0
 
@@ -96,12 +114,12 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
 def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode):
     env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len)
     d_output = env.action_space.shape[0]
-    d_plan = 10
+    d_plan = 1
     wsm_actor_setup = make_wsm_setup(
         seq_len=seq_len, d_output=d_output, device=device, weight_decay=weight_decay)
     wsm_critic_setup = make_wsm_setup(
         seq_len=seq_len, d_output=1, device=device, weight_decay=weight_decay)
-    wsm_planner_setup = make_wsm_setup(
+    wsm_planner_setup = make_wsm_setup_tiny(
         seq_len=seq_len, d_output=d_plan, weight_decay=weight_decay, device=device)
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device, opt_mode=opt_mode)
@@ -348,25 +366,25 @@ def run_eval_stats_pp(device, weight_decay):
                                     fast=False)
 
 def run_eval_stats_env(device, weight_decay):
-    imitation_phases = [False, True]
-    demonstrations_list = [20]
+    imitation_phases = [False]
+    demonstrations_list = [4]
     run_ids = [i for i in range(5)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 100
-    total_training_epsiodes = 2000
+    training_episodes = 40
+    total_training_epsiodes = 400
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['pickplace']
-    val_everys = [18000]
-    add_data_everys = [18000]
-    opt_modes = ['goal']
+    env_tags = ['reach']
+    val_everys = [1000]
+    add_data_everys = [1000]
+    opt_modes = ['actions']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
                 for val_step, val_every in enumerate(val_everys):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
-                            logname = f' 100 opt steps load best actor trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            logname = f' tiny planner trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                             print(f'____________________________________logname: {logname}')
                             run_experiment(device=device,
                                         env_tag=env_tag,

@@ -15,4 +15,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     #run_experiment_analyze(device=args.device)
     #run_eval_stats(device=args.device, demos=args.demos, weight_decay=args.wd)
-    run_eval_stats_env(device=args.device, weight_decay=1e-2)
+    run_eval_stats_env(device=args.device, weight_decay=1e-1)
