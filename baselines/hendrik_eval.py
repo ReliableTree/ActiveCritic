@@ -441,7 +441,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag)
         logname_save_path=logname_save_path,
         seq_len=seq_len,
         n_demonstrations=demonstrations,
-        bc_epochs=7 * n_samples,
+        bc_epochs=10 * n_samples,
         n_samples=n_samples,
         device=device,
         logname=logname,
@@ -566,7 +566,7 @@ if __name__ == '__main__':
         )
     elif args.learner == 'stats_RPPO':
         print('running RPPO')
-        for lr in [1e-7]:
+        for lr in [5e-6, 1e-6]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_RPPO(
