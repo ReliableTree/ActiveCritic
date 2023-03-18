@@ -80,7 +80,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
         acps.opt_steps = 5
     elif opt_mode == 'goal':
         acps.inference_opt_lr = 1e-3
-        acps.opt_steps = 5
+        acps.opt_steps = 50
     else:
         1/0
 
@@ -348,17 +348,17 @@ def run_eval_stats_pp(device, weight_decay):
                                     fast=False)
 
 def run_eval_stats_env(device, weight_decay):
-    imitation_phases = [False]
+    imitation_phases = [False, True]
     demonstrations_list = [20]
     run_ids = [i for i in range(5)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 20
-    total_training_epsiodes = 400
+    training_episodes = 100
+    total_training_epsiodes = 2000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['pickplace']
-    val_everys = [4000]
-    add_data_everys = [4000]
+    val_everys = [18000]
+    add_data_everys = [18000]
     opt_modes = ['goal']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
@@ -366,7 +366,7 @@ def run_eval_stats_env(device, weight_decay):
                 for val_step, val_every in enumerate(val_everys):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
-                            logname = f' opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            logname = f' 100 opt steps load best actor trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                             print(f'____________________________________logname: {logname}')
                             run_experiment(device=device,
                                         env_tag=env_tag,

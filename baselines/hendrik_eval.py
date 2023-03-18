@@ -513,8 +513,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [20]
-    list_env_tags = ['pickplace']
+    list_demonstrations = [20, 30, 40]
+    list_env_tags = ['push']
     
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
 

@@ -18,6 +18,7 @@ from torch.utils.data.dataloader import DataLoader
 import numpy as np
 import pickle
 import copy
+import math
 
 from active_critic.learner.higher_learning import actor_step, critic_step
 
@@ -26,6 +27,9 @@ class ACLScores:
         self.mean_actor = [float('inf')]
         self.mean_critic = [float('inf')]
         self.mean_reward = [0]
+
+    def reset_min_score(self, score):
+        score[0] = float('inf')
 
     def update_min_score(self, old_score, new_score):
         new_min = old_score[0] > new_score
@@ -126,7 +130,11 @@ class ActiveCriticLearner(nn.Module):
 
         actor_input = self.policy.get_actor_input(plans=plans, obsvs=obsv)
         actor_result = self.policy.actor.forward(actor_input)
+        """critic_inpt = self.policy.get_critic_input(obsvs=obsv, acts=actor_result)
+        critic_result = self.policy.critic.forward(inputs=critic_inpt)
+        critic_loss = calcMSE(critic_result[critic_result<1], th.ones_like(critic_result[critic_result<1]))"""
         loss = calcMSE(actor_result, actions)
+        #loss = loss + critic_loss
         self.policy.actor.optimizer.zero_grad()
         self.policy.planner.optimizer.zero_grad()
         loss.backward()
@@ -167,18 +175,34 @@ class ActiveCriticLearner(nn.Module):
             policy.eval()
             opt_before = self.policy.args_obj.optimize
             self.policy.args_obj.optimize = (self.policy.args_obj.optimize and self.network_args.start_critic)
+            iterations = math.ceil(episodes/self.env.num_envs)
         else:
             opt_before = None
 
         h = time.perf_counter()
-        actions, observations, rewards, _, expected_rewards = sample_new_episode(
-            policy=policy,
-            env=self.env,
-            extractor=self.network_args.extractor,
-            device=self.network_args.device,
-            episodes=episodes,
-            seq_len=seq_len)
-
+        add_results = []
+        for iteration in range(iterations):
+            result = sample_new_episode(
+                policy=policy,
+                env=self.env,
+                extractor=self.network_args.extractor,
+                device=self.network_args.device,
+                episodes=self.env.num_envs,
+                seq_len=seq_len)
+            result_array = []
+            for res in result:
+                result_array.append(res)
+            add_results.append(result_array)
+        
+        for element in add_results[1:]:
+            for i, part in enumerate(element):
+                add_results[0][i] = th.cat((add_results[0][i], part), dim=0)
+        actions, observations, rewards, _, expected_rewards = add_results[0]
+        assert actions.shape[0] >= episodes, 'ASDSAD'
+        actions = actions[:episodes]
+        observations = observations[:episodes]
+        rewards = rewards[:episodes]
+        expected_rewards = expected_rewards[:episodes]
         if self.last_trj_training is not None:
             self.compare_expecations(self.last_trj_training, 'Training')
         self.last_trj_training = [
@@ -248,11 +272,26 @@ class ActiveCriticLearner(nn.Module):
                 next_val = self.global_step + self.network_args.val_every
                 if self.network_args.tboard:
                     print('_____________________________________________________________')
+                    th.save(self.policy.actor.state_dict(), 'actor_before')
+                    th.save(self.policy.planner.state_dict(), 'planner_before')
+
+                    try:
+                        self.policy.actor.load_state_dict(th.load('best_actor'))
+                        self.policy.planner.load_state_dict(th.load('best_planner'))
+                    except:
+                        print('no actor loaded')
                     self.policy.eval()
                     self.run_validation(optimize=True)
                     self.run_validation(optimize=False)
                     print(f'self.get_num_training_samples(): {self.get_num_training_samples()}')
                     print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
+                    try:
+                        self.policy.actor.load_state_dict(th.load('actor_before'))
+                        self.policy.planner.load_state_dict(th.load('planner_before'))
+                    except:
+                        print('actor not reloaded')
+                    #self.scores.reset_min_score(self.scores.mean_actor)
+
                     if self.get_num_training_samples()>= self.network_args.total_training_epsiodes:
                         return None
 
@@ -301,8 +340,12 @@ class ActiveCriticLearner(nn.Module):
                 max_critic = None
 
             
-            self.scores.update_min_score(
+            new_min = self.scores.update_min_score(
                 self.scores.mean_actor, max_actor)
+            if new_min:
+                th.save(self.policy.actor.state_dict(), 'best_actor')
+                th.save(self.policy.planner.state_dict(), 'best_planner')
+                print('new actor')
 
             reward = self.train_data.reward
             b, _ = th.max(reward, dim=1)
