@@ -212,14 +212,14 @@ def run_eval(device):
                             acl.train(epochs=100000)
 
 def run_eval_stats(device, demos, weight_decay):
-    imitation_phases = [True, False]
+    imitation_phases = [False]
     demonstrations = demos
-    run_ids = [0,1,2,3,4]
+    run_ids = [0,1]
     training_episodes = 10
-    total_training_epsiodes = 200
+    total_training_epsiodes = 20000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_test_19'
-    env_tags = ['push, reach, windowopen, pickplace']
+    env_tags = ['reach']
     for env_tag in env_tags:
         for im_ph in imitation_phases:
             for run_id in run_ids:
@@ -237,16 +237,16 @@ def run_eval_stats(device, demos, weight_decay):
                             fast=False)
 
 def run_eval_stats_demos(device, weight_decay):
-    imitation_phases = [True, False]
-    demonstrations_list = [14, 14, 6, 6]
-    run_ids = [i for i in range(5)]
+    imitation_phases = [False]
+    demonstrations_list = [4]
+    run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 200
+    total_training_epsiodes = 20000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['pickplace', 'push', 'reach', 'windowopen']
-    val_everys = [2000, 20000]
+    env_tags = ['reach']
+    val_everys = [2000]
     for i in range(len(env_tags)):
         demonstrations = demonstrations_list[i]
         env_tag = env_tags[i]
