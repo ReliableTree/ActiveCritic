@@ -220,21 +220,23 @@ def run_eval_stats(device, demos, weight_decay):
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_test_19'
     env_tags = ['reach']
-    for env_tag in env_tags:
-        for im_ph in imitation_phases:
-            for run_id in run_ids:
-                logname = f' demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, run id: {run_id}'
-                run_experiment(device=device,
-                            env_tag=env_tag,
-                            logname=logname,
-                            data_path=data_path,
-                            demos=demonstrations,
-                            imitation_phase=im_ph,
-                            total_training_epsiodes=total_training_epsiodes,
-                            training_episodes=training_episodes,
-                            min_critic_threshold=min_critic_threshold,
-                            weight_decay = weight_decay,
-                            fast=False)
+    for opt_mode in ['actions', 'actor']:
+        for env_tag in env_tags:
+            for im_ph in imitation_phases:
+                for run_id in run_ids:
+                    logname = f' demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, run id: {run_id}'
+                    run_experiment(device=device,
+                                env_tag=env_tag,
+                                logname=logname,
+                                data_path=data_path,
+                                demos=demonstrations,
+                                imitation_phase=im_ph,
+                                total_training_epsiodes=total_training_epsiodes,
+                                training_episodes=training_episodes,
+                                min_critic_threshold=min_critic_threshold,
+                                weight_decay = weight_decay,
+                                opt_mode=opt_mode,
+                                fast=False)
 
 def run_eval_stats_demos(device, weight_decay):
     imitation_phases = [False]
