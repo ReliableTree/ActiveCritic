@@ -201,14 +201,14 @@ def run_tune_TQC(device):
         lr = lr * 0.4
 
 def stats_PPO(device, path, demonstration, lr, env_tag):
-    ids = [i for i in range(5)]
+    ids = [i for i in range(2)]
     for id in ids:
         run_eval_PPO(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=20000, id=id, env_tag=env_tag)
 
 def stats_TQC(device, path, demonstration, lr, env_tag):
-    ids = [i for i in range(5)]
+    ids = [i for i in range(2)]
     for id in ids:
-        run_eval_TQC(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=200, id=id, env_tag=env_tag)
+        run_eval_TQC(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=20000, id=id, env_tag=env_tag)
 
 def run_tune_PPO(device):
     lr = 1e-4
@@ -450,7 +450,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag)
     )
 
 def stats_RPPO(device, lr, demonstrations, save_path, n_samples, env_tag):
-    ids = [i for i in range(5)]
+    ids = [i for i in range(2)]
     for id in ids:
         run_eval_RPPO(
             device=device,
