@@ -42,6 +42,7 @@ class Rec_PPO_BC:
                 actions_res, values, log_prob, rnn_states = self.model.policy.forward(obs = obs, lstm_states=lstm_states, episode_starts = th.zeros([obs.shape[0] * obs.shape[1]], device=self.device), deterministic=False)
                 self.model.policy.optimizer.zero_grad()
                 loss = calcMSE(actions_res.reshape(-1), act.reshape(-1))
+                loss = 10*loss
                 loss.backward()
                 self.model.policy.optimizer.step()
                 if verbose and epoch % 2000 == 0:
