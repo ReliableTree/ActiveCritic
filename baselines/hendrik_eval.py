@@ -579,7 +579,7 @@ if __name__ == '__main__':
                         save_path=path,
                         n_samples=200,
                         env_tag=env_tag,
-                        bc_mult = 100
+                        bc_mult = 10
                     )
 
     elif args.learner == 'stats_PPO':
