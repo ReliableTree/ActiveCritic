@@ -370,14 +370,14 @@ def run_eval_stats_env(device, weight_decay):
     demonstrations_list = [4]
     run_ids = [i for i in range(5)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 40
-    total_training_epsiodes = 400
+    training_episodes = 10
+    total_training_epsiodes = 20000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']
     val_everys = [1000]
     add_data_everys = [1000]
-    opt_modes = ['actions']
+    opt_modes = ['actions', 'actor']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
@@ -399,7 +399,7 @@ def run_eval_stats_env(device, weight_decay):
                                         val_every=val_every,
                                         add_data_every = add_data_everys[val_step],
                                         opt_mode=opt_mode,
-                                        make_graphs = True,
+                                        make_graphs = False,
                                         fast=False)
 
 if __name__ == '__main__':
