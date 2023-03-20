@@ -342,7 +342,7 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
             tboard.addValidationScalar('Success Rate', value=th.tensor(
                 success_rate), stepid=learner.env.envs[0].reset_count)
             
-def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, logname, eval_every, lr):
+def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, logname, eval_every, lr, bc_mult):
     history = None
     if not os.path.exists(logname_save_path):
         os.makedirs(logname_save_path)
@@ -370,7 +370,7 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
     runs_per_epoch = 300 * fac
     for i in range(int(bc_epochs/fac)):
         print(f'BC: {i} from {int(bc_epochs/fac)}')
-        bc_learner.train(n_epochs=runs_per_epoch, verbose=True)
+        bc_learner.train(n_epochs=runs_per_epoch, verbose=True, bc_mult=bc_mult)
         success, rews, history = get_avr_succ_rew_det_rec(
             env=pomdp_env_val, 
             learner=bc_learner.policy,
@@ -432,7 +432,7 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
         tboard.addValidationScalar('Success Rate', value=th.tensor(
             success_rate), stepid=learner.env.envs[0].reset_count)
             
-def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
+def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag, bc_mult):
     seq_len=100
     logname = f'RPPO_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
     logname_save_path = os.path.join(save_path, logname + '/')
@@ -447,10 +447,11 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag)
         device=device,
         logname=logname,
         eval_every=2000,
-        lr=lr
+        lr=lr,
+        bc_mult=bc_mult
     )
 
-def stats_RPPO(device, lr, demonstrations, save_path, n_samples, env_tag):
+def stats_RPPO(device, lr, demonstrations, save_path, n_samples, env_tag, bc_mult):
     ids = [i for i in range(5)]
     for id in ids:
         run_eval_RPPO(
@@ -460,7 +461,8 @@ def stats_RPPO(device, lr, demonstrations, save_path, n_samples, env_tag):
             save_path=save_path,
             n_samples=n_samples,
             id=id,
-            env_tag=env_tag
+            env_tag=env_tag,
+            bc_mult=bc_mult
         )
             
 def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_tag):
@@ -576,7 +578,8 @@ if __name__ == '__main__':
                         demonstrations=demos,
                         save_path=path,
                         n_samples=200,
-                        env_tag=env_tag
+                        env_tag=env_tag,
+                        bc_mult = 100
                     )
 
     elif args.learner == 'stats_PPO':
