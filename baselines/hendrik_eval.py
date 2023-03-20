@@ -451,7 +451,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag)
     )
 
 def stats_RPPO(device, lr, demonstrations, save_path, n_samples, env_tag):
-    ids = [i for i in range(1, 5)]
+    ids = [i for i in range(5)]
     for id in ids:
         run_eval_RPPO(
             device=device,
@@ -514,8 +514,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [14]
-    list_env_tags = ['pickplace']
+    list_demonstrations = [10]
+    list_env_tags = ['push']
     
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
 
