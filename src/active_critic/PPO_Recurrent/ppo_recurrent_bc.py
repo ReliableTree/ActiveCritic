@@ -43,7 +43,6 @@ class Rec_PPO_BC:
                 self.model.policy.optimizer.zero_grad()
                 loss = calcMSE(actions_res.reshape(-1), act.reshape(-1))
                 loss = bc_mult*loss
-                print(f'bc mult: {bc_mult}')
                 loss.backward()
                 self.model.policy.optimizer.step()
                 if verbose and epoch % 2000 == 0:
