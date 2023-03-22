@@ -22,7 +22,7 @@ class DatasetAC(torch.utils.data.Dataset):
         self.reward = reward.to(self.device)
         self.obsv = obsv.to(self.device)
         self.actions = actions.to(self.device)
-        success = self.reward.squeeze().max(-1).values
+        success = self.reward.reshape(self.reward.shape[0], -1).max(-1).values
         self.success = (success == 1)
 
     def add_data(self, obsv: torch.Tensor, actions: torch.Tensor, reward: torch.Tensor):
@@ -35,7 +35,7 @@ class DatasetAC(torch.utils.data.Dataset):
             self.reward = torch.cat(
                 (self.reward, reward.to(self.device)), dim=0)
             
-            success = reward.squeeze().max(-1).values == 1
+            success = reward.reshape(reward.shape[0], -1).max(-1).values == 1
             self.success = torch.cat(
                 (self.success, (success).to(self.device)), dim=0)
 
