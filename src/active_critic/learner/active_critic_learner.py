@@ -521,11 +521,12 @@ class ActiveCriticLearner(nn.Module):
 
 
     def createGraphs(self, trjs:list([th.tensor]), trj_names:list([str]), plot_name:str):
-        np_trjs = []
+        pass
+        '''np_trjs = []
         trj_colors = ['forestgreen', 'orange', 'pink']
         for trj in trjs:
             np_trjs.append(trj.detach().cpu().numpy())
-        self.tboard.plot_graph(trjs=np_trjs, trj_names=trj_names, trj_colors=trj_colors, plot_name=plot_name, step=self.global_step)
+        self.tboard.plot_graph(trjs=np_trjs, trj_names=trj_names, trj_colors=trj_colors, plot_name=plot_name, step=self.global_step)'''
 
 
     def saveNetworkToFile(self, add, data_path):
