@@ -231,6 +231,8 @@ class ActiveCriticPolicy(BaseModel):
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
+            init_plan = th.clone(plans.detach())
+            
             plans = plans.detach()
             plans.requires_grad = True
 
@@ -272,7 +274,6 @@ class ActiveCriticPolicy(BaseModel):
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()
-
         while (step <= self.args_obj.opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
             mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success, plans = self.inference_opt_step(
@@ -322,9 +323,12 @@ class ActiveCriticPolicy(BaseModel):
             current_obs_seq = obs_seq
             assert goals is None, 'Kinda the wrong mode or smth.'
 
-        if (self.args_obj.optimizer_mode in ['actor', 'plan', 'goal']):
+        if (self.args_obj.optimizer_mode in ['actor', 'plan', 'goal', 'actor+plan']):
             opt_actions = self.make_action(action_seq=org_actions, observation_seq=current_obs_seq, plans=plans, current_step=current_step)
-
+        elif (self.args_obj.optimizer_mode in ['actions']):
+            pass
+        else:
+            1/0
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
