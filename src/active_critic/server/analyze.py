@@ -229,20 +229,18 @@ def run_experiment(
                             fast=fast)    
     acl.network_args.num_expert_demos = demos
 
-        
-    actions, observations, rewards, _, expected_rewards = sample_new_episode(
-        policy=expert,
-        env=acl.env,
-        extractor=acl.network_args.extractor,
-        device=acl.network_args.device,
-        episodes=demos,
-        seq_len=seq_len)
+    if demos > 0:
+        actions, observations, rewards, _, expected_rewards = sample_new_episode(
+            policy=expert,
+            env=acl.env,
+            extractor=acl.network_args.extractor,
+            device=acl.network_args.device,
+            episodes=demos,
+            seq_len=seq_len)
     
-    exp_trjs = th.ones([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
+        exp_trjs = th.ones([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
 
-
-
-    acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos])
+        acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos])
 
     acl.train(epochs=100000)
 
@@ -367,17 +365,17 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
-    demonstrations_list = [4]
-    run_ids = [i for i in range(5)]
+    demonstrations_list = [0]
+    run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 20000
+    total_training_epsiodes = 1000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['reach']
+    env_tags = ['drawerclose']
     val_everys = [1000]
     add_data_everys = [1000]
-    opt_modes = ['actions', 'actor']
+    opt_modes = ['actor']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:

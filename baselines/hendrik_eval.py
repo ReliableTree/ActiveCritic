@@ -10,7 +10,7 @@ from active_critic.utils.gym_utils import (
     make_dummy_vec_env_rec_pomdp
 )
 import gym
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, SAC
 import torch
 import numpy as np
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -58,66 +58,69 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
         os.makedirs(logname_save_path)
     env, vec_expert = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
     val_env, _ = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
-    transitions, rollouts = sample_expert_transitions_rollouts(
-        vec_expert.predict, val_env, n_demonstrations)
-
-    pomdp_rollouts = make_pomdp_rollouts(
-        rollouts, lookup_frq=lookup_freq, count_dim=10)
-    pomdp_transitions = rollout.flatten_trajectories(pomdp_rollouts)
-
-    if learner is None:
-        bc_learner = bc.BC(
-            observation_space=env.observation_space,
-            action_space=env.action_space,
-            demonstrations=pomdp_transitions,
-            device=device)
-    else:
-        bc_learner = bc.BC(
-            observation_space=env.observation_space,
-            action_space=env.action_space,
-            demonstrations=pomdp_transitions,
-            device=device,
-            policy=learner.policy)
 
     pomdp_env_val, pomdp_vec_expert = make_dummy_vec_env_pomdp(
         name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
-    bc_file_path = logname_save_path+'bc_best'
-    bc_stats_path = logname_save_path + 'bc_stats'
-    if (not os.path.isfile(bc_file_path)):
-        print('BC Phase')
-        tboard = TBoardGraphs(logname=logname + '_BC',
-                              data_path=logname_save_path)
+    if bc_epochs > 0:
+        transitions, rollouts = sample_expert_transitions_rollouts(
+            vec_expert.predict, val_env, n_demonstrations)
 
-        best_succes_rate = -1
-        fac = 40
-        runs_per_epoch = 20 * fac
-        for i in range(int(bc_epochs/fac)):
-            bc_learner.train(n_epochs=runs_per_epoch)
-            success, rews, history = get_avr_succ_rew_det(
-                env=pomdp_env_val, 
-                learner=bc_learner.policy, 
-                epsiodes=50,
-                path=bc_stats_path,
-                history=history,
-                step=i)
-            success_rate = success.mean()
-            tboard.addValidationScalar(
-                'Reward', value=th.tensor(rews.mean()), stepid=i)
-            tboard.addValidationScalar(
-                'Success Rate', value=th.tensor(success_rate), stepid=i)
-            if success_rate > best_succes_rate:
-                best_succes_rate = success_rate
-                th.save(bc_learner.policy.state_dict(),
-                        bc_file_path)
-    else:
-        print('skipping BC')
+        pomdp_rollouts = make_pomdp_rollouts(
+            rollouts, lookup_frq=lookup_freq, count_dim=10)
+        pomdp_transitions = rollout.flatten_trajectories(pomdp_rollouts)
+
+        if learner is None:
+            bc_learner = bc.BC(
+                observation_space=env.observation_space,
+                action_space=env.action_space,
+                demonstrations=pomdp_transitions,
+                device=device)
+        else:
+            bc_learner = bc.BC(
+                observation_space=env.observation_space,
+                action_space=env.action_space,
+                demonstrations=pomdp_transitions,
+                device=device,
+                policy=learner.policy)
+
+        bc_file_path = logname_save_path+'bc_best'
+        bc_stats_path = logname_save_path + 'bc_stats'
+        if (not os.path.isfile(bc_file_path)):
+            print('BC Phase')
+            tboard = TBoardGraphs(logname=logname + '_BC',
+                                data_path=logname_save_path)
+
+            best_succes_rate = -1
+            fac = 40
+            runs_per_epoch = 20 * fac
+            for i in range(int(bc_epochs/fac)):
+                bc_learner.train(n_epochs=runs_per_epoch)
+                success, rews, history = get_avr_succ_rew_det(
+                    env=pomdp_env_val, 
+                    learner=bc_learner.policy, 
+                    epsiodes=50,
+                    path=bc_stats_path,
+                    history=history,
+                    step=i)
+                success_rate = success.mean()
+                tboard.addValidationScalar(
+                    'Reward', value=th.tensor(rews.mean()), stepid=i)
+                tboard.addValidationScalar(
+                    'Success Rate', value=th.tensor(success_rate), stepid=i)
+                if success_rate > best_succes_rate:
+                    best_succes_rate = success_rate
+                    th.save(bc_learner.policy.state_dict(),
+                            bc_file_path)
+        else:
+            print('skipping BC')
 
     if learner is not None:
         learner_stats_path = logname_save_path + 'stats_learner'
         tboard = TBoardGraphs(
             logname=logname + str(' Reinforcement'), data_path=logname_save_path)
-        learner.policy.load_state_dict(
-            th.load(bc_file_path))
+        if bc_epochs > 0:
+            learner.policy.load_state_dict(
+                th.load(bc_file_path))
 
 
         history = None
@@ -170,7 +173,7 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env,
                       device=device, learning_rate=lr)
     evaluate_learner(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=500, n_samples=n_samples, device=device, eval_every=1000, learner=tqc_learner)
+                     bc_epochs=0, n_samples=n_samples, device=device, eval_every=1000, learner=tqc_learner)
 
 
 def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
@@ -185,7 +188,7 @@ def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag):
                       device=device, learning_rate=lr)
 
     evaluate_learner(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=500, n_samples=n_samples, device=device, eval_every=1000, learner=PPO_learner)
+                     bc_epochs=0, n_samples=n_samples, device=device, eval_every=1000, learner=PPO_learner)
 
 
 def run_tune_TQC(device):
@@ -208,7 +211,7 @@ def stats_PPO(device, path, demonstration, lr, env_tag):
 def stats_TQC(device, path, demonstration, lr, env_tag):
     ids = [i for i in range(5)]
     for id in ids:
-        run_eval_TQC(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=200, id=id, env_tag=env_tag)
+        run_eval_TQC(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=20000, id=id, env_tag=env_tag)
 
 def run_tune_PPO(device):
     lr = 1e-4
@@ -229,57 +232,58 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
         os.makedirs(logname_save_path)
     env, vec_expert = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
     val_env, _ = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
-    transitions, rollouts = sample_expert_transitions_rollouts(
-        vec_expert.predict, val_env, n_demonstrations)
+    if bc_epochs > 0:
+        transitions, rollouts = sample_expert_transitions_rollouts(
+            vec_expert.predict, val_env, n_demonstrations)
 
-    pomdp_rollouts = make_pomdp_rollouts(
-        rollouts, lookup_frq=lookup_freq, count_dim=10)
-    pomdp_transitions = rollout.flatten_trajectories(pomdp_rollouts)
+        pomdp_rollouts = make_pomdp_rollouts(
+            rollouts, lookup_frq=lookup_freq, count_dim=10)
+        pomdp_transitions = rollout.flatten_trajectories(pomdp_rollouts)
 
-    if learner is None:
-        bc_learner = bc.BC(
-            observation_space=env.observation_space,
-            action_space=env.action_space,
-            demonstrations=pomdp_transitions,
-            device=device)
-    else:
-        bc_learner = bc.BC(
-            observation_space=env.observation_space,
-            action_space=env.action_space,
-            demonstrations=pomdp_transitions,
-            device=device,
-            policy=learner.policy)
+        if learner is None:
+            bc_learner = bc.BC(
+                observation_space=env.observation_space,
+                action_space=env.action_space,
+                demonstrations=pomdp_transitions,
+                device=device)
+        else:
+            bc_learner = bc.BC(
+                observation_space=env.observation_space,
+                action_space=env.action_space,
+                demonstrations=pomdp_transitions,
+                device=device,
+                policy=learner.policy)
 
-    pomdp_env_val, pomdp_vec_expert = make_dummy_vec_env_pomdp(
-        name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
-    bc_file_path = logname_save_path+'bc_best'
-    bc_stats_path = logname_save_path + 'bc_stats_gail'
-    #if (not os.path.isfile(bc_file_path)):
-    print('BC Phase')
-    tboard = TBoardGraphs(logname=logname + '_BC',
-                            data_path=logname_save_path)
+        pomdp_env_val, pomdp_vec_expert = make_dummy_vec_env_pomdp(
+            name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq)
+        bc_file_path = logname_save_path+'bc_best'
+        bc_stats_path = logname_save_path + 'bc_stats_gail'
+        #if (not os.path.isfile(bc_file_path)):
+        print('BC Phase')
+        tboard = TBoardGraphs(logname=logname + '_BC',
+                                data_path=logname_save_path)
 
-    best_succes_rate = -1
-    fac = 40
-    runs_per_epoch = 20 * fac
-    for i in range(int(bc_epochs/fac)):
-        bc_learner.train(n_epochs=runs_per_epoch)
-        success, rews, history = get_avr_succ_rew_det(
-            env=pomdp_env_val, 
-            learner=bc_learner.policy, 
-            epsiodes=50,
-            path=bc_stats_path,
-            history=history,
-            step=i)
-        success_rate = success.mean()
-        tboard.addValidationScalar(
-            'Reward', value=th.tensor(rews.mean()), stepid=i*fac)
-        tboard.addValidationScalar(
-            'Success Rate', value=th.tensor(success_rate), stepid=i*fac)
-        if success_rate > best_succes_rate:
-            best_succes_rate = success_rate
-            th.save(bc_learner.policy.state_dict(),
-                    bc_file_path)
+        best_succes_rate = -1
+        fac = 40
+        runs_per_epoch = 20 * fac
+        for i in range(int(bc_epochs/fac)):
+            bc_learner.train(n_epochs=runs_per_epoch)
+            success, rews, history = get_avr_succ_rew_det(
+                env=pomdp_env_val, 
+                learner=bc_learner.policy, 
+                epsiodes=50,
+                path=bc_stats_path,
+                history=history,
+                step=i)
+            success_rate = success.mean()
+            tboard.addValidationScalar(
+                'Reward', value=th.tensor(rews.mean()), stepid=i*fac)
+            tboard.addValidationScalar(
+                'Success Rate', value=th.tensor(success_rate), stepid=i*fac)
+            if success_rate > best_succes_rate:
+                best_succes_rate = success_rate
+                th.save(bc_learner.policy.state_dict(),
+                        bc_file_path)
 
     if learner is not None:
         learner_stats_path = logname_save_path + 'learner_stats_gail'
@@ -289,9 +293,9 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
         reward_net = BasicRewardNet(
             learner.env.observation_space, learner.env.action_space, normalize_input_layer=RunningNorm
         )
-
-        learner.policy.load_state_dict(
-            th.load(bc_file_path))
+        if bc_epochs > 0:
+            learner.policy.load_state_dict(
+                th.load(bc_file_path))
 
         gail_trainer = GAIL(
             demonstrations=pomdp_transitions,
@@ -442,7 +446,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag,
         logname_save_path=logname_save_path,
         seq_len=seq_len,
         n_demonstrations=demonstrations,
-        bc_epochs=5 * n_samples,
+        bc_epochs=10 * n_samples,
         n_samples=n_samples,
         device=device,
         logname=logname,
@@ -569,7 +573,7 @@ if __name__ == '__main__':
         )
     elif args.learner == 'stats_RPPO':
         print('running RPPO')
-        for lr in [1e-6]:
+        for lr in [5e-6]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_RPPO(

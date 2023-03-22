@@ -103,6 +103,8 @@ class ActiveCriticLearner(nn.Module):
         self.exp_dict_opt = None
         self.exp_dict = None
 
+        self.set_best_actor = False
+
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
         if len(train_data) > 0:
@@ -244,11 +246,12 @@ class ActiveCriticLearner(nn.Module):
 
     def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic):
         self.train_data.onyl_positiv = True
-        for data in train_loader:
-            device_data = []
-            for dat in data:
-                device_data.append(dat.to(self.network_args.device))
-            loss_actor = actor_step(device_data, loss_actor)
+        if len(self.train_data) > 0:
+            for data in train_loader:
+                device_data = []
+                for dat in data:
+                    device_data.append(dat.to(self.network_args.device))
+                loss_actor = actor_step(device_data, loss_actor)
 
         if train_critic:
             self.train_data.onyl_positiv = False
@@ -275,21 +278,17 @@ class ActiveCriticLearner(nn.Module):
                     th.save(self.policy.actor.state_dict(), 'actor_before')
                     th.save(self.policy.planner.state_dict(), 'planner_before')
 
-                    try:
+                    if self.set_best_actor:
                         self.policy.actor.load_state_dict(th.load('best_actor'))
                         self.policy.planner.load_state_dict(th.load('best_planner'))
-                    except:
-                        print('no actor loaded')
+
                     self.policy.eval()
                     self.run_validation(optimize=True)
                     self.run_validation(optimize=False)
                     print(f'self.get_num_training_samples(): {self.get_num_training_samples()}')
                     print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
-                    try:
-                        self.policy.actor.load_state_dict(th.load('actor_before'))
-                        self.policy.planner.load_state_dict(th.load('planner_before'))
-                    except:
-                        print('actor not reloaded')
+                    self.policy.actor.load_state_dict(th.load('actor_before'), strict=False)
+                    self.policy.planner.load_state_dict(th.load('planner_before'), strict=False)
                     self.scores.reset_min_score(self.scores.mean_actor)
 
                     if self.get_num_training_samples()>= self.network_args.total_training_epsiodes:
@@ -300,17 +299,14 @@ class ActiveCriticLearner(nn.Module):
                 next_add = self.global_step + self.network_args.add_data_every
                 th.save(self.policy.actor.state_dict(), 'actor_before')
                 th.save(self.policy.planner.state_dict(), 'planner_before')
-                try:
+                if self.set_best_actor:
                     self.policy.actor.load_state_dict(th.load('best_actor'))
                     self.policy.planner.load_state_dict(th.load('best_planner'))
-                except:
-                    print('no actor loaded')
+
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
-                try:
-                    self.policy.actor.load_state_dict(th.load('actor_before'))
-                    self.policy.planner.load_state_dict(th.load('planner_before'))
-                except:
-                    print('actor not reloaded')
+                self.policy.actor.load_state_dict(th.load('actor_before'), strict=False)
+                self.policy.planner.load_state_dict(th.load('planner_before'), strict=False)
+
                 self.virtual_step += self.network_args.training_epsiodes
 
             elif (self.global_step >= next_add):
@@ -357,7 +353,7 @@ class ActiveCriticLearner(nn.Module):
             if new_min:
                 th.save(self.policy.actor.state_dict(), 'best_actor')
                 th.save(self.policy.planner.state_dict(), 'best_planner')
-                print('new actor')
+                self.set_best_actor = True
 
             reward = self.train_data.reward
             b, _ = th.max(reward, dim=1)
