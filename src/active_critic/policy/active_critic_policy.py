@@ -221,10 +221,25 @@ class ActiveCriticPolicy(BaseModel):
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
+            plans = plans.detach()
             init_actor = copy.deepcopy(self.actor.state_dict())
             optimizer = th.optim.AdamW(
                 self.actor.parameters(), lr=self.args_obj.inference_opt_lr, weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
                 )
+        elif self.args_obj.optimizer_mode == 'actor+plan':
+            print('use actor+plan opt mode')
+            optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
+            actions = actions.detach()
+            observations = observations.detach()
+            plans = plans.detach()
+            plans.requires_grad = True
+
+            init_actor = copy.deepcopy(self.actor.state_dict())
+            optimizer = th.optim.AdamW(
+                [{'params': self.actor.parameters()}, {'params': plans}],
+                lr=self.args_obj.inference_opt_lr,
+                weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
+            )
 
         elif self.args_obj.optimizer_mode == 'plan':
             print('use plan opt mode')

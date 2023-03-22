@@ -99,6 +99,9 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
     elif opt_mode == 'goal':
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
+    elif opt_mode == 'actor+plan':
+        acps.inference_opt_lr = 1e-6
+        acps.opt_steps = 100
     else:
         1/0
 
@@ -373,9 +376,9 @@ def run_eval_stats_env(device, weight_decay):
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']
-    val_everys = [1000]
-    add_data_everys = [1000]
-    opt_modes = ['actor']
+    val_everys = [2000]
+    add_data_everys = [2000]
+    opt_modes = ['actor+plan']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
@@ -397,7 +400,7 @@ def run_eval_stats_env(device, weight_decay):
                                         val_every=val_every,
                                         add_data_every = add_data_everys[val_step],
                                         opt_mode=opt_mode,
-                                        make_graphs = False,
+                                        make_graphs = True,
                                         fast=False)
 
 if __name__ == '__main__':
