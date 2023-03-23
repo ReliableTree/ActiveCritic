@@ -3,10 +3,10 @@ src/active_critic/learner/__pycache__/active_critic_args.cpython-310.pyc
 src/active_critic/learner/__pycache__/active_critic_learner.cpython-310.pyc
 src/active_critic/learner/__pycache__/higher_learning.cpython-310.pyc
 src/active_critic/model_src/__pycache__/whole_sequence_model.cpython-310.pyc
-.gitignore
 src/active_critic/server/__pycache__/analyze.cpython-310.pyc
 src/active_critic/server/__pycache__/init_reach.cpython-310.pyc
 src/active_critic/utils/__pycache__/gym_utils.cpython-310.pyc
 tests/learner/best_actor
 tests/learner/best_planner
 tests/learner/planner_before
+src/active_critic/learner/__pycache__/active_critic_args.cpython-310.pyc

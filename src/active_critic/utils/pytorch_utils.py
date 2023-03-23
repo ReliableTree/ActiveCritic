@@ -96,3 +96,9 @@ def get_seq_end_mask(inpt, current_step):
 
 def get_rew_mask(reward):
     return (reward.squeeze()>=0)
+
+def pain_boundaries(actions:th.Tensor, min_bound:float, max_bound:float):
+    pain = (th.exp((actions[actions < min_bound] - min_bound)**2)).sum().nan_to_num()
+    pain += (th.exp((actions[actions > max_bound] - max_bound)**2)).sum().nan_to_num()
+    pain = pain / actions.shape[0]
+    return pain

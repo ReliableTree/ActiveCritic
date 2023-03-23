@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel, CriticSequenceModel
-from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq
+from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq, pain_boundaries
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -284,7 +284,8 @@ class ActiveCriticPolicy(BaseModel):
                 goal_label=goal_label,
                 current_step=current_step,
                 plans=plans,
-                goals=goals
+                goals=goals,
+                current_opt_step = step
                 )
             if self.write_tboard_scalar is not None:
                 debug_dict = {
@@ -315,7 +316,8 @@ class ActiveCriticPolicy(BaseModel):
             goal_label: th.Tensor, 
             plans:th.Tensor,
             current_step: int,
-            goals:th.Tensor
+            goals:th.Tensor,
+            current_opt_step
             ):
         if (self.args_obj.optimizer_mode == 'goal'):
             current_obs_seq = th.cat((obs_seq[:, :, :-3], goals), dim=-1)
@@ -332,8 +334,20 @@ class ActiveCriticPolicy(BaseModel):
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
+
+        pain = pain_boundaries(actions=opt_actions, min_bound=-1, max_bound=1)
+
+        debug_dict = {
+            'pain' : pain.mean().detach(),
+            'critic_loiss' : critic_loss.mean().detach()
+        }
+
+        self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=current_opt_step, optimize=True)
+
+        loss = critic_loss + pain
+
         optimizer.zero_grad()
-        critic_loss.backward()
+        loss.backward()
         optimizer.step()
 
 
