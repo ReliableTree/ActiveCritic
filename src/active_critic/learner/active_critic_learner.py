@@ -530,7 +530,7 @@ class ActiveCriticLearner(nn.Module):
         print(f'Success Rate: {success.mean()}' + fix)
         print(f'Reward: {sparse_reward.mean()}' + fix)
         print(
-            f'training samples: {int(len(self.train_data))}' + fix)
+            f'training samples: {int(len(self.train_data.obsv))}' + fix)
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize, step=self.get_num_training_samples())
 
         self.policy.args_obj.optimize = pre_opt
