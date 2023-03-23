@@ -456,7 +456,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag,
     )
 
 def stats_RPPO(device, lr, demonstrations, save_path, n_samples, env_tag, bc_mult):
-    ids = [i for i in range(5)]
+    ids = [i for i in range(2, 5)]
     for id in ids:
         run_eval_RPPO(
             device=device,
