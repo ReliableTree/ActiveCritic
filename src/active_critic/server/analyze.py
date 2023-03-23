@@ -176,13 +176,13 @@ def make_acl(
         acla.val_every = val_every
         acla.add_data_every = add_data_every
 
-        acla.validation_episodes = 25 #(*8)
-        acla.validation_rep = 2
+        acla.validation_episodes = 15 
+        acla.validation_rep = 3
         acla.training_epsiodes = training_episodes
         acla.actor_threshold = 1e-2
         acla.critic_threshold = 1e-2
         acla.min_critic_threshold = min_critic_threshold
-        acla.num_cpu = 25
+        acla.num_cpu = 15
 
     acla.patients = 40000
     acla.total_training_epsiodes = total_training_epsiodes
