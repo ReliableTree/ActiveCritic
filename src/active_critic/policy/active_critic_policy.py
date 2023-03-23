@@ -182,7 +182,7 @@ class ActiveCriticPolicy(BaseModel):
             
             actions[:half_batch_size] = actions_opt
             expected_success[:half_batch_size] = expected_success_opt
-            
+
             return ACPOptResult(
                 gen_trj=actions.detach(),
                 expected_succes_before=expected_success,
@@ -244,7 +244,7 @@ class ActiveCriticPolicy(BaseModel):
             optimizer = th.optim.AdamW(
                 [{'params': self.actor.parameters()}, {'params': plans}],
                 lr=self.args_obj.inference_opt_lr,
-                weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
+                weight_decay=0
             )
 
         elif self.args_obj.optimizer_mode == 'plan':
@@ -338,18 +338,17 @@ class ActiveCriticPolicy(BaseModel):
             1/0
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
-        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
-
-        pain = pain_boundaries(actions=opt_actions, min_bound=-1, max_bound=1)
+        critic_mask = critic_result < 1
+        critic_loss = self.critic.loss_fct(result=critic_result[critic_mask], label=goal_label[critic_mask])
 
         debug_dict = {
-            'pain' : pain.mean().detach(),
+            'in optimisation expected sucess' : critic_result.mean().detach(),
             'critic_loiss' : critic_loss.mean().detach()
         }
 
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=current_opt_step, optimize=True)
 
-        loss = critic_loss + pain
+        loss = critic_loss
 
         optimizer.zero_grad()
         loss.backward()
