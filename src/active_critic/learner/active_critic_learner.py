@@ -112,7 +112,6 @@ class ActiveCriticLearner(nn.Module):
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
     def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor, expert_trjs:th.Tensor):
-        print(f'')
         acts, obsv, rews = make_part_obs_data(
             actions=actions, observations=observations, rewards=rewards)
         self.train_data.add_data(
@@ -121,6 +120,7 @@ class ActiveCriticLearner(nn.Module):
             reward=rews,
             expert_trjs=expert_trjs
             )
+        self.train_data.onyl_positiv = False
         self.train_loader = DataLoader(
             dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
     
@@ -338,7 +338,14 @@ class ActiveCriticLearner(nn.Module):
                 train_critic=self.train_critic
             )
 
-            max_actor = th.max(loss_actor)
+            new_min = self.scores.update_min_score(
+                self.scores.mean_actor, max_actor)
+            if loss_actor is not None:
+                max_actor = th.max(loss_actor)
+            else:
+                max_actor = None
+
+            
             if loss_critic is not None:
                 max_critic = th.max(loss_critic)
                 self.scores.update_min_score(
@@ -348,8 +355,7 @@ class ActiveCriticLearner(nn.Module):
                 max_critic = None
 
             
-            new_min = self.scores.update_min_score(
-                self.scores.mean_actor, max_actor)
+
             if new_min:
                 th.save(self.policy.actor.state_dict(), 'best_actor')
                 th.save(self.policy.planner.state_dict(), 'best_planner')
@@ -361,7 +367,6 @@ class ActiveCriticLearner(nn.Module):
             positive_examples = successfull_trj.sum()
 
             debug_dict = {
-                'Loss Actor': max_actor,
                 'Examples': th.tensor(int(len(self.train_data.obsv))),
                 'Positive Examples': positive_examples
             }
@@ -370,8 +375,13 @@ class ActiveCriticLearner(nn.Module):
             else:
                 max_critic = 0
 
+            if max_actor is not None:
+                debug_dict['Loss Actor'] = max_actor
+            else:
+                max_actor = 0
+
             self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
-            self.global_step += int(self.train_data.virt_success.sum().detach().cpu())            
+            self.global_step += max(int(self.train_data.virt_success.sum().detach().cpu()), self.network_args.batch_size)
             '''if current_patients <= 0:
                 self.policy.critic.init_model()
                 print('reinit critic')
@@ -454,6 +464,12 @@ class ActiveCriticLearner(nn.Module):
             fix = ' optimize'
             if self.last_trj is not None:
                 self.compare_expecations(self.last_trj, 'Validation')
+            opt_steps_before = self.policy.args_obj.opt_steps
+            if self.train_data.success is not None:
+                self.policy.args_obj.opt_steps = min(opt_steps_before, 10 * self.train_data.success.sum())
+            else:
+                self.policy.args_obj.opt_steps = 0
+            print(f'self.policy.args_obj.opt_steps: {self.policy.args_obj.opt_steps}')
         else:
             fix = ''
             
@@ -462,6 +478,7 @@ class ActiveCriticLearner(nn.Module):
 
         h = time.perf_counter()
         rewards_cumm = None
+
         for i in range(self.network_args.validation_rep):
             opt_actions, gen_actions, observations, rewards_run, expected_rewards_before, expected_rewards_after = sample_new_episode(
                 policy=self.policy,
@@ -529,8 +546,12 @@ class ActiveCriticLearner(nn.Module):
 
         print(f'Success Rate: {success.mean()}' + fix)
         print(f'Reward: {sparse_reward.mean()}' + fix)
-        print(
-            f'training samples: {int(len(self.train_data.obsv))}' + fix)
+        try:
+            print(
+                f'training samples: {int(len(self.train_data.obsv))}' + fix)
+            print(f'positive training samples: {int(self.train_data.success.sum())}' + fix)
+        except:
+            pass
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize, step=self.get_num_training_samples())
 
         self.policy.args_obj.optimize = pre_opt
@@ -546,6 +567,8 @@ class ActiveCriticLearner(nn.Module):
 
         if optimize:
             self.exp_dict_opt = exp_dict
+            self.policy.args_obj.opt_steps = opt_steps_before
+            print(f'self.policy.args_obj.opt_steps after: {self.policy.args_obj.opt_steps}')
         else:
             self.exp_dict = exp_dict
 
