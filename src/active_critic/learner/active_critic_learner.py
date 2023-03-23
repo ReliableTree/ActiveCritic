@@ -105,6 +105,8 @@ class ActiveCriticLearner(nn.Module):
 
         self.set_best_actor = False
 
+        self.next_critic_init = None
+
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
         if len(train_data) > 0:
@@ -132,11 +134,7 @@ class ActiveCriticLearner(nn.Module):
 
         actor_input = self.policy.get_actor_input(plans=plans, obsvs=obsv)
         actor_result = self.policy.actor.forward(actor_input)
-        """critic_inpt = self.policy.get_critic_input(obsvs=obsv, acts=actor_result)
-        critic_result = self.policy.critic.forward(inputs=critic_inpt)
-        critic_loss = calcMSE(critic_result[critic_result<1], th.ones_like(critic_result[critic_result<1]))"""
         loss = calcMSE(actor_result, actions)
-        #loss = loss + critic_loss
         self.policy.actor.optimizer.zero_grad()
         self.policy.planner.optimizer.zero_grad()
         loss.backward()
@@ -158,16 +156,16 @@ class ActiveCriticLearner(nn.Module):
         critic_input = self.policy.get_critic_input(obsvs=obsv, acts=actions)
         critic_result = self.policy.critic.forward(critic_input)
         label = self.make_critic_score(reward)
-        loss = calcMSE(critic_result, label)
+        loss, l2_dist = calcMSE(critic_result, label, return_tensor=True)
         self.policy.critic.optimizer.zero_grad()
         loss.backward()
         self.policy.critic.optimizer.step()
         loss = loss.detach()
         if loss_critic is None:
-            loss_critic = loss.unsqueeze(0)
+            loss_critic = l2_dist.reshape([-1])
         else:
             loss_critic = th.cat(
-                (loss_critic, loss.unsqueeze(0)), dim=0)
+                (loss_critic, l2_dist.reshape([-1])), dim=0)
         self.write_tboard_scalar(debug_dict={'lr actor': th.tensor(self.policy.critic.scheduler.get_last_lr()).mean()}, train=True)
         return loss_critic
 
@@ -299,6 +297,12 @@ class ActiveCriticLearner(nn.Module):
                 self.policy.planner.load_state_dict(th.load('planner_before'), strict=False)
 
                 self.virtual_step += self.network_args.training_epsiodes
+
+                if self.next_critic_init is None:
+                    self.next_critic_init = int(self.train_data.success.sum()) * 2
+                if self.train_data.success.sum() > self.next_critic_init:
+                    self.policy.critic.init_model()
+                    self.next_critic_init *= 2
 
             elif (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every

@@ -58,8 +58,13 @@ def add_max_val_to_dict(dict, key, val, tm):
         dict[key] = val
 
 
-def calcMSE(a, b):
-    return ((a.reshape([-1]) - b.reshape([-1]))**2).mean()
+def calcMSE(a, b, return_tensor = False):
+    l2_dist = (a.reshape([-1]) - b.reshape([-1]))**2
+    loss = (l2_dist).mean()
+    if return_tensor:
+        return loss, l2_dist
+    else:
+        return loss
 
 
 def apply_triu(inpt:th.Tensor, diagonal:th.Tensor):

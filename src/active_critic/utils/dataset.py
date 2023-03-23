@@ -31,7 +31,7 @@ class DatasetAC(torch.utils.data.Dataset):
 
     def make_virt_data(self):
         if len(self.obsv) < self.batch_size:
-            rep_fac = math.ceil(self.batch_size / len(self.obsv))
+            rep_fac = math.ceil(self.batch_size / len(self.obsv)) + 1
             self.virt_reward = self.reward.repeat([rep_fac, 1, 1])
             self.virt_obsv = self.obsv.repeat([rep_fac, 1, 1])
             self.virt_actions = self.actions.repeat([rep_fac, 1, 1])

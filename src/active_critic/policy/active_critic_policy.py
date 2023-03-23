@@ -171,14 +171,16 @@ class ActiveCriticPolicy(BaseModel):
             return result
 
         else:
-            actions, expected_success_opt = self.optimize_act_sequence(
+            opt_count = int(actions.shape[0]/2)
+            actions_opt, expected_success_opt = self.optimize_act_sequence(
                 actions=actions, 
                 observations=observation_seq, 
                 current_step=current_step,
                 plans=plans,
                 stop_opt=stop_opt
                 )
-
+            actions[:opt_count + 1] = actions_opt[:opt_count + 1]
+            expected_success_opt[opt_count + 1:] = expected_success[opt_count + 1:]
             return ACPOptResult(
                 gen_trj=actions.detach(),
                 expected_succes_before=expected_success,
@@ -284,7 +286,8 @@ class ActiveCriticPolicy(BaseModel):
                 goal_label=goal_label,
                 current_step=current_step,
                 plans=plans,
-                goals=goals
+                goals=goals,
+                current_opt_step=step
                 )
             if self.write_tboard_scalar is not None:
                 debug_dict = {
@@ -315,7 +318,8 @@ class ActiveCriticPolicy(BaseModel):
             goal_label: th.Tensor, 
             plans:th.Tensor,
             current_step: int,
-            goals:th.Tensor
+            goals:th.Tensor,
+            current_opt_step
             ):
         if (self.args_obj.optimizer_mode == 'goal'):
             current_obs_seq = th.cat((obs_seq[:, :, :-3], goals), dim=-1)
@@ -336,6 +340,11 @@ class ActiveCriticPolicy(BaseModel):
         critic_loss.backward()
         optimizer.step()
 
+        debug_dict = {
+            'in optimisation expected success' : critic_result.mean().detach()
+        }
+
+        self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=current_opt_step, optimize=True)
 
 
         return opt_actions, critic_result, plans

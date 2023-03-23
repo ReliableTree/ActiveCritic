@@ -176,13 +176,13 @@ def make_acl(
         acla.val_every = val_every
         acla.add_data_every = add_data_every
 
-        acla.validation_episodes = 15 
-        acla.validation_rep = 3
+        acla.validation_episodes = 25 
+        acla.validation_rep = 2
         acla.training_epsiodes = training_episodes
         acla.actor_threshold = 1e-2
         acla.critic_threshold = 1e-2
         acla.min_critic_threshold = min_critic_threshold
-        acla.num_cpu = 15
+        acla.num_cpu = 25
 
     acla.patients = 40000
     acla.total_training_epsiodes = total_training_epsiodes
@@ -368,14 +368,14 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
-    demonstrations_list = [4]
-    run_ids = [i for i in range(5)]
+    demonstrations_list = [1]
+    run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 10
-    total_training_epsiodes = 400
-    min_critic_threshold = 5e-5
+    training_episodes = 25
+    total_training_epsiodes = 10000
+    min_critic_threshold = 1e-1
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['reach', 'windowopen', 'push', 'pickplace']
+    env_tags = ['pickplace']
     val_everys = [6000]
     add_data_everys = [6000]
     opt_modes = ['actor+plan']
@@ -400,7 +400,7 @@ def run_eval_stats_env(device, weight_decay):
                                         val_every=val_every,
                                         add_data_every = add_data_everys[val_step],
                                         opt_mode=opt_mode,
-                                        make_graphs = False,
+                                        make_graphs = True,
                                         fast=False)
 
 if __name__ == '__main__':
