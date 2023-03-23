@@ -171,18 +171,40 @@ class ActiveCriticPolicy(BaseModel):
             return result
 
         else:
-            actions, expected_success_opt = self.optimize_act_sequence(
-                actions=actions, 
-                observations=observation_seq, 
+
+            opt_actions, opt_expected_success_opt = self.optimize_act_sequence(
+                actions=th.clone(actions.detach()), 
+                observations=th.clone(observation_seq.detach()), 
                 current_step=current_step,
-                plans=plans,
+                plans=th.clone(plans.detach()),
                 stop_opt=stop_opt
                 )
+            
+            random_actions = (th.rand_like(actions) - 1) * 2
+            random_plans = th.rand_like(plans)
+            
+            opt_fail = (opt_expected_success_opt < 0.3).reshape(-1)
+            print(f'opt fail: {opt_fail.sum()}')
+            if opt_fail.sum() > 0:
+                reopt_actions, reopt_exp_success = self.optimize_act_sequence(
+                    actions=random_actions[opt_fail], 
+                    observations=th.clone(observation_seq.detach())[opt_fail], 
+                    current_step=current_step,
+                    plans=random_plans[opt_fail],
+                    stop_opt=stop_opt
+                    )
+
+                actions[~opt_fail] = opt_actions[~opt_fail]
+                actions[opt_fail] = reopt_actions[opt_fail]
+
+                opt_expected_success_opt[opt_fail] = reopt_exp_success[opt_fail]
+            else:
+                actions = opt_actions
 
             return ACPOptResult(
                 gen_trj=actions.detach(),
                 expected_succes_before=expected_success,
-                expected_succes_after=expected_success_opt)
+                expected_succes_after=opt_expected_success_opt)
 
     def make_action(self, action_seq, observation_seq, plans, current_step):
         actor_input = self.get_actor_input(plans=plans, obsvs=observation_seq)
