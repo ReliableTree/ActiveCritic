@@ -98,7 +98,7 @@ class ActiveCriticLearner(nn.Module):
                 self.logname + ' optimized', data_path=network_args_obj.data_path)
         self.global_step = 0
 
-        self.train_data = DatasetAC(device=self.network_args.device)
+        self.train_data = DatasetAC(batch_size=self.network_args.batch_size, device=self.network_args.device)
         self.train_data.onyl_positiv = False
         self.exp_dict_opt = None
         self.exp_dict = None
@@ -371,7 +371,7 @@ class ActiveCriticLearner(nn.Module):
                 max_critic = 0
 
             self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
-            self.global_step += int(self.train_data.success.sum().detach().cpu())            
+            self.global_step += int(self.train_data.virt_success.sum().detach().cpu())            
             '''if current_patients <= 0:
                 self.policy.critic.init_model()
                 print('reinit critic')
