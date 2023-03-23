@@ -369,13 +369,13 @@ def run_eval_stats_pp(device, weight_decay):
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
     demonstrations_list = [1]
-    run_ids = [i for i in range(2)]
+    run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 20000
+    total_training_epsiodes = 100000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['reach']
+    env_tags = ['pickplace']
     val_everys = [2000]
     add_data_everys = [2000]
     opt_modes = ['actor+plan']
