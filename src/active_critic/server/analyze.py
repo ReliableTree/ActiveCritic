@@ -35,7 +35,7 @@ def make_wsm_setup(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 200
     wsm.model_setup.nlayers = 5
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout = 0
+    wsm.model_setup.dropout = 0.1
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -53,7 +53,7 @@ def make_wsm_setup_small(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 64
     wsm.model_setup.nlayers = 3
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout = 0
+    wsm.model_setup.dropout = 0.1
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -71,7 +71,7 @@ def make_wsm_setup_tiny(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 1
     wsm.model_setup.nlayers = 1
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout = 0
+    wsm.model_setup.dropout =0.1
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -368,14 +368,14 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
-    demonstrations_list = [1]
-    run_ids = [i for i in range(2)]
+    demonstrations_list = [4]
+    run_ids = [i for i in range(5)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 2000
+    total_training_epsiodes = 400
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['reach', 'windowopen']
+    env_tags = ['reach', 'windowopen', 'push', 'pickplace']
     val_everys = [6000]
     add_data_everys = [6000]
     opt_modes = ['actor+plan']
@@ -385,7 +385,7 @@ def run_eval_stats_env(device, weight_decay):
                 for val_step, val_every in enumerate(val_everys):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
-                            logname = f'reinit tiny planner trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            logname = f'incr incr tiny planner trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                             print(f'____________________________________logname: {logname}')
                             run_experiment(device=device,
                                         env_tag=env_tag,

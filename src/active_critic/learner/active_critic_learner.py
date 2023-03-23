@@ -221,16 +221,7 @@ class ActiveCriticLearner(nn.Module):
         success = rewards.squeeze().max(-1).values
         success = (success == 1).type(th.float).mean()
 
-        '''if ((self.last_scores is None) or (self.last_scores < success)) and (policy == self.policy):
-            self.last_scores = success
-            th.save(self.policy.actor.state_dict(), 'actor')
-            th.save(self.policy.actor.optimizer.state_dict(), 'optm')
-            print('new actor')
-        elif ((self.last_scores is not None) and (self.last_scores > success)) and (policy == self.policy):
-            self.policy.actor.load_state_dict(th.load('actor'))
-            self.policy.actor.optimizer.load_state_dict(th.load('optm'))
 
-            print('loaded old actor')'''
         print(f'last rewards: {rewards.mean()}')
         print(f'last success: {success}')
         print(f'self.last_scores: {self.last_scores}')
