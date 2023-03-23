@@ -446,7 +446,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag,
         logname_save_path=logname_save_path,
         seq_len=seq_len,
         n_demonstrations=demonstrations,
-        bc_epochs=10 * n_samples,
+        bc_epochs=2000,
         n_samples=n_samples,
         device=device,
         logname=logname,
@@ -456,7 +456,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag,
     )
 
 def stats_RPPO(device, lr, demonstrations, save_path, n_samples, env_tag, bc_mult):
-    ids = [i for i in range(2, 5)]
+    ids = [i for i in range(5)]
     for id in ids:
         run_eval_RPPO(
             device=device,
@@ -479,7 +479,7 @@ def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
                       device=device, learning_rate=lr)
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=1000, n_samples=n_samples, device=device, learner=PPO_learner, pomdp_env=pomdp_env, eval_every=2048)
+                     bc_epochs=500, n_samples=n_samples, device=device, learner=PPO_learner, pomdp_env=pomdp_env, eval_every=2048)
     
 def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_tag):
     seq_len=100
@@ -491,7 +491,7 @@ def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
         device=device, learning_rate=lr)
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=400, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=2000)
+                     bc_epochs=500, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=2000)
 
 def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples, env_tag):
     ids = [i for i in range(5)]
@@ -520,8 +520,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [14]
-    list_env_tags = ['pickplace']
+    list_demonstrations = [4]
+    list_env_tags = ['reach', 'windowopen', 'push', 'pickplace']
+    n_samples = 400
     
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
 
@@ -545,11 +546,11 @@ if __name__ == '__main__':
     elif args.learner == 'stats_GAIL_TQC':
         print('running GAIL + TQC')
         
-        lrs = [1e-6, 1e-7]
+        lrs = [5e-7]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
-                    stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200, env_tag=env_tag)
+                    stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=n_samples, env_tag=env_tag)
 
     elif args.learner == 'stats_GAIL_PPO':
         print('running GAIL + PPO')
@@ -558,7 +559,7 @@ if __name__ == '__main__':
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
-                    stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=200, env_tag=env_tag)
+                    stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=n_samples, env_tag=env_tag)
 
     elif args.learner == 'RPPO':
         print('running RPPO')
@@ -573,7 +574,7 @@ if __name__ == '__main__':
         )
     elif args.learner == 'stats_RPPO':
         print('running RPPO')
-        for lr in [5e-6]:
+        for lr in [1e-6]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_RPPO(
@@ -581,7 +582,7 @@ if __name__ == '__main__':
                         lr=lr,
                         demonstrations=demos,
                         save_path=path,
-                        n_samples=200,
+                        n_samples=n_samples,
                         env_tag=env_tag,
                         bc_mult = 10
                     )
