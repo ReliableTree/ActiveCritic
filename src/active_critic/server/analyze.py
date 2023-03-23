@@ -176,13 +176,13 @@ def make_acl(
         acla.val_every = val_every
         acla.add_data_every = add_data_every
 
-        acla.validation_episodes = 25 
+        acla.validation_episodes = 15 
         acla.validation_rep = 2
         acla.training_epsiodes = training_episodes
         acla.actor_threshold = 1e-2
         acla.critic_threshold = 1e-2
         acla.min_critic_threshold = min_critic_threshold
-        acla.num_cpu = 25
+        acla.num_cpu = 15
 
     acla.patients = 40000
     acla.total_training_epsiodes = total_training_epsiodes
@@ -371,7 +371,7 @@ def run_eval_stats_env(device, weight_decay):
     demonstrations_list = [1]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 25
+    training_episodes = 15
     total_training_epsiodes = 10000
     min_critic_threshold = 1e-1
     data_path = '/data/bing/hendrik/AC_var_' + s
