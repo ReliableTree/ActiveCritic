@@ -464,11 +464,11 @@ class ActiveCriticLearner(nn.Module):
             fix = ' optimize'
             if self.last_trj is not None:
                 self.compare_expecations(self.last_trj, 'Validation')
-            opt_steps_before = self.policy.args_obj.opt_steps
+            '''opt_steps_before = self.policy.args_obj.opt_steps
             if self.train_data.success is not None:
                 self.policy.args_obj.opt_steps = min(opt_steps_before, 10 * self.train_data.success.sum())
             else:
-                self.policy.args_obj.opt_steps = 0
+                self.policy.args_obj.opt_steps = 0'''
             print(f'self.policy.args_obj.opt_steps: {self.policy.args_obj.opt_steps}')
         else:
             fix = ''
@@ -567,7 +567,7 @@ class ActiveCriticLearner(nn.Module):
 
         if optimize:
             self.exp_dict_opt = exp_dict
-            self.policy.args_obj.opt_steps = opt_steps_before
+            #self.policy.args_obj.opt_steps = opt_steps_before
             print(f'self.policy.args_obj.opt_steps after: {self.policy.args_obj.opt_steps}')
         else:
             self.exp_dict = exp_dict

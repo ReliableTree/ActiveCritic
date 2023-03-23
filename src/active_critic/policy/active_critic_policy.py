@@ -303,7 +303,7 @@ class ActiveCriticPolicy(BaseModel):
         if self.args_obj.clip:
             with th.no_grad():
                 th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
-        if self.args_obj.optimizer_mode == 'actor':
+        if self.args_obj.optimizer_mode == 'actor' or self.args_obj.optimizer_mode == 'actor+plan':
             self.actor.load_state_dict(init_actor)
         return final_actions, final_exp_success
 
