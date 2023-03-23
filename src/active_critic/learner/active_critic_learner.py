@@ -244,6 +244,12 @@ class ActiveCriticLearner(nn.Module):
         if opt_before is not None:
             self.policy.args_obj.optimize = opt_before
 
+        if self.train_data.success.sum() == 0:
+            self.policy.actor.init_model()
+            self.policy.critic.init_model()
+            self.policy.planner.init_model()
+            print(f'___________________________________________reinit models, no success__________________________________________')
+
     def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic):
         self.train_data.onyl_positiv = True
         if len(self.train_data) > 0:
