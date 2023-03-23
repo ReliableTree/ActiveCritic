@@ -35,7 +35,7 @@ def make_wsm_setup(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 200
     wsm.model_setup.nlayers = 5
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout = 0
+    wsm.model_setup.dropout = 0.3
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -53,7 +53,7 @@ def make_wsm_setup_small(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 64
     wsm.model_setup.nlayers = 3
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout = 0
+    wsm.model_setup.dropout = 0.3
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -71,7 +71,7 @@ def make_wsm_setup_tiny(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 1
     wsm.model_setup.nlayers = 1
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout = 0
+    wsm.model_setup.dropout = 0.3
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -100,8 +100,8 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
     elif opt_mode == 'actor+plan':
-        acps.inference_opt_lr = 1e-6
-        acps.opt_steps = 100
+        acps.inference_opt_lr = 1e-3
+        acps.opt_steps = 300
     else:
         1/0
 
@@ -369,7 +369,7 @@ def run_eval_stats_pp(device, weight_decay):
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
     demonstrations_list = [1]
-    run_ids = [i for i in range(5)]
+    run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
     total_training_epsiodes = 100000
@@ -385,7 +385,7 @@ def run_eval_stats_env(device, weight_decay):
                 for val_step, val_every in enumerate(val_everys):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
-                            logname = f'random actions tiny planner trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            logname = f'opt: 300, tiny planner trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                             print(f'____________________________________logname: {logname}')
                             run_experiment(device=device,
                                         env_tag=env_tag,

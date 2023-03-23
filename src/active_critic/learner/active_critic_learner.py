@@ -174,7 +174,7 @@ class ActiveCriticLearner(nn.Module):
     def add_training_data(self, policy=None, episodes = 1, seq_len = None):
         if policy is None:
             policy = self.policy
-            policy.eval()
+            policy.train(True)
             opt_before = self.policy.args_obj.optimize
             self.policy.args_obj.optimize = (self.policy.args_obj.optimize and self.network_args.start_critic)
             iterations = math.ceil(episodes/self.env.num_envs)

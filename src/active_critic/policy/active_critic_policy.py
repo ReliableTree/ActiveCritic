@@ -171,40 +171,22 @@ class ActiveCriticPolicy(BaseModel):
             return result
 
         else:
-
-            opt_actions, opt_expected_success_opt = self.optimize_act_sequence(
-                actions=th.clone(actions.detach()), 
-                observations=th.clone(observation_seq.detach()), 
+            half_batch_size = int(actions.shape[0]/2)
+            actions_opt, expected_success_opt = self.optimize_act_sequence(
+                actions=actions[:half_batch_size], 
+                observations=observation_seq[:half_batch_size], 
                 current_step=current_step,
-                plans=th.clone(plans.detach()),
+                plans=plans[:half_batch_size],
                 stop_opt=stop_opt
                 )
             
-            random_actions = (th.rand_like(actions) - 1) * 2
-            random_plans = th.rand_like(plans)
+            actions[:half_batch_size] = actions_opt
+            expected_success[:half_batch_size] = expected_success_opt
             
-            opt_fail = (opt_expected_success_opt < 0.3).reshape(-1)
-            print(f'opt fail: {opt_fail.sum()}')
-            if opt_fail.sum() > 0:
-                reopt_actions, reopt_exp_success = self.optimize_act_sequence(
-                    actions=random_actions[opt_fail], 
-                    observations=th.clone(observation_seq.detach())[opt_fail], 
-                    current_step=current_step,
-                    plans=random_plans[opt_fail],
-                    stop_opt=stop_opt
-                    )
-
-                actions[~opt_fail] = opt_actions[~opt_fail]
-                actions[opt_fail] = reopt_actions[opt_fail]
-
-                opt_expected_success_opt[opt_fail] = reopt_exp_success[opt_fail]
-            else:
-                actions = opt_actions
-
             return ACPOptResult(
                 gen_trj=actions.detach(),
                 expected_succes_before=expected_success,
-                expected_succes_after=opt_expected_success_opt)
+                expected_succes_after=expected_success_opt)
 
     def make_action(self, action_seq, observation_seq, plans, current_step):
         actor_input = self.get_actor_input(plans=plans, obsvs=observation_seq)
@@ -296,7 +278,8 @@ class ActiveCriticPolicy(BaseModel):
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()
-        while (step <= self.args_obj.opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
+        
+        while (step <= self.args_obj.opt_steps) and ((not self.args_obj.stop_opt) or (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold))):
             mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success, plans = self.inference_opt_step(
                 org_actions=actions,
