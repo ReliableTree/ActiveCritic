@@ -522,13 +522,14 @@ def get_avr_succ_rew_det_rec(env, learner, epsiodes, path, history, step):
     return success, rews, history
 
 def make_ppo_rec_data_loader(env, vec_expert, n_demonstrations, seq_len, device):
+    batch_size=16
     transitions, rollouts = sample_expert_transitions_rollouts(
         vec_expert.predict, env, n_demonstrations)
     actions, observations, rewards = parse_sampled_transitions(transitions=transitions, extractor=DummyExtractor(), seq_len=seq_len, device='cuda')
     inpt_obsv = observations[:,:1].repeat([1, observations.shape[1], 1])
-    train_data = DatasetAC(device=device)
+    train_data = DatasetAC(batch_size=batch_size, device=device)
     train_data.add_data(obsv=inpt_obsv, actions=actions, reward=rewards, expert_trjs=rewards)
     train_data.onyl_positiv = False
 
-    dataloader = DataLoader(dataset=train_data, batch_size=16, shuffle=True)
+    dataloader = DataLoader(dataset=train_data, batch_size=batch_size, shuffle=True)
     return dataloader
