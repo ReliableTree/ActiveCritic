@@ -520,7 +520,7 @@ if __name__ == '__main__':
     list_demonstrations = [4]
     list_env_tags = ['reach', 'windowopen', 'push', 'pickplace']
     n_samples = 400
-    ids = [range(3)]
+    ids = [i for i in range(2)]
     
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
 
