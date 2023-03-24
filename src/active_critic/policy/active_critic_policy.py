@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel, CriticSequenceModel
-from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq
+from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq, pain_boundaries
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -345,7 +345,7 @@ class ActiveCriticPolicy(BaseModel):
             1/0
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
-        mask = critic_result < self.args_obj.optimisation_threshold
+        mask = (critic_result < self.args_obj.optimisation_threshold).reshape([-1])
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label, mask=mask)
         optimizer.zero_grad()
         critic_loss.backward()
@@ -373,9 +373,10 @@ class ActiveCriticPolicy(BaseModel):
 
     def proj_actions(self, org_actions: th.Tensor, new_actions: th.Tensor, current_step: int):
         with th.no_grad():
+            pass
             #new_actions[:, :current_step] = org_actions[:, :current_step]
-            if self.args_obj.clip:
-                th.clamp(new_actions, min=self.clip_min, max=self.clip_max, out=new_actions)
+            '''if self.args_obj.clip:
+                th.clamp(new_actions, min=self.clip_min, max=self.clip_max, out=new_actions)'''
         return new_actions
 
     def save_policy(self, add, data_path):

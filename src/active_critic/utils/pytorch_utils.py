@@ -101,3 +101,18 @@ def get_seq_end_mask(inpt, current_step):
 
 def get_rew_mask(reward):
     return (reward.squeeze()>=0)
+
+def pain_boundaries(actions:th.Tensor, min_bound:float, max_bound:float):
+    positive_mask = actions < (min_bound - 0.1)
+    negative_mask = actions > (max_bound + 0.1)
+    print(positive_mask)
+    print(negative_mask)
+    print('____________-')
+    positive_pain = th.zeros_like(actions)
+    negative_pain = th.zeros_like(actions)
+    if positive_mask.sum() > 0:
+        positive_pain[positive_mask] = ((actions - min_bound + 0.1)**2)[positive_mask]
+    if negative_mask.sum() > 0:
+        negative_pain[negative_pain] = ((actions - max_bound - 0.1)**2)[negative_pain]
+    result = th.cat((positive_pain, negative_pain), dim = 0).mean()
+    return result
