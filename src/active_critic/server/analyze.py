@@ -184,6 +184,7 @@ def make_acl(
         acla.min_critic_threshold = min_critic_threshold
         acla.num_cpu = 15
 
+    acla.plan_decay = 0.1
     acla.patients = 40000
     acla.total_training_epsiodes = total_training_epsiodes
     acla.start_critic = True
@@ -371,19 +372,19 @@ def run_eval_stats_env(device, weight_decay):
     demonstrations_list = [1]
     run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 15
+    training_episodes = 10
     total_training_epsiodes = 1000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['reach', 'windowopen']
+    env_tags = ['windowopen', 'reach']
     val_everys = [6000]
     add_data_everys = [6000]
     opt_modes = ['actor+plan']
-    for demonstrations in demonstrations_list:
-        for env_tag in env_tags:
-            for im_ph in imitation_phases:
-                for val_step, val_every in enumerate(val_everys):
-                    for run_id in run_ids:
+    for run_id in run_ids:
+        for demonstrations in demonstrations_list:
+            for env_tag in env_tags:
+                for im_ph in imitation_phases:
+                    for val_step, val_every in enumerate(val_everys):
                         for opt_mode in opt_modes:
                             logname = f' 1e-4 opr lr trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                             print(f'____________________________________logname: {env_tag}  {logname}')

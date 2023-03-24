@@ -135,6 +135,7 @@ class ActiveCriticLearner(nn.Module):
         actor_input = self.policy.get_actor_input(plans=plans, obsvs=obsv)
         actor_result = self.policy.actor.forward(actor_input)
         loss = calcMSE(actor_result, actions)
+        loss = loss + ((plans)**2).mean() * self.network_args.plan_decay
         self.policy.actor.optimizer.zero_grad()
         self.policy.planner.optimizer.zero_grad()
         loss.backward()

@@ -26,3 +26,4 @@ class ActiveCriticLearnerArgs:
         self.num_expert_demos:int = None
         self.start_critic:int = None
         self.make_graphs:bool = None
+        self.plan_decay = None
