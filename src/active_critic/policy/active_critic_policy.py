@@ -311,6 +311,7 @@ class ActiveCriticPolicy(BaseModel):
             else:
                 final_actions = optimized_actions
                 final_exp_success = expected_success
+            
 
         if self.args_obj.clip:
             with th.no_grad():
@@ -344,7 +345,8 @@ class ActiveCriticPolicy(BaseModel):
             1/0
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
-        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
+        mask = critic_result < self.args_obj.optimisation_threshold
+        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label, mask=mask)
         optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()
