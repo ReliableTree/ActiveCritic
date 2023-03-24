@@ -518,9 +518,9 @@ if __name__ == '__main__':
     s = datetime.today().strftime('%Y-%m-%d')
 
     list_demonstrations = [4]
-    list_env_tags = ['reach', 'windowopen', 'push', 'pickplace']
+    list_env_tags = ['windowopen', 'push', 'pickplace']
     n_samples = 400
-    ids = [i for i in range(2)]
+    ids = [i for i in range(3)]
     
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
 
