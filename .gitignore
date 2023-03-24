@@ -12,3 +12,4 @@ tests/learner/best_planner
 tests/learner/planner_before
 src/active_critic/server/__pycache__/analyze.cpython-310.pyc
 tests/learner/actor_before
+src/active_critic/learner/__pycache__/active_critic_args.cpython-310.pyc
