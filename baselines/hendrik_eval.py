@@ -518,10 +518,11 @@ if __name__ == '__main__':
     s = datetime.today().strftime('%Y-%m-%d')
 
     list_demonstrations = [4]
-    list_env_tags = ['windowopen', 'push', 'pickplace']
+    list_env_tags = ['reach', 'windowopen', 'push', 'pickplace']
     n_samples = 400
     ids = [i for i in range(3)]
-    
+    #ids = [3]
+
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
 
     print(f'___________stats: list_demonstrations {list_demonstrations} list_env_tags {list_env_tags}')
@@ -544,7 +545,7 @@ if __name__ == '__main__':
     elif args.learner == 'stats_GAIL_TQC':
         print('running GAIL + TQC')
         
-        lrs = [5e-7]
+        lrs = [1e-7]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
