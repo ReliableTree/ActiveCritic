@@ -10,6 +10,7 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
 import pickle
 import copy
+import math
 
 class ACPOptResult:
     def __init__(self, gen_trj: th.Tensor, inpt_trj: th.Tensor = None, expected_succes_before: th.Tensor = None, expected_succes_after: th.Tensor = None) -> None:
@@ -175,7 +176,9 @@ class ActiveCriticPolicy(BaseModel):
 
         else:
             if self.train_inference:
-                opt_count = int(actions.shape[0]/2)
+                opt_count = int(math.ceil(actions.shape[0]/2))
+                print(f'also use actor vorschläge: opt count {opt_count}')
+
             else:
                 opt_count = actions.shape[0]
             actions_opt, expected_success_opt = self.optimize_act_sequence(
@@ -185,8 +188,8 @@ class ActiveCriticPolicy(BaseModel):
                 plans=plans,
                 stop_opt=stop_opt
                 )
-            actions[:opt_count + 1] = actions_opt[:opt_count + 1]
-            expected_success_opt[opt_count + 1:] = expected_success[opt_count + 1:]
+            actions[:opt_count] = actions_opt[:opt_count]
+            expected_success_opt[opt_count:] = expected_success[opt_count:]
             return ACPOptResult(
                 gen_trj=actions.detach(),
                 expected_succes_before=expected_success,

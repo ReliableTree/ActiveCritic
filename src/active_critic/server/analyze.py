@@ -100,7 +100,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
     elif opt_mode == 'actor+plan':
-        acps.inference_opt_lr = 1e-6
+        acps.inference_opt_lr = 1e-4
         acps.opt_steps = 100
     else:
         1/0
@@ -372,12 +372,12 @@ def run_eval_stats_env(device, weight_decay):
     run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 15
-    total_training_epsiodes = 405
+    total_training_epsiodes = 10000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['push', 'pickplace']
-    val_everys = [8000]
-    add_data_everys = [8000]
+    env_tags = ['pickplace']
+    val_everys = [6000]
+    add_data_everys = [6000]
     opt_modes = ['actor+plan']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
@@ -385,7 +385,7 @@ def run_eval_stats_env(device, weight_decay):
                 for val_step, val_every in enumerate(val_everys):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
-                            logname = f' linear critic tiny planner trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            logname = f' 1e-4 opr lr trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                             print(f'____________________________________logname: {env_tag}  {logname}')
                             run_experiment(device=device,
                                         env_tag=env_tag,

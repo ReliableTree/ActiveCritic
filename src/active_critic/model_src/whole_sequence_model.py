@@ -83,5 +83,5 @@ class CriticSequenceModel(WholeSequenceModel):
                 self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
             self.scheduler = th.optim.lr_scheduler.StepLR(self.optimizer, int(100000/32), gamma=0.97)
         pre_sm = self.result_decoder.forward(trans_result)
-        result = self.sm(pre_sm)
-        return result
+        #result = self.sm(pre_sm)
+        return pre_sm
