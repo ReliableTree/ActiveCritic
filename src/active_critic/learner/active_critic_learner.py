@@ -113,14 +113,17 @@ class ActiveCriticLearner(nn.Module):
             self.train_loader = DataLoader(
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
-    def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor, expert_trjs:th.Tensor):
-        acts, obsv, rews = make_part_obs_data(
+    def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor, expert_trjs:th.Tensor, action_history:th.Tensor):
+        acts, obsv, rews, steps = make_part_obs_data(
             actions=actions, observations=observations, rewards=rewards)
+
         self.train_data.add_data(
             obsv=obsv, 
             actions=acts, 
             reward=rews,
-            expert_trjs=expert_trjs
+            expert_trjs=expert_trjs,
+            actions_history=action_history,
+            steps=steps
             )
         self.train_data.onyl_positiv = False
         self.train_loader = DataLoader(
@@ -128,7 +131,7 @@ class ActiveCriticLearner(nn.Module):
     
 
     def actor_step(self, data, loss_actor):
-        obsv, actions, reward, expert_trjs = data
+        obsv, actions, reward, expert_trjs, _, _, _ = data
         plans = self.policy.make_plans(acts=actions, obsvs=obsv)
         plans[expert_trjs] = 0
 
@@ -151,12 +154,20 @@ class ActiveCriticLearner(nn.Module):
         return loss_actor
     
     def critic_step(self, data, loss_critic):
-        obsv, actions, reward, expert_trjs = data
+
+        obsv, actions, reward, expert_trjs, action_historys, next_obsvs, steps = data
 
         critic_input = self.policy.get_critic_input(obsvs=obsv, acts=actions)
         critic_result = self.policy.critic.forward(critic_input)
         label = self.make_critic_score(reward)
         loss, l2_dist = calcMSE(critic_result, label, return_tensor=True)
+
+        prediction_mask = steps < self.policy.args_obj.epoch_len - 1
+        pred_init_obsvs = obsv[prediction_mask]
+        pred_next_obsvs = next_obsvs[prediction_mask]
+        pred_actions = action_historys[prediction_mask][:, ]
+
+
         self.policy.critic.optimizer.zero_grad()
         loss.backward()
         self.policy.critic.optimizer.step()
@@ -197,12 +208,13 @@ class ActiveCriticLearner(nn.Module):
         for element in add_results[1:]:
             for i, part in enumerate(element):
                 add_results[0][i] = th.cat((add_results[0][i], part), dim=0)
-        actions, observations, rewards, _, expected_rewards = add_results[0]
+        actions, observations, rewards, _, expected_rewards, action_history = add_results[0]
         assert actions.shape[0] >= episodes, 'ASDSAD'
         actions = actions[:episodes]
         observations = observations[:episodes]
         rewards = rewards[:episodes]
         expected_rewards = expected_rewards[:episodes]
+        action_history = action_history[:episodes]
         if self.last_trj_training is not None:
             self.compare_expecations(self.last_trj_training, 'Training')
         self.last_trj_training = [
@@ -228,7 +240,8 @@ class ActiveCriticLearner(nn.Module):
             actions=actions,
             observations=observations,
             rewards=rewards,
-            expert_trjs=expert_trjs
+            expert_trjs=expert_trjs,
+            action_history=action_history
         )
         if opt_before is not None:
             self.policy.args_obj.optimize = opt_before
@@ -475,7 +488,7 @@ class ActiveCriticLearner(nn.Module):
         rewards_cumm = None
 
         for i in range(self.network_args.validation_rep):
-            opt_actions, gen_actions, observations, rewards_run, expected_rewards_before, expected_rewards_after = sample_new_episode(
+            opt_actions, gen_actions, observations, rewards_run, expected_rewards_before, expected_rewards_after, _ = sample_new_episode(
                 policy=self.policy,
                 env=self.eval_env,
                 extractor=self.network_args.extractor,

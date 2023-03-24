@@ -1,5 +1,6 @@
 import torch
 import math
+from active_critic.utils.pytorch_utils import pick_action_from_history
 class DatasetAC(torch.utils.data.Dataset):
     def __init__(self, batch_size, device='cpu'):
         self.device = device
@@ -19,13 +20,16 @@ class DatasetAC(torch.utils.data.Dataset):
         else:
             return 0
 
-    def set_data(self, obsv: torch.Tensor, actions: torch.Tensor, reward: torch.Tensor, expert_trjs: torch.Tensor):
+    def set_data(self, obsv: torch.Tensor, actions: torch.Tensor, reward: torch.Tensor, expert_trjs: torch.Tensor, actions_history : torch.Tensor, steps:torch.Tensor):
         self.reward = reward.to(self.device)
         self.obsv = obsv.to(self.device)
         self.actions = actions.to(self.device)
+        actions_at_time_t = pick_action_from_history(action_histories=actions_history, steps=steps)
+        self.actions_at_time_t = actions_at_time_t.to(self.device)
         success = self.reward.reshape([obsv.shape[0], obsv.shape[1]]).max(-1).values
         self.success = (success == 1)
         self.expert_trjs = expert_trjs.to(self.device)
+        self.steps = steps.to(self.device)
         self.make_virt_data()
 
 
@@ -37,17 +41,29 @@ class DatasetAC(torch.utils.data.Dataset):
             self.virt_actions = self.actions.repeat([rep_fac, 1, 1])
             self.virt_success = self.success.repeat([rep_fac])
             self.virt_expert_trjs = self.expert_trjs.repeat([rep_fac])
+            self.actions_at_time_t = self.actions_at_time_t.repeat([rep_fac, 1, 1, 1])
+            self.virt_steps = self.steps.repeat([rep_fac])
         else:
             self.virt_reward = self.reward
             self.virt_obsv = self.obsv
             self.virt_actions = self.actions
             self.virt_success = self.success
             self.virt_expert_trjs = self.expert_trjs
+            self.virt_actions_at_time_t = self.actions_at_time_t
+            self.virt_steps = self.steps
 
 
-    def add_data(self, obsv: torch.Tensor, actions: torch.Tensor, reward: torch.Tensor, expert_trjs: torch.Tensor):
+
+
+    def add_data(self, 
+                 obsv: torch.Tensor, 
+                 actions: torch.Tensor, 
+                 reward: torch.Tensor, 
+                 expert_trjs: torch.Tensor, 
+                 actions_history : torch.Tensor,
+                 steps : torch.Tensor):
         if self.obsv is None:
-            self.set_data(obsv=obsv, actions=actions, reward=reward, expert_trjs=expert_trjs)
+            self.set_data(obsv=obsv, actions=actions, reward=reward, expert_trjs=expert_trjs, actions_history=actions_history, steps=steps)
         else:
             self.obsv = torch.cat((self.obsv, obsv.to(self.device)), dim=0)
             self.actions = torch.cat(
@@ -60,12 +76,32 @@ class DatasetAC(torch.utils.data.Dataset):
                 (self.success, (success).to(self.device)), dim=0)
             self.expert_trjs = torch.cat((
                 self.expert_trjs, expert_trjs.to(self.device)
-            ), dim=-1)
+            ), dim=0)
+            actions_at_time_t = pick_action_from_history(action_histories=actions_history, steps=steps)
+            self.actions_at_time_t = torch.cat((
+                self.actions_at_time_t, actions_at_time_t.to(self.device)
+            ), dim=0)
+            self.steps = torch.cat((
+                self.steps, steps.to(self.device)
+            ), dim=0)
         self.make_virt_data()
 
     def __getitem__(self, index):
         assert self.onyl_positiv is not None, 'traindata only positiv not set'
         if self.onyl_positiv:
-            return self.virt_obsv[self.virt_success][index], self.virt_actions[self.virt_success][index], self.virt_reward[self.virt_success][index], self.virt_expert_trjs[self.virt_success][index]
+            return (self.virt_obsv[self.virt_success][index], 
+                    self.virt_actions[self.virt_success][index], 
+                    self.virt_reward[self.virt_success][index], 
+                    self.virt_expert_trjs[self.virt_success][index], 
+                    self.virt_actions_history[self.virt_success][index],
+                    self.virt_obsv[self.virt_success][(index+1)%self.__len__()],
+                    self.virt_steps[self.virt_success][index])
         else:
-            return self.virt_obsv[index], self.virt_actions[index], self.virt_reward[index], self.virt_expert_trjs[index]
+            return (self.virt_obsv[index], 
+                    self.virt_actions[index], 
+                    self.virt_reward[index], 
+                    self.virt_expert_trjs[index],
+                    self.virt_actions_history[index],
+                    self.virt_obsv[(index+1)%self.__len__()],
+                    self.virt_steps[index])
+        

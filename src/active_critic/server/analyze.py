@@ -212,7 +212,7 @@ def run_experiment(
         total_training_epsiodes=20, 
         training_episodes=10, 
         min_critic_threshold=1e-4):
-    seq_len = 100
+    seq_len = 2
 
     acl, env, expert, seq_len, epsiodes, device = make_acl(
                             device,
@@ -233,7 +233,7 @@ def run_experiment(
     acl.network_args.num_expert_demos = demos
 
     if demos > 0:
-        actions, observations, rewards, _, expected_rewards = sample_new_episode(
+        actions, observations, rewards, _, expected_rewards, _ = sample_new_episode(
             policy=expert,
             env=acl.env,
             extractor=acl.network_args.extractor,
@@ -371,7 +371,7 @@ def run_eval_stats_env(device, weight_decay):
     demonstrations_list = [1]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 15
+    training_episodes = 2
     total_training_epsiodes = 10000
     min_critic_threshold = 1e-1
     data_path = '/data/bing/hendrik/AC_var_' + s
@@ -401,7 +401,7 @@ def run_eval_stats_env(device, weight_decay):
                                         add_data_every = add_data_everys[val_step],
                                         opt_mode=opt_mode,
                                         make_graphs = True,
-                                        fast=False)
+                                        fast=True)
 
 if __name__ == '__main__':
     run_eval(device='cuda')

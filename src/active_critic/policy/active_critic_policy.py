@@ -119,20 +119,24 @@ class ActiveCriticPolicy(BaseModel):
         if (self.last_goal is None) or (self.args_obj.new_epoch(self.last_goal, vec_obsv)):
             self.reset_epoch(vec_obsv=vec_obsv)
             action_seq = None
+            #T observations x T actions timesteps
+            self.action_history = th.zeros([vec_obsv.shape[0], self.args_obj.epoch_len, self.args_obj.epoch_len, self.action_space.shape[0]], device=self.args_obj.device, dtype=th.float)
         else:
             self.current_step += 1
             action_seq = self.current_result.gen_trj
 
 
-        #self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
-        self.obs_seq = vec_obsv.repeat([1, self.obs_seq.shape[1], 1]).type(th.float)
-        if action_seq is None:
-            self.current_result = self.forward(
-                observation_seq=self.obs_seq, action_seq=action_seq, 
-                optimize=self.args_obj.optimize, 
-                current_step=self.current_step,
-                stop_opt=self.args_obj.stop_opt
-                )
+        self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
+        #self.obs_seq = vec_obsv.repeat([1, self.obs_seq.shape[1], 1]).type(th.float)
+        #if action_seq is None:
+        self.current_result = self.forward(
+            observation_seq=self.obs_seq, action_seq=action_seq, 
+            optimize=self.args_obj.optimize, 
+            current_step=self.current_step,
+            stop_opt=self.args_obj.stop_opt
+            )
+        
+        self.action_history[:, self.current_step] = th.clone(self.current_result.gen_trj.detach())
 
         if self.current_step == 0:
             if self.args_obj.optimize:
@@ -151,7 +155,7 @@ class ActiveCriticPolicy(BaseModel):
             current_step: int,
             stop_opt: bool
             ):
-        # In inference, we want the maximum eventual reward.
+        
         plans = th.zeros([observation_seq.shape[0], observation_seq.shape[1], self.planner.wsms.model_setup.d_output], device=self.args_obj.device, dtype=th.float32)
         actions = self.make_action(action_seq=action_seq, observation_seq=observation_seq, plans=plans, current_step=current_step)
 
@@ -172,6 +176,8 @@ class ActiveCriticPolicy(BaseModel):
 
         else:
             opt_count = int(actions.shape[0]/2)
+            org_actions = th.clone(actions.detach())
+            org_observation_seq= th.clone(observation_seq.detach())
             actions_opt, expected_success_opt = self.optimize_act_sequence(
                 actions=actions, 
                 observations=observation_seq, 
@@ -181,6 +187,7 @@ class ActiveCriticPolicy(BaseModel):
                 )
             actions[:opt_count + 1] = actions_opt[:opt_count + 1]
             expected_success_opt[opt_count + 1:] = expected_success[opt_count + 1:]
+
             return ACPOptResult(
                 gen_trj=actions.detach(),
                 expected_succes_before=expected_success,
@@ -212,6 +219,7 @@ class ActiveCriticPolicy(BaseModel):
             ):
 
         goals = None
+        org_actions = th.clone(actions.detach())
 
         if self.args_obj.optimizer_mode == 'actions':
             optimized_actions = th.clone(actions.detach())
@@ -279,7 +287,7 @@ class ActiveCriticPolicy(BaseModel):
         while (step <= self.args_obj.opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
             mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success, plans = self.inference_opt_step(
-                org_actions=actions,
+                org_actions=org_actions,
                 opt_actions=optimized_actions,
                 obs_seq=observations,
                 optimizer=optimizer,
@@ -362,7 +370,7 @@ class ActiveCriticPolicy(BaseModel):
 
     def proj_actions(self, org_actions: th.Tensor, new_actions: th.Tensor, current_step: int):
         with th.no_grad():
-            #new_actions[:, :current_step] = org_actions[:, :current_step]
+            new_actions[:, :current_step] = org_actions[:, :current_step]
             if self.args_obj.clip:
                 th.clamp(new_actions, min=self.clip_min, max=self.clip_max, out=new_actions)
         return new_actions

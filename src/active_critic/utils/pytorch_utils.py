@@ -82,9 +82,16 @@ def apply_triu(inpt:th.Tensor, diagonal:th.Tensor):
     return exp_out
 
 
+
 def make_part_obs_data(actions:th.Tensor, observations:th.Tensor, rewards:th.Tensor):
-    obsv = observations[:, :1, :].repeat([1, observations.shape[1], 1]).reshape([-1, observations.shape[1], observations.shape[2]])
-    return actions, obsv, rewards
+    acts = actions.repeat([1, actions.shape[1], 1]).reshape([-1, actions.shape[1], actions.shape[2]])
+    rews = rewards.repeat([1, rewards.shape[1], 1]).reshape([-1, actions.shape[1], 1])
+    obsv = apply_triu(observations, diagonal=0).reshape([-1, observations.shape[-2], observations.shape[-1]])
+    step = th.arange(0, actions.shape[1], device=actions.device).reshape([1, -1]).repeat([actions.shape[0], 1]).reshape([-1])
+    print(obsv)
+    print(step)
+    1/0
+    return acts, obsv, rews
 
 def make_inf_seq(obs:th.Tensor, seq_len:th.Tensor):
     start_seq = th.zeros([obs.shape[0], int(seq_len/2), obs.shape[-1]], device= obs.device)
@@ -101,3 +108,11 @@ def get_seq_end_mask(inpt, current_step):
 
 def get_rew_mask(reward):
     return (reward.squeeze()>=0)
+
+def pick_action_from_history(action_histories, steps):
+    batch_count=th.arange(action_histories.shape[0]).reshape([1, -1]).repeat([action_histories.shape[1]*action_histories.shape[-1], 1]).T.reshape([-1])
+    time_count = th.arange(action_histories.shape[1]).reshape([1, -1]).repeat([action_histories.shape[0],1]).reshape([1, action_histories.shape[0],-1]).repeat([action_histories.shape[-1], 1, 1]).transpose(-1,-2).reshape(-1)
+    dim_count = th.arange(action_histories.shape[-1]).reshape([1, -1]).repeat([action_histories.shape[0]*action_histories.shape[1], 1]).reshape([-1])
+    steps_count = steps.reshape([1, -1]).repeat([action_histories.shape[1] * action_histories.shape[-1], 1]).T.reshape([-1])
+    result = action_histories[tuple((batch_count, steps_count, time_count, dim_count))].reshape([action_histories.shape[0], action_histories.shape[1], action_histories.shape[-1]])
+    return result

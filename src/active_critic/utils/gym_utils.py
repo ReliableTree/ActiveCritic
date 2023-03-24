@@ -301,11 +301,11 @@ def sample_expert_transitions(policy, env, episodes):
 
 def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str, episodes:int=1, return_gen_trj = False, seq_len = None):
 
-        try:
+        if type(policy) is ActiveCriticPolicy:
             policy.eval()
             policy.reset()
             seq_len = policy.args_obj.epoch_len
-        except:
+        else:
             seq_len = seq_len
             
         transitions = sample_expert_transitions(
@@ -325,10 +325,16 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str
             expected_rewards_before = th.clone(rewards)
             expected_rewards_after = th.clone(rewards)
 
-        if return_gen_trj:
-            return actions, policy.history.gen_trj[0][:episodes], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]
+        if type(policy) is ActiveCriticPolicy:
+            action_history = policy.action_history
         else:
-            return actions, observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes]
+            action_history = None
+
+
+        if return_gen_trj:
+            return actions, policy.history.gen_trj[0][:episodes], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes], action_history
+        else:
+            return actions, observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes], action_history
         
 class POMDP_Wrapper(gym.Wrapper):
     def __init__(self, env, lookup_freq, pe_dim, seq_len) -> None:
