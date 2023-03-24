@@ -35,6 +35,7 @@ class ActiveCriticPolicySetup:
         self.clip:bool = True
 
 
+
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
         self.reset()
@@ -83,6 +84,8 @@ class ActiveCriticPolicy(BaseModel):
         self.clip_max = th.tensor(self.action_space.high, device=acps.device)
         self.n_inferred = 0
         self.write_tboard_scalar = write_tboard_scalar
+        self.train_inference = False
+
         self.reset()
 
     def reset(self):
@@ -171,7 +174,10 @@ class ActiveCriticPolicy(BaseModel):
             return result
 
         else:
-            opt_count = int(actions.shape[0]/2)
+            if self.train_inference:
+                opt_count = int(actions.shape[0]/2)
+            else:
+                opt_count = actions.shape[0]
             actions_opt, expected_success_opt = self.optimize_act_sequence(
                 actions=actions, 
                 observations=observation_seq, 

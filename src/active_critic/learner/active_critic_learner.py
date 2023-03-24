@@ -171,6 +171,7 @@ class ActiveCriticLearner(nn.Module):
 
     def add_training_data(self, policy=None, episodes = 1, seq_len = None):
         if policy is None:
+            self.policy.train_inference = True
             policy = self.policy
             policy.eval()
             opt_before = self.policy.args_obj.optimize
@@ -299,10 +300,10 @@ class ActiveCriticLearner(nn.Module):
                 self.virtual_step += self.network_args.training_epsiodes
 
                 if self.next_critic_init is None:
-                    self.next_critic_init = int(self.train_data.success.sum()) * 2
+                    self.next_critic_init = int(self.train_data.success.sum()) * 10
                 if self.train_data.success.sum() > self.next_critic_init:
                     self.policy.critic.init_model()
-                    self.next_critic_init *= 2
+                    self.next_critic_init *= 10
 
             elif (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every
@@ -455,6 +456,7 @@ class ActiveCriticLearner(nn.Module):
 
 
     def run_validation(self, optimize):
+        self.policy.train_inference = False
         if optimize:
             fix = ' optimize'
             if self.last_trj is not None:
