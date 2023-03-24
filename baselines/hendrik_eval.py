@@ -455,8 +455,7 @@ def run_eval_RPPO(device, lr, demonstrations, save_path, n_samples, id, env_tag,
         bc_mult=bc_mult
     )
 
-def stats_RPPO(device, lr, demonstrations, save_path, n_samples, env_tag, bc_mult):
-    ids = [i for i in range(5)]
+def stats_RPPO(device, lr, demonstrations, save_path, n_samples, env_tag, bc_mult, ids):
     for id in ids:
         run_eval_RPPO(
             device=device,
@@ -493,13 +492,11 @@ def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
                      bc_epochs=500, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=2000)
 
-def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples, env_tag):
-    ids = [i for i in range(5)]
+def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples, env_tag, ids):
     for id in ids:
         run_eval_PPO_GAIL(device=device, lr=lr, demonstrations=demonstrations, save_path=save_path, n_samples=n_samples, id=id, env_tag=env_tag)
 
-def stats_GAIL_TQC(device, lr, demonstrations, save_path, n_samples, env_tag):
-    ids = [i for i in range(1, 5)]
+def stats_GAIL_TQC(device, lr, demonstrations, save_path, n_samples, env_tag, ids):
     for id in ids:
         run_eval_TQC_GAIL(device=device, lr=lr, demonstrations=demonstrations, save_path=save_path, n_samples=n_samples, id=id, env_tag=env_tag)
 
@@ -523,6 +520,7 @@ if __name__ == '__main__':
     list_demonstrations = [4]
     list_env_tags = ['reach', 'windowopen', 'push', 'pickplace']
     n_samples = 400
+    ids = [range(3)]
     
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
 
@@ -550,7 +548,7 @@ if __name__ == '__main__':
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
-                    stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=n_samples, env_tag=env_tag)
+                    stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=n_samples, env_tag=env_tag, ids=ids)
 
     elif args.learner == 'stats_GAIL_PPO':
         print('running GAIL + PPO')
@@ -559,7 +557,7 @@ if __name__ == '__main__':
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
-                    stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=n_samples, env_tag=env_tag)
+                    stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=n_samples, env_tag=env_tag, ids=ids)
 
     elif args.learner == 'RPPO':
         print('running RPPO')
@@ -584,7 +582,8 @@ if __name__ == '__main__':
                         save_path=path,
                         n_samples=n_samples,
                         env_tag=env_tag,
-                        bc_mult = 10
+                        bc_mult = 10,
+                        ids = ids
                     )
 
     elif args.learner == 'stats_PPO':
