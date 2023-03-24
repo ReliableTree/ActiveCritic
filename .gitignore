@@ -10,3 +10,5 @@ src/active_critic/utils/__pycache__/gym_utils.cpython-310.pyc
 tests/learner/best_actor
 tests/learner/best_planner
 tests/learner/planner_before
+src/active_critic/server/__pycache__/analyze.cpython-310.pyc
+tests/learner/actor_before
