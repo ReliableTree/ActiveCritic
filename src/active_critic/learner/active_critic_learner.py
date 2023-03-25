@@ -114,14 +114,14 @@ class ActiveCriticLearner(nn.Module):
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
     def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor, expert_trjs:th.Tensor, action_history:th.Tensor):
-        acts, obsv, rews, steps = make_part_obs_data(
-            actions=actions, observations=observations, rewards=rewards)
+        acts, obsv, rews, steps, exp_trjs = make_part_obs_data(
+            actions=actions, observations=observations, rewards=rewards, expert_trjs=expert_trjs)
 
         self.train_data.add_data(
             obsv=obsv, 
             actions=acts, 
             reward=rews,
-            expert_trjs=expert_trjs,
+            expert_trjs=exp_trjs,
             actions_history=action_history,
             steps=steps
             )

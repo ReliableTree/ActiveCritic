@@ -83,15 +83,13 @@ def apply_triu(inpt:th.Tensor, diagonal:th.Tensor):
 
 
 
-def make_part_obs_data(actions:th.Tensor, observations:th.Tensor, rewards:th.Tensor):
+def make_part_obs_data(actions:th.Tensor, observations:th.Tensor, rewards:th.Tensor, expert_trjs:th.Tensor):
     acts = actions.repeat([1, actions.shape[1], 1]).reshape([-1, actions.shape[1], actions.shape[2]])
+    exp_trjs = expert_trjs.unsqueeze(1).repeat([1, actions.shape[1]]).reshape([-1])
     rews = rewards.repeat([1, rewards.shape[1], 1]).reshape([-1, actions.shape[1], 1])
     obsv = apply_triu(observations, diagonal=0).reshape([-1, observations.shape[-2], observations.shape[-1]])
     steps = get_steps_from_actions(actions=actions)
-    print(f'steps: {steps}')
-    print(f'acts: {acts}')
-    1/0
-    return acts, obsv, rews, steps
+    return acts, obsv, rews, steps, exp_trjs
 
 def get_steps_from_actions(actions):
     steps = th.arange(0, actions.shape[1], device=actions.device).reshape([1, -1]).repeat([actions.shape[0], 1]).reshape([actions.shape[0], -1])
@@ -114,8 +112,9 @@ def get_rew_mask(reward):
     return (reward.squeeze()>=0)
 
 def pick_action_from_history(action_histories, steps):
-    result = th.zeros([steps.shape[0], action_histories.shape[1], action_histories.shape[-1]], device=action_histories.device, dtype=th.float)
+    result = th.zeros([steps.shape[0] * steps.shape[1], action_histories.shape[1], action_histories.shape[-1]], device=action_histories.device, dtype=th.float)
     for batch in range(steps.shape[0]):
-        for time_step in range(action_histories.shape[1]):
-            result[batch, time_step] = action_histories[batch, int(steps[batch, time_step]), time_step]
+        for i, timestep in enumerate(steps[batch]):
+            result_index = batch * len(steps[batch]) + i
+            result[result_index] = action_histories[batch, timestep]
     return result

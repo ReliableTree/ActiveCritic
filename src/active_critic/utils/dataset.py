@@ -25,10 +25,6 @@ class DatasetAC(torch.utils.data.Dataset):
         self.obsv = obsv.to(self.device)
         self.actions = actions.to(self.device)
         actions_history = torch.rand_like(actions_history)
-
-        print(f'rewards: {reward.shape}')
-        print(f'steps: {steps.shape}')
-
         previous_steps = steps - 1
         previous_steps[previous_steps<0] = 0
         prev_proposed_acts = pick_action_from_history(action_histories=actions_history, steps=previous_steps)
