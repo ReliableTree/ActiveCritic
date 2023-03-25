@@ -369,7 +369,7 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
 
         best_succes_rate = -1
         fac = 40
-        runs_per_epoch = 300 * fac
+        runs_per_epoch = 1500 * fac
         for i in range(int(bc_epochs/fac)):
             print(f'BC: {i} from {int(bc_epochs/fac)}')
             bc_learner.train(n_epochs=runs_per_epoch, verbose=True, bc_mult=bc_mult)
@@ -519,7 +519,7 @@ if __name__ == '__main__':
     list_demonstrations = [1]
     list_env_tags = ['reach']
     n_samples = 2000
-    bc_epochs = 1000
+    bc_epochs = 500
     ids = [i for i in range(2)]
     #ids = [3]
 
@@ -590,7 +590,7 @@ if __name__ == '__main__':
 
     elif args.learner == 'stats_PPO':
         print('running stats PPO')
-        for lr in [1e-4, 1e-5]:
+        for lr in [1e-5]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_PPO(
@@ -605,7 +605,55 @@ if __name__ == '__main__':
                     )
     elif args.learner == 'stats_TQC':
         print('running stats TQC')
-        for lr in [1e-4, 1e-5, 1e-6]:
+        for lr in [1e-6]:
+            for env_tag in list_env_tags:
+                for demos in list_demonstrations:
+                    stats_TQC(
+                        device=args.device,
+                        path=path,
+                        demonstration=demos,
+                        lr=lr,
+                        env_tag=env_tag,
+                        n_samples=n_samples,
+                        bc_epochs=bc_epochs,
+                        ids=ids
+                    )
+
+    elif args.learner == 'stats_TPR':
+        print('running RPPO')
+        for lr in [1e-6]:
+            for env_tag in list_env_tags:
+                for demos in list_demonstrations:
+                    stats_RPPO(
+                        device=args.device,
+                        lr=lr,
+                        demonstrations=demos,
+                        save_path=path,
+                        n_samples=n_samples,
+                        env_tag=env_tag,
+                        bc_mult = 10,
+                        ids = ids,
+                        bc_epochs=bc_epochs
+                    )
+
+        print('running stats PPO')
+        for lr in [1e-5]:
+            for env_tag in list_env_tags:
+                for demos in list_demonstrations:
+                    stats_PPO(
+                        device=args.device,
+                        path=path,
+                        demonstration=demos,
+                        lr=lr,
+                        env_tag=env_tag,
+                        n_samples=n_samples,
+                        bc_epochs=bc_epochs,
+                        ids=ids
+                    )
+
+    elif args.learner == 'stats_TQC':
+        print('running stats TQC')
+        for lr in [1e-6]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_TQC(
