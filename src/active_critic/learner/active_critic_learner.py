@@ -330,7 +330,7 @@ class ActiveCriticLearner(nn.Module):
             self.policy.train()
 
             max_actor = float('inf')
-            max_critic = float('inf')
+            mean_critic = float('inf')
             current_patients = self.network_args.patients
             #while ((max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold and (not self.network_args.imitation_phase))) and current_patients > 0:
             current_patients -= len(self.train_data)
@@ -357,12 +357,12 @@ class ActiveCriticLearner(nn.Module):
                 new_min = False
             
             if loss_critic is not None:
-                max_critic = th.max(loss_critic)
+                mean_critic = th.max(loss_critic)
                 self.scores.update_min_score(
-                self.scores.mean_critic, max_critic)
-                self.train_critic = (max_critic>self.network_args.min_critic_threshold)
+                self.scores.mean_critic, mean_critic)
+                self.train_critic = (mean_critic>self.network_args.min_critic_threshold)
             else:
-                max_critic = None
+                mean_critic = None
 
             
 
@@ -380,10 +380,10 @@ class ActiveCriticLearner(nn.Module):
                 'Examples': th.tensor(int(len(self.train_data.obsv))),
                 'Positive Examples': positive_examples
             }
-            if max_critic is not None:
-                debug_dict['Loss Critic'] = max_critic
+            if mean_critic is not None:
+                debug_dict['Loss Critic'] = mean_critic
             else:
-                max_critic = 0
+                mean_critic = 0
 
             if max_actor is not None:
                 debug_dict['Loss Actor'] = max_actor
