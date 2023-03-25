@@ -600,7 +600,8 @@ if __name__ == '__main__':
                         lr=lr,
                         env_tag=env_tag,
                         n_samples=n_samples,
-                        bc_epochs=bc_epochs
+                        bc_epochs=bc_epochs,
+                        ids=ids
                     )
     elif args.learner == 'stats_TQC':
         print('running stats TQC')
