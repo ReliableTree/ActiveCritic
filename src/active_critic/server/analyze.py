@@ -73,8 +73,8 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
         acps.inference_opt_lr = 1e-6
         acps.opt_steps = 30
     else:
-        acps.inference_opt_lr = 1e-3
-        acps.opt_steps = 5
+        acps.inference_opt_lr = 1e-6
+        acps.opt_steps = 100
 
     acps.optimize = True
     acps.batch_size = 32
@@ -306,7 +306,7 @@ def run_eval_stats_env(device, weight_decay):
     run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 20000
+    total_training_epsiodes = 2000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']

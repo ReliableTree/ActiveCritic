@@ -188,7 +188,7 @@ class ActiveCriticLearner(nn.Module):
 
         if ((self.last_scores is None) or (self.last_scores < success)) and (policy == self.policy):
             self.last_scores = success
-            self.policy.args_obj.opt_steps *= 1.1
+            self.policy.args_obj.opt_steps *= 1
             print(f'new opt_steps = {self.policy.args_obj.opt_steps}')
         print(f'last rewards: {rewards.mean()}')
         print(f'last success: {success}')
