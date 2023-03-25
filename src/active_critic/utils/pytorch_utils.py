@@ -87,11 +87,12 @@ def make_part_obs_data(actions:th.Tensor, observations:th.Tensor, rewards:th.Ten
     acts = actions.repeat([1, actions.shape[1], 1]).reshape([-1, actions.shape[1], actions.shape[2]])
     rews = rewards.repeat([1, rewards.shape[1], 1]).reshape([-1, actions.shape[1], 1])
     obsv = apply_triu(observations, diagonal=0).reshape([-1, observations.shape[-2], observations.shape[-1]])
-    step = th.arange(0, actions.shape[1], device=actions.device).reshape([1, -1]).repeat([actions.shape[0], 1]).reshape([-1])
-    print(obsv)
-    print(step)
-    1/0
-    return acts, obsv, rews
+    steps = get_steps_from_actions(actions=actions)
+    return acts, obsv, rews, steps
+
+def get_steps_from_actions(actions):
+    steps = th.arange(0, actions.shape[1], device=actions.device).reshape([1, -1]).repeat([actions.shape[0], 1]).reshape([actions.shape[0], -1])
+    return steps
 
 def make_inf_seq(obs:th.Tensor, seq_len:th.Tensor):
     start_seq = th.zeros([obs.shape[0], int(seq_len/2), obs.shape[-1]], device= obs.device)
@@ -110,9 +111,8 @@ def get_rew_mask(reward):
     return (reward.squeeze()>=0)
 
 def pick_action_from_history(action_histories, steps):
-    batch_count=th.arange(action_histories.shape[0]).reshape([1, -1]).repeat([action_histories.shape[1]*action_histories.shape[-1], 1]).T.reshape([-1])
-    time_count = th.arange(action_histories.shape[1]).reshape([1, -1]).repeat([action_histories.shape[0],1]).reshape([1, action_histories.shape[0],-1]).repeat([action_histories.shape[-1], 1, 1]).transpose(-1,-2).reshape(-1)
-    dim_count = th.arange(action_histories.shape[-1]).reshape([1, -1]).repeat([action_histories.shape[0]*action_histories.shape[1], 1]).reshape([-1])
-    steps_count = steps.reshape([1, -1]).repeat([action_histories.shape[1] * action_histories.shape[-1], 1]).T.reshape([-1])
-    result = action_histories[tuple((batch_count, steps_count, time_count, dim_count))].reshape([action_histories.shape[0], action_histories.shape[1], action_histories.shape[-1]])
+    result = th.zeros([steps.shape[0], action_histories.shape[1], action_histories.shape[-1]], device=action_histories.device, dtype=th.float)
+    for batch in range(steps.shape[0]):
+        for time_step in range(action_histories.shape[1]):
+            result[batch, time_step] = action_histories[batch, int(steps[batch, time_step]), time_step]
     return result

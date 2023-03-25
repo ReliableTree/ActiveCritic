@@ -3,7 +3,7 @@ from active_critic.learner.active_critic_learner import ActiveCriticLearner, ACL
 from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env, parse_sampled_transitions, sample_expert_transitions, DummyExtractor, new_epoch_reach, sample_new_episode
-from active_critic.utils.pytorch_utils import make_part_obs_data, count_parameters
+from active_critic.utils.pytorch_utils import make_part_obs_data, count_parameters, get_steps_from_actions
 from active_critic.utils.dataset import DatasetAC
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -240,10 +240,14 @@ def run_experiment(
             device=acl.network_args.device,
             episodes=demos,
             seq_len=seq_len)
+        
+        print(f'demos: {demos}')
+        print(f'actions: {actions.shape}')
     
         exp_trjs = th.ones([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
+        actions_history = actions.unsqueeze(1).repeat([1, actions.shape[1], 1, 1])
 
-        acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos])
+        acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos], action_history=actions_history)
 
     acl.train(epochs=100000)
 
@@ -368,7 +372,7 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
-    demonstrations_list = [1]
+    demonstrations_list = [2]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 2

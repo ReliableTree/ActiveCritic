@@ -24,6 +24,8 @@ class DatasetAC(torch.utils.data.Dataset):
         self.reward = reward.to(self.device)
         self.obsv = obsv.to(self.device)
         self.actions = actions.to(self.device)
+        print(actions_history.shape)
+        print(steps.shape)
         actions_at_time_t = pick_action_from_history(action_histories=actions_history, steps=steps)
         self.actions_at_time_t = actions_at_time_t.to(self.device)
         success = self.reward.reshape([obsv.shape[0], obsv.shape[1]]).max(-1).values
@@ -31,6 +33,10 @@ class DatasetAC(torch.utils.data.Dataset):
         self.expert_trjs = expert_trjs.to(self.device)
         self.steps = steps.to(self.device)
         self.make_virt_data()
+        print(f'steps: {steps}')
+        print(f'actions_history: {actions_history}')
+        print(f'actions_at_time_t: {actions_at_time_t}')
+        1/0
 
 
     def make_virt_data(self):
@@ -84,6 +90,10 @@ class DatasetAC(torch.utils.data.Dataset):
             self.steps = torch.cat((
                 self.steps, steps.to(self.device)
             ), dim=0)
+            print(f'steps: {steps}')
+            print(f'actions_history: {actions_history}')
+            print(f'actions_at_time_t: {actions_at_time_t}')
+            1/0
         self.make_virt_data()
 
     def __getitem__(self, index):
@@ -93,7 +103,7 @@ class DatasetAC(torch.utils.data.Dataset):
                     self.virt_actions[self.virt_success][index], 
                     self.virt_reward[self.virt_success][index], 
                     self.virt_expert_trjs[self.virt_success][index], 
-                    self.virt_actions_history[self.virt_success][index],
+                    self.virt_actions_at_time_t[self.virt_success][index],
                     self.virt_obsv[self.virt_success][(index+1)%self.__len__()],
                     self.virt_steps[self.virt_success][index])
         else:
@@ -101,7 +111,7 @@ class DatasetAC(torch.utils.data.Dataset):
                     self.virt_actions[index], 
                     self.virt_reward[index], 
                     self.virt_expert_trjs[index],
-                    self.virt_actions_history[index],
+                    self.virt_actions_at_time_t[index],
                     self.virt_obsv[(index+1)%self.__len__()],
                     self.virt_steps[index])
         
