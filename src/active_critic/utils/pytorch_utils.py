@@ -88,6 +88,9 @@ def make_part_obs_data(actions:th.Tensor, observations:th.Tensor, rewards:th.Ten
     rews = rewards.repeat([1, rewards.shape[1], 1]).reshape([-1, actions.shape[1], 1])
     obsv = apply_triu(observations, diagonal=0).reshape([-1, observations.shape[-2], observations.shape[-1]])
     steps = get_steps_from_actions(actions=actions)
+    print(f'steps: {steps}')
+    print(f'acts: {acts}')
+    1/0
     return acts, obsv, rews, steps
 
 def get_steps_from_actions(actions):

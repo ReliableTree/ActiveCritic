@@ -101,7 +101,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
         acps.opt_steps = 5
     elif opt_mode == 'actor+plan':
         acps.inference_opt_lr = 1e-6
-        acps.opt_steps = 100
+        acps.opt_steps = 2
     else:
         1/0
 
@@ -212,7 +212,7 @@ def run_experiment(
         total_training_epsiodes=20, 
         training_episodes=10, 
         min_critic_threshold=1e-4):
-    seq_len = 2
+    seq_len = 3
 
     acl, env, expert, seq_len, epsiodes, device = make_acl(
                             device,
@@ -240,12 +240,13 @@ def run_experiment(
             device=acl.network_args.device,
             episodes=demos,
             seq_len=seq_len)
-        
-        print(f'demos: {demos}')
-        print(f'actions: {actions.shape}')
+    
     
         exp_trjs = th.ones([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
         actions_history = actions.unsqueeze(1).repeat([1, actions.shape[1], 1, 1])
+
+        actions = th.rand_like(actions)
+        print(f'actions: {actions}')
 
         acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos], action_history=actions_history)
 
