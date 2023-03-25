@@ -273,6 +273,7 @@ class ActiveCriticLearner(nn.Module):
                     if self.set_best_actor:
                         self.policy.actor.load_state_dict(th.load('best_actor'+self.logname))
                         self.policy.planner.load_state_dict(th.load('best_planner'+self.logname))
+                        self.saveNetworkToFile(add=self.logname, data_path=self.network_args.data_path)
 
                     self.policy.eval()
                     self.run_validation(optimize=True)
@@ -282,6 +283,7 @@ class ActiveCriticLearner(nn.Module):
                     self.policy.actor.load_state_dict(th.load('actor_before'+self.logname), strict=False)
                     self.policy.planner.load_state_dict(th.load('planner_before'+self.logname), strict=False)
                     self.scores.reset_min_score(self.scores.mean_actor)
+
 
                     if self.get_num_training_samples()>= self.network_args.total_training_epsiodes:
                         os.remove('actor_before'+self.logname)
@@ -638,6 +640,8 @@ class ActiveCriticLearner(nn.Module):
                 path_to_file + "/optimizer_actor")
         th.save(self.policy.critic.optimizer.state_dict(),
                 path_to_file + "/optimizer_critic")
+        th.save(self.policy.planner.optimizer.state_dict(),
+                path_to_file + "/optimizer_planner")
         th.save(th.tensor(self.global_step),
                 path_to_file + "/global_step")
         with open(path_to_file + '/scores.pkl', 'wb') as f:
@@ -659,6 +663,8 @@ class ActiveCriticLearner(nn.Module):
         self.policy.actor.optimizer.load_state_dict(
             th.load(path + "/optimizer_actor"))
         self.policy.critic.optimizer.load_state_dict(
+            th.load(path + "/optimizer_critic"))
+        self.policy.planner.optimizer.load_state_dict(
             th.load(path + "/optimizer_critic"))
         self.global_step = int(th.load(path+'/global_step'))
         self.setDatasets(train_data=th.load(
