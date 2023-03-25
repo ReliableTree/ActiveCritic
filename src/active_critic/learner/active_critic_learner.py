@@ -364,7 +364,7 @@ class ActiveCriticLearner(nn.Module):
                 self.scores.mean_actor, max_actor)
             if new_min:
                 th.save(self.policy.actor.state_dict(), self.inter_path + 'best_actor'+self.logname)
-                th.save(self.policy.planner.state_dict(), self.inter_path + 'best_actor'+self.logname)
+                th.save(self.policy.planner.state_dict(), self.inter_path + 'best_panner'+self.logname)
                 self.set_best_actor = True
 
             reward = self.train_data.reward
