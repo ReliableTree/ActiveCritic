@@ -73,7 +73,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
         acps.inference_opt_lr = 1e-6
         acps.opt_steps = 30
     else:
-        acps.inference_opt_lr = 1e-6
+        acps.inference_opt_lr = 1e-4
         acps.opt_steps = 100
 
     acps.optimize = True
