@@ -178,7 +178,6 @@ class ActiveCriticPolicy(BaseModel):
             if self.train_inference:
                 opt_count = int(math.ceil(actions.shape[0]/2))
                 print(f'also use actor vorschläge: opt count {opt_count}')
-
             else:
                 opt_count = actions.shape[0]
             actions_opt, expected_success_opt = self.optimize_act_sequence(

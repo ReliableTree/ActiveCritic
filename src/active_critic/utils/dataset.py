@@ -9,6 +9,7 @@ class DatasetAC(torch.utils.data.Dataset):
         self.success = None
         self.onyl_positiv = None
         self.batch_size = batch_size
+        self.last_success_is_role = False
 
     def __len__(self):
         if self.obsv is not None:
@@ -58,8 +59,15 @@ class DatasetAC(torch.utils.data.Dataset):
             success = reward.reshape([obsv.shape[0], obsv.shape[1]]).max(-1).values == 1
             self.success = torch.cat(
                 (self.success, (success).to(self.device)), dim=0)
-            self.expert_trjs = torch.cat((
-                self.expert_trjs, expert_trjs.to(self.device)
+            if self.last_success_is_role:
+                self.expert_trjs = torch.zeros_like(torch.cat((
+                    self.expert_trjs, expert_trjs.to(self.device)
+                    ), dim=-1))
+                self.expert_trjs[-1] = 1
+                print(self.expert_trjs)
+            else:
+                self.expert_trjs = torch.cat((
+                    self.expert_trjs, expert_trjs.to(self.device)
             ), dim=-1)
         self.make_virt_data()
 

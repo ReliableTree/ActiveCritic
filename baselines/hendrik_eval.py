@@ -369,7 +369,7 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
 
         best_succes_rate = -1
         fac = 40
-        runs_per_epoch = 1500 * fac
+        runs_per_epoch = 500 * fac
         for i in range(int(bc_epochs/fac)):
             print(f'BC: {i} from {int(bc_epochs/fac)}')
             bc_learner.train(n_epochs=runs_per_epoch, verbose=True, bc_mult=bc_mult)
@@ -631,7 +631,7 @@ if __name__ == '__main__':
                         save_path=path,
                         n_samples=n_samples,
                         env_tag=env_tag,
-                        bc_mult = 10,
+                        bc_mult = 1,
                         ids = ids,
                         bc_epochs=bc_epochs
                     )
@@ -651,7 +651,6 @@ if __name__ == '__main__':
                         ids=ids
                     )
 
-    elif args.learner == 'stats_TQC':
         print('running stats TQC')
         for lr in [1e-6]:
             for env_tag in list_env_tags:
