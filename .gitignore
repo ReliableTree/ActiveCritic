@@ -15,3 +15,4 @@ tests/learner/actor_before
 src/active_critic/learner/__pycache__/active_critic_args.cpython-310.pyc
 src/active_critic/learner/__pycache__/active_critic_learner.cpython-310.pyc
 *.pyc
+src/active_critic/server/analyze.py
