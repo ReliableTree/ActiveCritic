@@ -63,8 +63,7 @@ class DatasetAC(torch.utils.data.Dataset):
                 self.expert_trjs = torch.zeros_like(torch.cat((
                     self.expert_trjs, expert_trjs.to(self.device)
                     ), dim=-1))
-                self.expert_trjs[-1] = 1
-                print(self.expert_trjs)
+                self.expert_trjs[self.success][-1] = 1
             else:
                 self.expert_trjs = torch.cat((
                     self.expert_trjs, expert_trjs.to(self.device)

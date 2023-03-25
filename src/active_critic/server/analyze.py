@@ -246,6 +246,8 @@ def run_experiment(
 
         acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos])
 
+    acl.train_data.last_success_is_role = True
+    
     acl.train(epochs=100000)
 
 def run_eval(device):
