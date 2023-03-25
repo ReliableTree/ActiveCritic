@@ -226,7 +226,6 @@ class ActiveCriticLearner(nn.Module):
         success = rewards.squeeze().max(-1).values
         success = (success == 1).type(th.float).mean()
 
-
         print(f'last rewards: {rewards.mean()}')
         print(f'last success: {success}')
         print(f'self.last_scores: {self.last_scores}')
@@ -239,6 +238,14 @@ class ActiveCriticLearner(nn.Module):
         )
         if opt_before is not None:
             self.policy.args_obj.optimize = opt_before
+
+        if (success.sum() == 0) and (((self.train_data.success is None) or (self.train_data.success.sum() == 0))):
+            self.policy.actor.init_model()
+            self.policy.critic.init_model()
+            self.policy.planner.init_model()
+            self.set_best_actor = False
+            print('reinit')
+
 
     def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic):
         self.train_data.onyl_positiv = True
@@ -317,6 +324,7 @@ class ActiveCriticLearner(nn.Module):
                 if self.train_data.success.sum() > self.next_critic_init:
                     self.policy.critic.init_model()
                     self.next_critic_init *= 10
+                self.train_critic = True
 
             elif (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every
@@ -582,7 +590,6 @@ class ActiveCriticLearner(nn.Module):
             print(f'self.policy.args_obj.opt_steps after: {self.policy.args_obj.opt_steps}')
         else:
             self.exp_dict = exp_dict
-
 
 
     def analyze_critic_scores(self, reward: th.Tensor, expected_reward: th.Tensor, add: str):

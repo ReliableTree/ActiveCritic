@@ -37,6 +37,7 @@ class ActiveCriticPolicySetup:
 
 
 
+
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
         self.reset()
@@ -88,7 +89,6 @@ class ActiveCriticPolicy(BaseModel):
         self.train_inference = False
 
         self.reset()
-
     def reset(self):
         self.last_goal = None
         self.current_step = 0
@@ -249,9 +249,11 @@ class ActiveCriticPolicy(BaseModel):
 
             init_actor = copy.deepcopy(self.actor.state_dict())
             init_planner = copy.deepcopy(self.planner.state_dict())
+
+            lr = self.args_obj.inference_opt_lr
             optimizer = th.optim.AdamW(
                 [{'params': self.actor.parameters()}, {'params': self.planner.parameters()}],
-                lr=self.args_obj.inference_opt_lr,
+                lr=lr,
                 weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
             )
 
