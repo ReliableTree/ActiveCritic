@@ -372,7 +372,7 @@ def run_eval_stats_env(device, weight_decay):
     run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 20000
+    total_training_epsiodes = 5000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']

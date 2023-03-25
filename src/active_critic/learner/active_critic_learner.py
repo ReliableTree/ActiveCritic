@@ -19,6 +19,7 @@ import numpy as np
 import pickle
 import copy
 import math
+import os
 
 from active_critic.learner.higher_learning import actor_step, critic_step
 
@@ -104,6 +105,10 @@ class ActiveCriticLearner(nn.Module):
         self.exp_dict = None
 
         self.set_best_actor = False
+
+        self.inter_path = os.path.join(self.network_args.data_path, self.logname, 'inter_models/')
+        if not os.path.exists(self.inter_path):
+            os.makedirs(self.inter_path)
 
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
@@ -273,39 +278,46 @@ class ActiveCriticLearner(nn.Module):
         for epoch in range(epochs):
             if self.global_step >= next_val:
                 next_val = self.global_step + self.network_args.val_every
-                if self.network_args.tboard:
+                if self.network_args.tboard:                    
                     print('_____________________________________________________________')
-                    th.save(self.policy.actor.state_dict(), 'actor_before')
-                    th.save(self.policy.planner.state_dict(), 'planner_before')
+                    th.save(self.policy.actor.state_dict(), self.inter_path + 'actor_before'+self.logname)
+                    th.save(self.policy.planner.state_dict(), self.inter_path + 'planner_before'+self.logname)
 
                     if self.set_best_actor:
-                        self.policy.actor.load_state_dict(th.load('best_actor'))
-                        self.policy.planner.load_state_dict(th.load('best_planner'))
+                        self.policy.actor.load_state_dict(th.load(self.inter_path + 'best_actor'+self.logname))
+                        self.policy.planner.load_state_dict(th.load(self.inter_path + 'best_planner'+self.logname))
+                        self.saveNetworkToFile(add=self.logname, data_path=self.network_args.data_path)
+
 
                     self.policy.eval()
                     self.run_validation(optimize=True)
                     self.run_validation(optimize=False)
+                    self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'+self.logname), strict=False)
+                    self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'+self.logname), strict=False)
+
                     print(f'self.get_num_training_samples(): {self.get_num_training_samples()}')
                     print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
-                    self.policy.actor.load_state_dict(th.load('actor_before'), strict=False)
-                    self.policy.planner.load_state_dict(th.load('planner_before'), strict=False)
                     self.scores.reset_min_score(self.scores.mean_actor)
 
                     if self.get_num_training_samples()>= self.network_args.total_training_epsiodes:
+                        os.remove('actor_before'+self.logname)
+                        os.remove('planner_before'+self.logname)
+                        os.remove('best_actor'+self.logname)
+                        os.remove('best_planner'+self.logname)
                         return None
 
 
             if (not self.network_args.imitation_phase) and (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every
-                th.save(self.policy.actor.state_dict(), 'actor_before')
-                th.save(self.policy.planner.state_dict(), 'planner_before')
+                th.save(self.policy.actor.state_dict(), self.inter_path + 'actor_before'+self.logname)
+                th.save(self.policy.planner.state_dict(), self.inter_path + 'planner_before'+self.logname)
                 if self.set_best_actor:
-                    self.policy.actor.load_state_dict(th.load('best_actor'))
-                    self.policy.planner.load_state_dict(th.load('best_planner'))
+                    self.policy.actor.load_state_dict(th.load(self.inter_path + 'best_actor'+self.logname))
+                    self.policy.planner.load_state_dict(th.load(self.inter_path + 'best_planner'+self.logname))
 
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
-                self.policy.actor.load_state_dict(th.load('actor_before'), strict=False)
-                self.policy.planner.load_state_dict(th.load('planner_before'), strict=False)
+                self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'+self.logname), strict=False)
+                self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'+self.logname), strict=False)
 
                 self.virtual_step += self.network_args.training_epsiodes
 
