@@ -357,7 +357,7 @@ class ActiveCriticLearner(nn.Module):
                 new_min = False
             
             if loss_critic is not None:
-                mean_critic = th.max(loss_critic)
+                mean_critic = th.mean(loss_critic)
                 self.scores.update_min_score(
                 self.scores.mean_critic, mean_critic)
                 self.train_critic = (mean_critic>self.network_args.min_critic_threshold)
