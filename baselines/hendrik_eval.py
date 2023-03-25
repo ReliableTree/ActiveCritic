@@ -353,12 +353,13 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
 
     ppo_env, _ = make_dummy_vec_env_rec_pomdp(name=env_tag, seq_len=seq_len)
     learner = RecurrentPPO("MlpLstmPolicy", env=ppo_env, verbose=0, learning_rate=lr, device=device)
+    pomdp_env_val, _ = make_dummy_vec_env_rec_pomdp(
+    name=env_tag, seq_len=seq_len)
     if n_demonstrations > 0:
         dataloader = make_ppo_rec_data_loader(env=env, vec_expert=vec_expert, n_demonstrations=n_demonstrations, seq_len=seq_len, device=device)
         bc_learner = Rec_PPO_BC(model=learner, dataloader=dataloader, device=device)
 
-        pomdp_env_val, _ = make_dummy_vec_env_rec_pomdp(
-            name=env_tag, seq_len=seq_len)
+
         bc_file_path = logname_save_path+'bc_best'
         bc_stats_path = logname_save_path + 'bc_stats_rec_PPO'
         #if (not os.path.isfile(bc_file_path)):
