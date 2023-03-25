@@ -94,8 +94,8 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 100
     elif opt_mode == 'actions':
-        acps.inference_opt_lr = 1e-3
-        acps.opt_steps = 5
+        acps.inference_opt_lr = 1e-4
+        acps.opt_steps = 100
     elif opt_mode == 'goal':
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
@@ -369,17 +369,17 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
-    demonstrations_list = [0]
-    run_ids = [i for i in range(1)]
+    demonstrations_list = [1]
+    run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 10000
+    total_training_epsiodes = 2000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
+    env_tags = ['reach']
     val_everys = [2000]
     add_data_everys = [2000]
-    opt_modes = ['actor+plan']
+    opt_modes = ['actions']
     for run_id in run_ids:
         for demonstrations in demonstrations_list:
             for env_tag in env_tags:
