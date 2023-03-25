@@ -350,53 +350,52 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
         os.makedirs(logname_save_path)
 
     env, vec_expert = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
-    dataloader = make_ppo_rec_data_loader(env=env, vec_expert=vec_expert, n_demonstrations=n_demonstrations, seq_len=seq_len, device=device)
 
     ppo_env, _ = make_dummy_vec_env_rec_pomdp(name=env_tag, seq_len=seq_len)
     learner = RecurrentPPO("MlpLstmPolicy", env=ppo_env, verbose=0, learning_rate=lr, device=device)
-    learner.learning_rate
+    if n_demonstrations > 0:
+        dataloader = make_ppo_rec_data_loader(env=env, vec_expert=vec_expert, n_demonstrations=n_demonstrations, seq_len=seq_len, device=device)
+        bc_learner = Rec_PPO_BC(model=learner, dataloader=dataloader, device=device)
 
-    bc_learner = Rec_PPO_BC(model=learner, dataloader=dataloader, device=device)
+        pomdp_env_val, _ = make_dummy_vec_env_rec_pomdp(
+            name=env_tag, seq_len=seq_len)
+        bc_file_path = logname_save_path+'bc_best'
+        bc_stats_path = logname_save_path + 'bc_stats_rec_PPO'
+        #if (not os.path.isfile(bc_file_path)):
+        print('BC Phase')
+        tboard = TBoardGraphs(logname=logname + '_BC',
+                                data_path=logname_save_path)
 
-    pomdp_env_val, _ = make_dummy_vec_env_rec_pomdp(
-        name=env_tag, seq_len=seq_len)
-    bc_file_path = logname_save_path+'bc_best'
-    bc_stats_path = logname_save_path + 'bc_stats_rec_PPO'
-    #if (not os.path.isfile(bc_file_path)):
-    print('BC Phase')
-    tboard = TBoardGraphs(logname=logname + '_BC',
-                            data_path=logname_save_path)
+        best_succes_rate = -1
+        fac = 40
+        runs_per_epoch = 300 * fac
+        for i in range(int(bc_epochs/fac)):
+            print(f'BC: {i} from {int(bc_epochs/fac)}')
+            bc_learner.train(n_epochs=runs_per_epoch, verbose=True, bc_mult=bc_mult)
+            success, rews, history = get_avr_succ_rew_det_rec(
+                env=pomdp_env_val, 
+                learner=bc_learner.policy,
+                epsiodes=50,
+                path=bc_stats_path,
+                history=history,
+                step=i)
+            print(f'success: {success.mean()}')
+            success_rate = success.mean()
+            tboard.addValidationScalar(
+                'Reward', value=th.tensor(rews.mean()), stepid=i*fac)
+            tboard.addValidationScalar(
+                'Success Rate', value=th.tensor(success_rate), stepid=i*fac)
+            if success_rate > best_succes_rate:
+                best_succes_rate = success_rate
+        th.save(bc_learner.policy.state_dict(),
+                bc_file_path)
 
-    best_succes_rate = -1
-    fac = 40
-    runs_per_epoch = 300 * fac
-    for i in range(int(bc_epochs/fac)):
-        print(f'BC: {i} from {int(bc_epochs/fac)}')
-        bc_learner.train(n_epochs=runs_per_epoch, verbose=True, bc_mult=bc_mult)
-        success, rews, history = get_avr_succ_rew_det_rec(
-            env=pomdp_env_val, 
-            learner=bc_learner.policy,
-            epsiodes=50,
-            path=bc_stats_path,
-            history=history,
-            step=i)
-        print(f'success: {success.mean()}')
-        success_rate = success.mean()
-        tboard.addValidationScalar(
-            'Reward', value=th.tensor(rews.mean()), stepid=i*fac)
-        tboard.addValidationScalar(
-            'Success Rate', value=th.tensor(success_rate), stepid=i*fac)
-        if success_rate > best_succes_rate:
-            best_succes_rate = success_rate
-    th.save(bc_learner.policy.state_dict(),
-            bc_file_path)
+        learner_stats_path = logname_save_path + 'learner_stats_rec_PPO'
+        tboard = TBoardGraphs(
+            logname=logname + str(' Reinforcement'), data_path=logname_save_path)
 
-    learner_stats_path = logname_save_path + 'learner_stats_rec_PPO'
-    tboard = TBoardGraphs(
-        logname=logname + str(' Reinforcement'), data_path=logname_save_path)
-
-    learner.policy.load_state_dict(
-        th.load(bc_file_path))
+        learner.policy.load_state_dict(
+            th.load(bc_file_path))
 
     history = None
 
