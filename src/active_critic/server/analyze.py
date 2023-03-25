@@ -247,7 +247,7 @@ def run_experiment(
         acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos])
 
     acl.train_data.last_success_is_role = True
-    
+
     acl.train(epochs=100000)
 
 def run_eval(device):
@@ -378,7 +378,7 @@ def run_eval_stats_env(device, weight_decay):
     total_training_epsiodes = 10000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
+    env_tags = ['reach']
     val_everys = [2000]
     add_data_everys = [2000]
     opt_modes = ['actor+plan']
