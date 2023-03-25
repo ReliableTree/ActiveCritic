@@ -376,7 +376,7 @@ def run_eval_stats_env(device, weight_decay):
     total_training_epsiodes = 5000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['reach']
+    env_tags = ['pickplace']
     val_everys = [2000]
     add_data_everys = [2000]
     opt_modes = ['actor+plan']
