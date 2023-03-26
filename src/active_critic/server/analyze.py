@@ -246,7 +246,7 @@ def run_experiment(
 
         acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos])
 
-    acl.train_data.last_success_is_role = True
+    acl.train_data.last_success_is_role = False
 
     acl.train(epochs=100000)
 
@@ -371,11 +371,11 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
-    demonstrations_list = [0]
+    demonstrations_list = [1]
     run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 10000
+    total_training_epsiodes = 2000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']
