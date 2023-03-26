@@ -131,7 +131,7 @@ class ActiveCriticLearner(nn.Module):
     
 
     def actor_step(self, data, loss_actor):
-        obsv, actions, reward, expert_trjs, _ = data
+        obsv, actions, reward, expert_trjs, _, _, _ = data
         plans = self.policy.make_plans(acts=actions, obsvs=obsv)
         plans[expert_trjs] = 0
 
@@ -155,17 +155,23 @@ class ActiveCriticLearner(nn.Module):
     
     def critic_step(self, data, loss_critic):
 
-        obsv, actions, reward, expert_trjs, prev_proposed_actions = data
+        obsv, actions, reward, expert_trjs, prev_proposed_actions, steps, prev_observation = data
 
         critic_input = self.policy.get_critic_input(obsvs=obsv, acts=actions)
         critic_result = self.policy.critic.forward(critic_input)
-        label = self.make_critic_score(reward)
-        loss, l2_dist = calcMSE(critic_result, label, return_tensor=True)
+        reward_loss, l2_dist = calcMSE(critic_result, reward, return_tensor=True)
 
-        print(f'actions: {actions}')
-        print(f'prev_proposed_actions: {prev_proposed_actions}')
-        print(f'obsv: {obsv}')
-        1/0
+        prediction_mask = steps > 0
+        critic_predicted_input_prev = self.policy.get_critic_input(obsvs=prev_observation[prediction_mask], acts=prev_proposed_actions[prediction_mask])
+        critic_pred_result_prev = self.policy.critic.forward(critic_predicted_input_prev)
+
+        critic_predicted_input_current = self.policy.get_critic_input(obsvs=obsv[prediction_mask], acts=prev_proposed_actions[prediction_mask])
+        critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
+
+        pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
+
+        loss = reward_loss + pred_loss
+
 
         self.policy.critic.optimizer.zero_grad()
         loss.backward()

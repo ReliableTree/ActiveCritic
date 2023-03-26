@@ -24,7 +24,6 @@ class DatasetAC(torch.utils.data.Dataset):
         self.reward = reward.to(self.device)
         self.obsv = obsv.to(self.device)
         self.actions = actions.to(self.device)
-        actions_history = torch.rand_like(actions_history)
         previous_steps = steps - 1
         previous_steps[previous_steps<0] = 0
         prev_proposed_acts = pick_action_from_history(action_histories=actions_history, steps=previous_steps)
@@ -32,9 +31,7 @@ class DatasetAC(torch.utils.data.Dataset):
         success = self.reward.reshape([obsv.shape[0], obsv.shape[1]]).max(-1).values
         self.success = (success == 1)
         self.expert_trjs = expert_trjs.to(self.device)
-
-
-        self.previous_steps = previous_steps.to(self.device)
+        self.steps = steps.reshape([-1]).to(self.device)
         self.make_virt_data()
 
 
@@ -47,11 +44,7 @@ class DatasetAC(torch.utils.data.Dataset):
             self.virt_success = self.success.repeat([rep_fac])
             self.virt_expert_trjs = self.expert_trjs.repeat([rep_fac])
             self.virt_prev_proposed_acts = self.prev_proposed_acts.repeat([rep_fac, 1, 1])
-            print(f'virt_prev_proposed_acts: {self.virt_prev_proposed_acts.shape}')
-            print(f'virt_obsv: {self.virt_obsv.shape}')
-            print(f'obsv: {self.obsv.shape}')
-            print(f'prev_proposed_acts: {self.prev_proposed_acts.shape}')
-            self.virt_previous_steps = self.previous_steps.repeat([rep_fac, 1])
+            self.virt_steps = self.steps.repeat([rep_fac])
         else:
             self.virt_reward = self.reward
             self.virt_obsv = self.obsv
@@ -59,7 +52,7 @@ class DatasetAC(torch.utils.data.Dataset):
             self.virt_success = self.success
             self.virt_expert_trjs = self.expert_trjs
             self.virt_actions_at_time_t = self.prev_proposed_acts
-            self.virt_previous_steps = self.previous_steps
+            self.virt_steps = self.steps
 
 
 
@@ -88,13 +81,12 @@ class DatasetAC(torch.utils.data.Dataset):
             ), dim=0)
             previous_steps = steps - 1
             previous_steps[previous_steps<0] = 0
-            actions_history[0,0,1] = 10
             prev_proposed_acts = pick_action_from_history(action_histories=actions_history, steps=previous_steps)
             self.prev_proposed_acts = torch.cat((
                 self.prev_proposed_acts, prev_proposed_acts.to(self.device)
             ), dim=0)
-            self.previous_steps = torch.cat((
-                self.previous_steps, steps.to(self.device)
+            self.steps = torch.cat((
+                self.steps, steps.reshape([-1]).to(self.device)
             ), dim=0)
         self.make_virt_data()
 
@@ -105,11 +97,16 @@ class DatasetAC(torch.utils.data.Dataset):
                     self.virt_actions[self.virt_success][index], 
                     self.virt_reward[self.virt_success][index], 
                     self.virt_expert_trjs[self.virt_success][index], 
-                    self.virt_prev_proposed_acts[self.virt_success][index])
+                    self.virt_prev_proposed_acts[self.virt_success][index],
+                    self.virt_steps[self.virt_success][index],
+                    self.virt_obsv[self.virt_success][max(index-1, 0)])
         else:
             return (self.virt_obsv[index], 
                     self.virt_actions[index], 
                     self.virt_reward[index], 
                     self.virt_expert_trjs[index],
-                    self.virt_prev_proposed_acts[index])
+                    self.virt_prev_proposed_acts[index],
+                    self.virt_steps[index],
+                    self.virt_obsv[max(index-1, 0)])
+
         

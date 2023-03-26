@@ -22,8 +22,6 @@ from gym import Env
 import random
 
 from datetime import datetime
-
-
 def make_wsm_setup(seq_len, d_output, weight_decay, device='cuda'):
     wsm = WholeSequenceModelSetup()
     wsm.model_setup = ModelSetup()
@@ -246,9 +244,12 @@ def run_experiment(
         actions_history = actions.unsqueeze(1).repeat([1, actions.shape[1], 1, 1])
 
         actions = th.rand_like(actions)
+        actions_history = th.rand_like(actions_history)
         print(f'actions: {actions}')
+        print(f'actions history: {actions_history}')
+        print(f'observations : {observations}')
 
-        acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos], action_history=actions_history)
+        acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos], action_history=actions_history[:demos])
 
     acl.train(epochs=100000)
 

@@ -17,7 +17,6 @@ import argparse
 
 
 from gym import Env
-th.manual_seed(0)
 
 
 def make_wsm_setup(seq_len, d_output, device='cuda'):

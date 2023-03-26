@@ -49,7 +49,6 @@ class DebugTE(th.nn.TransformerEncoder):
             see the docs in Transformer class.
         """
         output = src
-
         for i, mod in enumerate(self.layers):
             if (i == 0) and return_attention:
                 output, attention = mod(output, src_mask=mask, src_key_padding_mask=src_key_padding_mask,

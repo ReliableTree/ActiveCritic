@@ -2,7 +2,7 @@ from abc import ABC, abstractstaticmethod
 import typing
 import torch as th
 import torch.nn as nn
-from active_critic.model_src.transformer import TransformerModel, ModelSetup
+from active_critic.model_src.transformer import TransformerModel, ModelSetup, generate_square_subsequent_mask
 from active_critic.utils.pytorch_utils import calcMSE
 
 
@@ -25,12 +25,12 @@ class WholeSequenceModel(nn.Module):
         self.model = None
         self.optimizer = None
 
-    def forward(self, inputs: th.Tensor) -> th.Tensor:
+    def forward(self, inputs: th.Tensor, mask:th.Tensor = None) -> th.Tensor:
         if (self.model is None):
             self.wsms.model_setup.ntoken = inputs.size(-1)
             self.model = TransformerModel(
                 model_setup=self.wsms.model_setup).to(inputs.device)
-        result = self.model.forward(inputs)
+        result = self.model.forward(inputs, mask=mask)
         if self.optimizer is None:
             self.optimizer = self.wsms.optimizer_class(
                 self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
@@ -68,20 +68,8 @@ class WholeSequenceModel(nn.Module):
 class CriticSequenceModel(WholeSequenceModel):
     def __init__(self, wsms: WholeSequenceModelSetup) -> None:
         super().__init__(wsms)
-        self.result_decoder = None
-        self.sm = th.nn.Sigmoid()
 
     def forward(self, inputs: th.Tensor) -> th.Tensor:
-        reinit = False
-        if self.model is None:
-            reinit = True
-        trans_result = super().forward(inputs).reshape([inputs.shape[0], -1])
-
-        if (self.result_decoder is None) or reinit:
-            self.result_decoder = nn.Linear(trans_result.shape[-1], self.wsms.model_setup.d_output, device=inputs.device)
-            self.optimizer = self.wsms.optimizer_class(
-                self.model.parameters(), self.wsms.lr, **self.wsms.optimizer_kwargs)
-            self.scheduler = th.optim.lr_scheduler.StepLR(self.optimizer, int(100000/32), gamma=0.97)
-        pre_sm = self.result_decoder.forward(trans_result)
-        result = self.sm(pre_sm)
+        mask = generate_square_subsequent_mask(inputs.shape[-2]).to(inputs.device)
+        result = super().forward(inputs=inputs, mask=mask)
         return result

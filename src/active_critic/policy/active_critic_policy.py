@@ -55,7 +55,8 @@ class ActiveCriticPolicyHistory:
 
 
     def add_value(self, history:list([th.Tensor]), value:th.Tensor, current_step:int):
-        history[0][-value.shape[0]:, current_step] = value
+        pass
+        #history[0][-value.shape[0]:, current_step] = value
 
 
 class ActiveCriticPolicy(BaseModel):
@@ -77,7 +78,7 @@ class ActiveCriticPolicy(BaseModel):
         self.planner = planner
         self.args_obj = acps
         self.register_buffer('gl', th.ones(
-            size=[1000, 1], dtype=th.float, device=acps.device))
+            size=[self.args_obj.epoch_len + 2, self.args_obj.epoch_len + 2, 1], dtype=th.float, device=acps.device))
         self.history = ActiveCriticPolicyHistory()
         self.clip_min = th.tensor(self.action_space.low, device=acps.device)
         self.clip_max = th.tensor(self.action_space.high, device=acps.device)
@@ -165,7 +166,7 @@ class ActiveCriticPolicy(BaseModel):
         critic_input = self.get_critic_input(obsvs=observation_seq, acts=actions)
 
         expected_success = self.critic.forward(
-            inputs=critic_input)  # batch_size, seq_len, 1
+            inputs=critic_input).max(dim=1)[0]  # batch_size, seq_len, 1
 
         if not optimize:
             result = ACPOptResult(
@@ -176,8 +177,6 @@ class ActiveCriticPolicy(BaseModel):
 
         else:
             opt_count = int(actions.shape[0]/2)
-            org_actions = th.clone(actions.detach())
-            org_observation_seq= th.clone(observation_seq.detach())
             actions_opt, expected_success_opt = self.optimize_act_sequence(
                 actions=actions, 
                 observations=observation_seq, 
@@ -280,7 +279,7 @@ class ActiveCriticPolicy(BaseModel):
         expected_success = th.zeros(
             size=[actions.shape[0], 1], dtype=th.float, device=actions.device)
         final_exp_success = th.clone(expected_success)
-        goal_label = self.gl[:actions.shape[0]]
+        goal_label = self.gl[:actions.shape[0], :actions.shape[1]]
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()
@@ -306,7 +305,7 @@ class ActiveCriticPolicy(BaseModel):
 
             if stop_opt:
                 final_actions[mask] = th.clone(optimized_actions[mask]).detach()
-                final_exp_success[mask] = th.clone(expected_success[mask]).detach()
+                final_exp_success[mask] = th.clone(expected_success.max(dim=1)[0][mask]).detach()
             else:
                 final_actions = optimized_actions
                 final_exp_success = expected_success
