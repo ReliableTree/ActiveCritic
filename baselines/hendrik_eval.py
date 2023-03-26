@@ -515,11 +515,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [15]
-    list_env_tags = ['push', 'reach', 'pickplace', 'windowopen']
-    n_samples = 400
-    bc_epochs = 500
-    ids = [i for i in range(3)]
+    list_demonstrations = [0]
+    list_env_tags = ['drawerclose']
+    n_samples = 2000
+    bc_epochs = 0
+    ids = [i for i in range(3,4)]
+    th.manual_seed(2)
 
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
 
