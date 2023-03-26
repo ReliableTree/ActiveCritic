@@ -17,7 +17,7 @@ if __name__ == '__main__':
     include_TQC_reach_4 = ['reach', 'demonstrations_4', 'TQC', 'learner_stats_gail_stepsize_10']
     exclude_bl_RPPO = []
 
-    save_path = '/home/hendrik/Documents/master_project/LokalData/server/Stats for MA/Reach 15/'
+    save_path = '/home/hendrik/Documents/master_project/LokalData/server/Stats for MA/Reach 4 200/'
 
     make_plot(
         paths=[AC_path, bl_path, bl_path, bl_path], 

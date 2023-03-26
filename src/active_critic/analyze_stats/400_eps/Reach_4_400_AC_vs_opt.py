@@ -17,7 +17,7 @@ if __name__ == '__main__':
         paths=[AC_reach_path, AC_reach_path], 
         includes=[include_AC_reach, include_AC_reach_non], 
         excludes=[exclude_AC_reach, exclude_AC_reach_non],
-        names=['AC', 'AC non optimized'],
+        names=['AC optimized', 'AC non optimized'],
         plot_name='Reach Environment',
         save_path = save_path,
         plot_closest=False

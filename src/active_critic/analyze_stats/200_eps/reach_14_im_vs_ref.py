@@ -11,7 +11,7 @@ if __name__ == '__main__':
     include_ac_reach_4_ref = ['reach', 'stats', 'False', 'demonstrations: 4']
     exclude_ac_imitation = ['optimized']
 
-    save_path = '/home/hendrik/Documents/master_project/LokalData/server/Stats for MA/Reach Imi vs. Ref 15/'
+    save_path = '/home/hendrik/Documents/master_project/LokalData/server/Stats for MA/Reach Imi vs. Ref 4/'
 
     make_plot(
         paths=[AC_path, AC_path], 
