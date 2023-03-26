@@ -373,15 +373,16 @@ def run_eval_stats_pp(device, weight_decay):
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
     demonstrations_list = [1]
+    th.manual_seed(2)
     run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 2000
+    total_training_epsiodes = 1000
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']
-    val_everys = [2000]
-    add_data_everys = [2000]
+    val_everys = [6000]
+    add_data_everys = [6000]
     opt_modes = ['actor+plan']
     for run_id in run_ids:
         for demonstrations in demonstrations_list:
@@ -389,7 +390,7 @@ def run_eval_stats_env(device, weight_decay):
                 for im_ph in imitation_phases:
                     for val_step, val_every in enumerate(val_everys):
                         for opt_mode in opt_modes:
-                            logname = f' no train inf eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            logname = f' manual_seed(2) no train inf eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                             print(f'____________________________________logname: {env_tag}  {logname}')
                             run_experiment(device=device,
                                         env_tag=env_tag,

@@ -298,10 +298,6 @@ class ActiveCriticLearner(nn.Module):
 
 
                     if self.get_num_training_samples()>= self.network_args.total_training_epsiodes:
-                        os.remove('actor_before'+self.logname)
-                        os.remove('planner_before'+self.logname)
-                        os.remove('best_actor'+self.logname)
-                        os.remove('best_planner'+self.logname)
                         return None
 
 
