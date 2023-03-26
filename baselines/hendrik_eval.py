@@ -85,34 +85,33 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
 
         bc_file_path = logname_save_path+'bc_best'
         bc_stats_path = logname_save_path + 'bc_stats'
-        if (not os.path.isfile(bc_file_path)):
-            print('BC Phase')
-            tboard = TBoardGraphs(logname=logname + '_BC',
-                                data_path=logname_save_path)
+        print('BC Phase')
+        tboard = TBoardGraphs(logname=logname + '_BC',
+                            data_path=logname_save_path)
 
-            best_succes_rate = -1
-            fac = 40
-            runs_per_epoch = 20 * fac
-            for i in range(int(bc_epochs/fac)):
-                bc_learner.train(n_epochs=runs_per_epoch)
-                success, rews, history = get_avr_succ_rew_det(
-                    env=pomdp_env_val, 
-                    learner=bc_learner.policy, 
-                    epsiodes=50,
-                    path=bc_stats_path,
-                    history=history,
-                    step=i)
-                success_rate = success.mean()
-                tboard.addValidationScalar(
-                    'Reward', value=th.tensor(rews.mean()), stepid=i)
-                tboard.addValidationScalar(
-                    'Success Rate', value=th.tensor(success_rate), stepid=i)
-                if success_rate > best_succes_rate:
-                    best_succes_rate = success_rate
-                    th.save(bc_learner.policy.state_dict(),
-                            bc_file_path)
-        else:
-            print('skipping BC')
+        best_succes_rate = -1
+        fac = 40
+        runs_per_epoch = 100 * fac
+        for i in range(int(bc_epochs/fac)):
+            bc_learner.train(n_epochs=runs_per_epoch)
+            success, rews, history = get_avr_succ_rew_det(
+                env=pomdp_env_val, 
+                learner=bc_learner.policy, 
+                epsiodes=50,
+                path=bc_stats_path,
+                history=history,
+                step=i)
+            success_rate = success.mean()
+            tboard.addValidationScalar(
+                'Reward', value=th.tensor(rews.mean()), stepid=i)
+            tboard.addValidationScalar(
+                'Success Rate', value=th.tensor(success_rate), stepid=i)
+            if success_rate > best_succes_rate:
+                best_succes_rate = success_rate
+                th.save(bc_learner.policy.state_dict(),
+                        bc_file_path)
+    else:
+        print('skipping BC')
 
     if learner is not None:
         learner_stats_path = logname_save_path + 'stats_learner'
@@ -516,10 +515,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [15]
-    list_env_tags = ['push', 'reach', 'pickplace', 'windowopen']
-    n_samples = 400
-    bc_epochs = 500
+    list_demonstrations = [0]
+    list_env_tags = ['drawerclose']
+    n_samples = 1000
+    bc_epochs = 0
     ids = [i for i in range(3)]
 
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
@@ -589,7 +588,7 @@ if __name__ == '__main__':
 
     elif args.learner == 'stats_PPO':
         print('running stats PPO')
-        for lr in [1e-5]:
+        for lr in [1e-4]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_PPO(

@@ -522,7 +522,7 @@ def get_avr_succ_rew_det_rec(env, learner, epsiodes, path, history, step):
     return success, rews, history
 
 def make_ppo_rec_data_loader(env, vec_expert, n_demonstrations, seq_len, device):
-    batch_size=16
+    batch_size=min(16, n_demonstrations)
     train_data = DatasetAC(batch_size=batch_size, device=device)
 
     if n_demonstrations > 0:

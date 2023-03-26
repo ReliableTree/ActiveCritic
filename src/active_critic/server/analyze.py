@@ -188,6 +188,7 @@ def make_acl(
     acla.patients = 40000
     acla.total_training_epsiodes = total_training_epsiodes
     acla.start_critic = True
+    acla.train_inference = False
 
     epsiodes = 30
     ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, opt_mode=opt_mode, tag=tag, weight_decay=weight_decay)
@@ -388,7 +389,7 @@ def run_eval_stats_env(device, weight_decay):
                 for im_ph in imitation_phases:
                     for val_step, val_every in enumerate(val_everys):
                         for opt_mode in opt_modes:
-                            logname = f' new plan in inf lin critic eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            logname = f' no train inf eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                             print(f'____________________________________logname: {env_tag}  {logname}')
                             run_experiment(device=device,
                                         env_tag=env_tag,

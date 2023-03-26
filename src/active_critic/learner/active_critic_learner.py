@@ -177,7 +177,7 @@ class ActiveCriticLearner(nn.Module):
 
     def add_training_data(self, policy=None, episodes = 1, seq_len = None):
         if policy is None:
-            self.policy.train_inference = True
+            self.policy.train_inference = self.network_args.train_inference
             policy = self.policy
             policy.eval()
             opt_before = self.policy.args_obj.optimize
