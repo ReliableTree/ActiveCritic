@@ -15,7 +15,7 @@ if __name__ == '__main__':
         includes=[include_AC, include_AC_non], 
         excludes=[exclude_AC, exclude_AC_non],
         names=['AC optimized', 'AC non optimized'],
-        plot_name='Reach Environment',
+        plot_name='Push',
         save_path = None,
         plot_closest=False
         )

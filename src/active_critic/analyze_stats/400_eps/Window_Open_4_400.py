@@ -26,7 +26,7 @@ if __name__ == '__main__':
         includes=[include_AC_pp, include_PPO, include_TQC, inlcude_RPPO], 
         excludes=[exclude_AC_pp, exculde_PPO, exculde_TQC, exculde_RPPO],
         names=['AC', 'PPO + BC + GAIL', 'TQC + BC + GAIL', 'RPPO + BC'],
-        plot_name='Window Open Environment',
+        plot_name='Window Open',
         save_path = None,
         plot_closest=False
         )

@@ -15,7 +15,7 @@ if __name__ == '__main__':
         includes=[include_TQC, include_PPO], 
         excludes=[exclude_TQC, exclude_PPO],
         names=['PPO', 'TQC', 'AC', 'AC non'],
-        plot_name='Reach Environment',
+        plot_name='Pick and Place',
         save_path = None,
         plot_closest=False
         )

@@ -30,7 +30,7 @@ if __name__ == '__main__':
         includes=[include_AC, include_bl_PPO, include_bl_TQC, include_RPPO], 
         excludes=[exclude_AC, exclude_bl_PPO, exclude_bl_TQC, exclude_RPPO],
         names=['AC', 'PPO + BC + GAIL', 'TQC + BC + GAIL', 'RPPO + BC'],
-        plot_name='Reach Environment',
+        plot_name='Reach',
         save_path = None,
         plot_closest=True
         )
