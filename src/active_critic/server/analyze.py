@@ -368,12 +368,13 @@ def run_eval_stats_pp(device, weight_decay):
                                     fast=False)
 
 def run_eval_stats_env(device, weight_decay):
+    th.manual_seed(3)
     imitation_phases = [False]
     demonstrations_list = [1]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 15
-    total_training_epsiodes = 5000
+    total_training_epsiodes = 2100
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']
@@ -386,7 +387,7 @@ def run_eval_stats_env(device, weight_decay):
                 for im_ph in imitation_phases:
                     for val_step, val_every in enumerate(val_everys):
                         for opt_mode in opt_modes:
-                            logname = f' new plan in inf eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            logname = f' seed 3 new plan in inf eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                             print(f'____________________________________logname: {env_tag}  {logname}')
                             run_experiment(device=device,
                                         env_tag=env_tag,
