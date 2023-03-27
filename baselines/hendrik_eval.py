@@ -518,7 +518,7 @@ if __name__ == '__main__':
     list_demonstrations = [1]
     list_env_tags = ['windowopen']
     n_samples = 1000
-    bc_epochs = 0
+    bc_epochs = 300
     ids = [i for i in range(2)]
     th.manual_seed(1)
 
