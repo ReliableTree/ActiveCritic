@@ -279,8 +279,8 @@ class ActiveCriticLearner(nn.Module):
         return self.virtual_step
 
     def train(self, epochs):
-        next_val = 0
-        next_add = 0
+        next_val = self.network_args.val_every
+        next_add = self.network_args.add_data_every
         for epoch in range(epochs):
             if self.global_step >= next_val:
                 next_val = self.global_step + self.network_args.val_every

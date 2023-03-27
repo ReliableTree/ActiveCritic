@@ -3,13 +3,34 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 
-def parse_data(paths):
+def parse_data(paths, find_closest):
     result_dict = {}
     dicts = []
     for path in paths:
         with open(path, 'rb') as f:
             dicts.append(pickle.load(f))
-    for dict in dicts:
+    if find_closest:
+        inter_dicts = []
+        min_time_frame = float('inf')
+        p_timesteps = None
+        for dict in dicts:
+            time_frame = dict['step'][-1] - dict['step'][0]
+            if time_frame < min_time_frame:
+                min_time_frame = time_frame
+                p_timesteps = dict['step']
+
+        for dict in dicts:
+            inter_dict = {}
+            timesteps = dict['step']
+            dist_timesteps = (timesteps[None,:] - p_timesteps[:, None])**2
+            ind_new_timesteps = np.argmin(dist_timesteps, axis=1)
+            for key in dict:
+                inter_dict[key] = dict[key][ind_new_timesteps]
+            inter_dicts.append(inter_dict)
+    else:
+        inter_dicts = dicts
+
+    for dict in inter_dicts:
         for key in dict:
             next_entrance = dict[key].reshape([1, -1])
             if key in result_dict:
@@ -79,7 +100,7 @@ def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=N
         # save the plot
         plt.savefig(os.path.join(path, plot_name + '.png'))
 
-def make_plot(paths, includes, excludes, names, plot_name, save_path = None, plot_closest=False, mean = True):
+def make_plot(paths, includes, excludes, names, plot_name, save_path = None, plot_closest=False, mean = True, find_closest = False):
     abs_file_path_list = []
     
     for i in range(len(paths)):
@@ -87,7 +108,7 @@ def make_plot(paths, includes, excludes, names, plot_name, save_path = None, plo
     dicts = []
     
     for result in abs_file_path_list:
-        dicts.append(parse_data(paths=result))
+        dicts.append(parse_data(paths=result, find_closest=find_closest))
 
     plot_experiment_data(
         timesteps=[result_dict['step'][0] for result_dict in dicts], 
