@@ -515,7 +515,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [15]
+    list_demonstrations = [4]
     list_env_tags = ['pickplace']
     n_samples = 400
     bc_epochs = 500
