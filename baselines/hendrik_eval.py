@@ -515,12 +515,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [0]
-    list_env_tags = ['drawerclose']
+    list_demonstrations = [1]
+    list_env_tags = ['windowopen']
     n_samples = 1000
     bc_epochs = 0
     ids = [i for i in range(2)]
-    th.manual_seed(2)
+    th.manual_seed(1)
 
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
 
@@ -603,7 +603,7 @@ if __name__ == '__main__':
                     )
     elif args.learner == 'stats_TQC':
         print('running stats TQC')
-        for lr in [1e-6]:
+        for lr in [5e-7]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_TQC(
@@ -619,7 +619,7 @@ if __name__ == '__main__':
 
     elif args.learner == 'stats_TPR':
         print('running RPPO')
-        for lr in [1e-6]:
+        for lr in [5e-7]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_RPPO(
@@ -635,7 +635,7 @@ if __name__ == '__main__':
                     )
 
         print('running stats PPO')
-        for lr in [1e-5]:
+        for lr in [5e-6]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_PPO(
@@ -650,7 +650,7 @@ if __name__ == '__main__':
                     )
 
         print('running stats TQC')
-        for lr in [1e-6]:
+        for lr in [5e-7]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_TQC(
