@@ -233,24 +233,25 @@ class ActiveCriticPolicy(BaseModel):
             actions = actions.detach()
             observations = observations.detach()
             plans = plans.detach()
-            init_actor = copy.deepcopy(self.actor.state_dict())
             optimizer = th.optim.AdamW(
                 self.actor.parameters(), lr=self.args_obj.inference_opt_lr, weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
                 )
         elif self.args_obj.optimizer_mode == 'actor+plan':
-            print('use actor+plan opt mode')
+            if current_step == 0:
+                print('use actor+plan opt mode')
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
-            init_plan = th.clone(plans.detach())
-            
-            plans = plans.detach()
-            plans.requires_grad = True
+            plans = self.make_plans(acts=actions, obsvs=observations)
 
-            init_actor = copy.deepcopy(self.actor.state_dict())
+            if current_step == 0:
+                self.init_actor = copy.deepcopy(self.actor.state_dict())
+                self.init_planner = copy.deepcopy(self.planner.state_dict())
+
+            lr = self.args_obj.inference_opt_lr
             optimizer = th.optim.AdamW(
-                [{'params': self.actor.parameters()}, {'params': plans}],
-                lr=self.args_obj.inference_opt_lr,
+                [{'params': self.actor.parameters()}, {'params': self.planner.parameters()}],
+                lr=lr,
                 weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
             )
 
@@ -315,8 +316,10 @@ class ActiveCriticPolicy(BaseModel):
         if self.args_obj.clip:
             with th.no_grad():
                 th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
-        if self.args_obj.optimizer_mode == 'actor' or self.args_obj.optimizer_mode == 'actor+plan':
-            self.actor.load_state_dict(init_actor)
+        if (self.args_obj.optimizer_mode == 'actor' or self.args_obj.optimizer_mode == 'actor+plan') and self.current_step == self.args_obj.epoch_len - 1:
+            print('___________________loaded init actor__________________________')
+            self.actor.load_state_dict(self.init_actor)
+            self.planner.load_state_dict(self.init_planner)
         return final_actions, final_exp_success
 
     def inference_opt_step(self, 
@@ -336,8 +339,9 @@ class ActiveCriticPolicy(BaseModel):
             current_obs_seq = obs_seq
             assert goals is None, 'Kinda the wrong mode or smth.'
 
-        if (self.args_obj.optimizer_mode in ['actor', 'plan', 'goal', 'actor+plan']):
-            opt_actions = self.make_action(action_seq=org_actions, observation_seq=current_obs_seq, plans=plans, current_step=current_step)
+        if (self.args_obj.optimizer_mode in ['plan', 'goal', 'actor+plan']):
+            opt_plan = self.make_plans(opt_actions.detach(), obsvs=obs_seq.detach())
+            opt_actions = self.make_action(action_seq=org_actions, observation_seq=current_obs_seq, plans=opt_plan, current_step=current_step)
         elif (self.args_obj.optimizer_mode in ['actions']):
             pass
         else:
