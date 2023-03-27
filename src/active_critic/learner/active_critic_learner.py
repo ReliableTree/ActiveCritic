@@ -279,8 +279,8 @@ class ActiveCriticLearner(nn.Module):
         return self.virtual_step
 
     def train(self, epochs):
-        next_val = self.network_args.val_every
-        next_add = self.network_args.add_data_every
+        next_val = 0
+        next_add = 0
         for epoch in range(epochs):
             if self.global_step >= next_val:
                 next_val = self.global_step + self.network_args.val_every
@@ -331,10 +331,12 @@ class ActiveCriticLearner(nn.Module):
                 self.virtual_step += self.network_args.training_epsiodes
 
                 if self.next_critic_init is None:
-                    self.next_critic_init = int(self.train_data.success.sum()) * 10
+                    self.next_critic_init = int(self.train_data.success.sum()) * 2
                 if self.train_data.success.sum() > self.next_critic_init:
                     self.policy.critic.init_model()
-                    self.next_critic_init *= 10
+                    self.next_critic_init *= 2
+                    self.scores.reset_min_score(self.scores.mean_critic)
+                    print('_____________________________________________________________init____________________________________________________')
                 self.train_critic = True
 
             elif (self.global_step >= next_add):

@@ -371,8 +371,8 @@ def run_eval_stats_pp(device, weight_decay):
                                     fast=False)
 
 def run_eval_stats_env(device, weight_decay):
-    imitation_phases = [True]
-    demonstrations_list = [1]
+    imitation_phases = [False]
+    demonstrations_list = [0]
     th.manual_seed(1)
     run_ids = [i for i in range(4)]
     s = datetime.today().strftime('%Y-%m-%d')
@@ -380,7 +380,7 @@ def run_eval_stats_env(device, weight_decay):
     total_training_epsiodes = 500
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
+    env_tags = ['drawerclose']
     val_everys = [6000]
     add_data_everys = [6000]
     opt_modes = ['actor+plan']
