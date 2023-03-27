@@ -137,6 +137,7 @@ class ActiveCriticPolicy(BaseModel):
             stop_opt=self.args_obj.stop_opt
             )
         
+        
         self.action_history[:, self.current_step] = th.clone(self.current_result.gen_trj.detach())
 
         if self.current_step == 0:

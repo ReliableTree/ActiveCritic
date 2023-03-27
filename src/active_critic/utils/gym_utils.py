@@ -234,7 +234,7 @@ def parse_sampled_transitions_legacy(transitions, new_epoch, extractor, seq_len,
     rewards = th.tensor(fill_arrays(rewards, seq_len = seq_len), dtype=th.float, device=device)
     return actions, observations, rewards
 
-def parse_sampled_transitions(transitions, extractor, seq_len, device='cuda'):
+def parse_sampled_transitions(transitions, extractor, seq_len, device='cuda', dense = False):
     observations = []
     actions = []
     rewards = []
@@ -253,10 +253,13 @@ def parse_sampled_transitions(transitions, extractor, seq_len, device='cuda'):
             current_success = True
 
         if transitions[i]['dones']:
-            if current_success:
-                rewards.append(np.ones_like(epch_rewards))
+            if dense:
+                rewards.append(epch_rewards)
             else:
-                rewards.append(np.zeros_like(epch_rewards))
+                if current_success:
+                    rewards.append(np.ones_like(epch_rewards))
+                else:
+                    rewards.append(np.zeros_like(epch_rewards))
 
             observations.append(np.array(epch_observations))
             actions.append(np.array(epch_actions))
@@ -271,6 +274,7 @@ def parse_sampled_transitions(transitions, extractor, seq_len, device='cuda'):
     observations = th.tensor(fill_arrays(observations, seq_len = seq_len), dtype=th.float, device=device)
     rewards = th.tensor(fill_arrays(rewards, seq_len = seq_len), dtype=th.float, device=device)
     return actions, observations, rewards
+
 
 def fill_arrays(inpt, seq_len):
     return inpt
@@ -299,7 +303,7 @@ def sample_expert_transitions(policy, env, episodes):
     return flatten_trajectories(rollouts)
 
 
-def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str, episodes:int=1, return_gen_trj = False, seq_len = None):
+def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str, dense, episodes:int=1, return_gen_trj = False, seq_len = None):
 
         if type(policy) is ActiveCriticPolicy:
             policy.eval()
@@ -312,7 +316,7 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str
             policy.predict, env, episodes)
 
         datas = parse_sampled_transitions(
-            transitions=transitions, seq_len=seq_len, extractor=extractor, device=device)
+            transitions=transitions, seq_len=seq_len, extractor=extractor, device=device, dense=dense)
         device_data = []
         for data in datas:
             device_data.append(data[:episodes].to(device))

@@ -52,6 +52,7 @@ class DatasetAC(torch.utils.data.Dataset):
             self.virt_success = self.success
             self.virt_expert_trjs = self.expert_trjs
             self.virt_actions_at_time_t = self.prev_proposed_acts
+            self.virt_prev_proposed_acts = self.prev_proposed_acts
             self.virt_steps = self.steps
 
 

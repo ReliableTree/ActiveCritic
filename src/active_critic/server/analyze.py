@@ -33,7 +33,7 @@ def make_wsm_setup(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 200
     wsm.model_setup.nlayers = 5
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout = 0.1
+    wsm.model_setup.dropout = 0
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -51,7 +51,7 @@ def make_wsm_setup_small(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 64
     wsm.model_setup.nlayers = 3
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout = 0.1
+    wsm.model_setup.dropout = 0
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -69,7 +69,7 @@ def make_wsm_setup_tiny(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 1
     wsm.model_setup.nlayers = 1
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout =0.1
+    wsm.model_setup.dropout =0
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -78,7 +78,7 @@ def make_wsm_setup_tiny(seq_len, d_output, weight_decay, device='cuda'):
 
 
 
-def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
+def make_acps(seq_len, extractor, new_epoch, device, opt_mode):
     acps = ActiveCriticPolicySetup()
     acps.device = device
     acps.epoch_len = seq_len
@@ -104,7 +104,6 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
         1/0
 
     acps.optimize = True
-    acps.batch_size = 32
     acps.stop_opt = True
     acps.clip = True
 
@@ -156,7 +155,7 @@ def make_acl(
     tag = env_tag
     acla.logname = tag + logname
     acla.tboard = True
-    acla.batch_size = 16
+    acla.batch_size = 2
     acla.make_graphs = make_graphs
     number = 10
 
@@ -185,6 +184,7 @@ def make_acl(
     acla.patients = 40000
     acla.total_training_epsiodes = total_training_epsiodes
     acla.start_critic = True
+    acla.dense = True
 
     epsiodes = 30
     ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, opt_mode=opt_mode, tag=tag, weight_decay=weight_decay)
@@ -229,11 +229,20 @@ def run_experiment(
                             make_graphs=make_graphs,
                             fast=fast)    
     acl.network_args.num_expert_demos = demos
-
     if demos > 0:
-        actions, observations, rewards, _, expected_rewards, _ = sample_new_episode(
+        '''actions, observations, rewards, _, expected_rewards, _ = sample_new_episode(
             policy=expert,
             env=acl.env,
+            dense=True,
+            extractor=acl.network_args.extractor,
+            device=acl.network_args.device,
+            episodes=demos,
+            seq_len=seq_len)'''
+        
+        actions, observations, rewards, _, expected_rewards, _ = sample_new_episode(
+            policy=acl.policy,
+            env=acl.env,
+            dense=True,
             extractor=acl.network_args.extractor,
             device=acl.network_args.device,
             episodes=demos,
@@ -241,16 +250,15 @@ def run_experiment(
     
     
         exp_trjs = th.ones([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
-        actions_history = actions.unsqueeze(1).repeat([1, actions.shape[1], 1, 1])
+        #actions_history = actions.unsqueeze(1).repeat([1, actions.shape[1], 1, 1])
+        actions_history = acl.policy.action_history
 
-        actions = th.rand_like(actions)
-        actions_history = th.rand_like(actions_history)
         print(f'actions: {actions}')
         print(f'actions history: {actions_history}')
         print(f'observations : {observations}')
-
+        print(f'rewards: {rewards}')
         acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos], action_history=actions_history[:demos])
-
+        print(f'num_obsv: {acl.train_data.obsv.shape}')
     acl.train(epochs=100000)
 
 def run_eval(device):
