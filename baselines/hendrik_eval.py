@@ -515,11 +515,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [1]
-    list_env_tags = ['reach']
-    n_samples = 2000
+    list_demonstrations = [15]
+    list_env_tags = ['pickplace', 'windowopen', 'reach', 'push']
+    n_samples = 400
     bc_epochs = 500
-    ids = [i for i in range(2)]
+    ids = [i for i in range(3)]
     th.manual_seed(2)
 
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
@@ -571,7 +571,7 @@ if __name__ == '__main__':
         )
     elif args.learner == 'stats_RPPO':
         print('running RPPO')
-        for lr in [1e-5]:
+        for lr in [5e-7]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_RPPO(

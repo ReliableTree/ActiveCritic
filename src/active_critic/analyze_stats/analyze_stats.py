@@ -28,7 +28,7 @@ def file_crawler(path, substrings, exclude=[]):
     print(f'for path: {path}: {len(result)}')
     return result
 
-def plot_experiment_data(timesteps, experiments, names, plot_name, path=None, plot_closest=False):
+def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=None, plot_closest=False):
     # create figure and axis objects
     fig, ax = plt.subplots()
 
@@ -54,7 +54,10 @@ def plot_experiment_data(timesteps, experiments, names, plot_name, path=None, pl
     for i, experiment in enumerate(new_experiments):
         # calculate mean and standard deviation of each time step for this experiment
         mean_data = np.mean(experiment, axis=0)
-        std_data = 1 / np.sqrt(experiment.shape[0]) * np.std(experiment, axis=0)
+        std_data = np.std(experiment, axis=0)
+
+        if mean:
+            std_data = 1 / np.sqrt(experiment.shape[0]) * std_data
 
         # plot mean data as a line and shade area between ±1 standard deviation
         if plot_closest:
@@ -76,7 +79,7 @@ def plot_experiment_data(timesteps, experiments, names, plot_name, path=None, pl
         # save the plot
         plt.savefig(os.path.join(path, plot_name + '.png'))
 
-def make_plot(paths, includes, excludes, names, plot_name, save_path = None, plot_closest=False):
+def make_plot(paths, includes, excludes, names, plot_name, save_path = None, plot_closest=False, mean = True):
     abs_file_path_list = []
     
     for i in range(len(paths)):
@@ -92,5 +95,6 @@ def make_plot(paths, includes, excludes, names, plot_name, save_path = None, plo
         names=names,
         plot_name=plot_name,
         path=save_path,
-        plot_closest=plot_closest
+        plot_closest=plot_closest,
+        mean=mean
         )
