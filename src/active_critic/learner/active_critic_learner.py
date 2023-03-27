@@ -331,10 +331,10 @@ class ActiveCriticLearner(nn.Module):
                 self.virtual_step += self.network_args.training_epsiodes
 
                 if self.next_critic_init is None:
-                    self.next_critic_init = int(self.train_data.success.sum()) * 2
+                    self.next_critic_init = int(self.train_data.success.sum()) * 10
                 if self.train_data.success.sum() > self.next_critic_init:
                     self.policy.critic.init_model()
-                    self.next_critic_init *= 2
+                    self.next_critic_init = self.train_data.success.sum() * 10   
                     self.scores.reset_min_score(self.scores.mean_critic)
                     print('_____________________________________________________________init____________________________________________________')
                 self.train_critic = True
