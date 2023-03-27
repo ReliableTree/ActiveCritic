@@ -248,6 +248,11 @@ class ActiveCriticPolicy(BaseModel):
 
             init_actor = copy.deepcopy(self.actor.state_dict())
             init_planner = copy.deepcopy(self.planner.state_dict())
+            init_critic = copy.deepcopy(self.critic.state_dict())
+
+            init_actor_optimizer = copy.deepcopy(self.actor.optimizer.state_dict())
+            init_critic_optimizer = copy.deepcopy(self.critic.optimizer.state_dict())
+            init_planner_optimizer = copy.deepcopy(self.planner.optimizer.state_dict())
 
             lr = self.args_obj.inference_opt_lr
             optimizer = th.optim.AdamW(
@@ -321,6 +326,11 @@ class ActiveCriticPolicy(BaseModel):
         if self.args_obj.optimizer_mode == 'actor' or self.args_obj.optimizer_mode == 'actor+plan':
             self.actor.load_state_dict(init_actor)
             self.planner.load_state_dict(init_planner)
+            self.critic.load_state_dict(init_critic)
+            self.actor.optimizer.load_state_dict(init_actor_optimizer)
+            self.critic.optimizer.load_state_dict(init_critic_optimizer)
+            self.planner.optimizer.load_state_dict(init_planner_optimizer)
+            print('reloaded models and optimizer')
         return final_actions, final_exp_success
 
     def inference_opt_step(self, 
