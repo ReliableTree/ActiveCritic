@@ -100,7 +100,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
     elif opt_mode == 'actor+plan':
-        acps.inference_opt_lr = 1e-7
+        acps.inference_opt_lr = 1e-6
         acps.opt_steps = 100
     else:
         1/0
@@ -383,7 +383,7 @@ def run_eval_stats_env(device, weight_decay):
     env_tags = ['pickplace']
     val_everys = [6000]
     add_data_everys = [6000]
-    opt_modes = ['actor+plan']
+    opt_modes = ['actor']
     for run_id in run_ids:
         for demonstrations in demonstrations_list:
             for env_tag in env_tags:

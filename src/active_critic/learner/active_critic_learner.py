@@ -105,6 +105,8 @@ class ActiveCriticLearner(nn.Module):
         self.exp_dict = None
 
         self.set_best_actor = False
+        self.set_best_critic = False
+
 
         self.next_critic_init = None
 
@@ -135,12 +137,16 @@ class ActiveCriticLearner(nn.Module):
     def actor_step(self, data, loss_actor):
         obsv, actions, reward, expert_trjs = data
         plans = self.policy.make_plans(acts=actions, obsvs=obsv)
-        plans[expert_trjs] = 0
 
-        actor_input = self.policy.get_actor_input(plans=plans, obsvs=obsv)
+        app_obsv = th.cat((obsv, obsv[expert_trjs]), dim=0)
+        app_actions = th.cat((actions, actions[expert_trjs]), dim=0)
+        app_plans = th.cat((plans, plans[expert_trjs]), dim=0)
+
+        app_plans[:plans.shape[0]][expert_trjs] = 0
+        actor_input = self.policy.get_actor_input(plans=app_plans, obsvs=app_obsv)
         actor_result = self.policy.actor.forward(actor_input)
-        loss = calcMSE(actor_result, actions)
-        loss = loss + ((plans)**2).mean() * self.network_args.plan_decay
+        loss = calcMSE(actor_result, app_actions)
+        loss = loss + ((app_plans)**2).mean() * self.network_args.plan_decay
         self.policy.actor.optimizer.zero_grad()
         self.policy.planner.optimizer.zero_grad()
         loss.backward()
@@ -244,6 +250,8 @@ class ActiveCriticLearner(nn.Module):
             self.policy.critic.init_model()
             self.policy.planner.init_model()
             self.set_best_actor = False
+            self.set_best_critic = False
+
             print('reinit')
 
 
@@ -286,6 +294,9 @@ class ActiveCriticLearner(nn.Module):
                         self.policy.actor.load_state_dict(th.load(self.inter_path + 'best_actor'+self.logname))
                         self.policy.planner.load_state_dict(th.load(self.inter_path + 'best_planner'+self.logname))
                         self.saveNetworkToFile(add=self.logname, data_path=self.network_args.data_path)
+                    if self.set_best_critic:
+                        self.policy.critic.load_state_dict(th.load(self.inter_path + 'best_critic'+self.logname))
+
 
                     self.policy.eval()
                     self.run_validation(optimize=True)
@@ -295,6 +306,7 @@ class ActiveCriticLearner(nn.Module):
                     self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'+self.logname), strict=False)
                     self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'+self.logname), strict=False)
                     self.scores.reset_min_score(self.scores.mean_actor)
+                    self.scores.reset_min_score(self.scores.mean_critic)
 
 
                     if self.get_num_training_samples()>= self.network_args.total_training_epsiodes:
@@ -308,6 +320,9 @@ class ActiveCriticLearner(nn.Module):
                 if self.set_best_actor:
                     self.policy.actor.load_state_dict(th.load(self.inter_path + 'best_actor'+self.logname))
                     self.policy.planner.load_state_dict(th.load(self.inter_path + 'best_planner'+self.logname))
+                if self.set_best_critic:
+                    self.policy.critic.load_state_dict(th.load(self.inter_path + 'best_critic'+self.logname))
+                    print('__________________lodaded best critic____________________')
 
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
                 self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'+self.logname), strict=False)
@@ -362,19 +377,21 @@ class ActiveCriticLearner(nn.Module):
             
             if loss_critic is not None:
                 mean_critic = th.mean(loss_critic)
-                self.scores.update_min_score(
+                new_min_critic = self.scores.update_min_score(
                 self.scores.mean_critic, mean_critic)
                 self.train_critic = (mean_critic>self.network_args.min_critic_threshold)
             else:
                 mean_critic = None
-
+                new_min_critic = False
             
 
             if new_min:
                 th.save(self.policy.actor.state_dict(), self.inter_path + 'best_actor'+self.logname)
                 th.save(self.policy.planner.state_dict(), self.inter_path + 'best_planner'+self.logname)
                 self.set_best_actor = True
-
+            if new_min_critic:
+                th.save(self.policy.critic.state_dict(), self.inter_path + 'best_critic'+self.logname)
+                self.set_best_critic = True 
             reward = self.train_data.reward
             b, _ = th.max(reward, dim=1)
             successfull_trj = (b == 1)

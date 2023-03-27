@@ -232,7 +232,12 @@ class ActiveCriticPolicy(BaseModel):
             actions = actions.detach()
             observations = observations.detach()
             plans = plans.detach()
+            with th.no_grad():
+                self.make_plans(acts=actions, obsvs=observations)
+
             init_actor = copy.deepcopy(self.actor.state_dict())
+            init_planner = copy.deepcopy(self.planner.state_dict())
+
             optimizer = th.optim.AdamW(
                 self.actor.parameters(), lr=self.args_obj.inference_opt_lr, weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
                 )
@@ -350,9 +355,13 @@ class ActiveCriticPolicy(BaseModel):
             current_obs_seq = obs_seq
             assert goals is None, 'Kinda the wrong mode or smth.'
 
-        if (self.args_obj.optimizer_mode in ['actor', 'plan', 'goal', 'actor+plan']):
+        if (self.args_obj.optimizer_mode in ['plan', 'goal', 'actor+plan']):
             opt_plan = self.make_plans(opt_actions.detach(), obsvs=obs_seq.detach())
             opt_actions = self.make_action(action_seq=org_actions, observation_seq=current_obs_seq, plans=opt_plan, current_step=current_step)
+        elif (self.args_obj.optimizer_mode in ['actor']):
+            opt_plan = th.zeros_like(plans.detach())
+            opt_actions = self.make_action(action_seq=org_actions, observation_seq=current_obs_seq, plans=opt_plan, current_step=current_step)
+        
         elif (self.args_obj.optimizer_mode in ['actions']):
             pass
         else:
