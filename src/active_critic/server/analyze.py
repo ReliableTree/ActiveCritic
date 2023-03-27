@@ -371,7 +371,7 @@ def run_eval_stats_pp(device, weight_decay):
                                     fast=False)
 
 def run_eval_stats_env(device, weight_decay):
-    imitation_phases = [False]
+    imitation_phases = [True]
     demonstrations_list = [1]
     th.manual_seed(1)
     run_ids = [i for i in range(4)]
