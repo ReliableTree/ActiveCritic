@@ -516,7 +516,7 @@ if __name__ == '__main__':
     s = datetime.today().strftime('%Y-%m-%d')
 
     list_demonstrations = [4]
-    list_env_tags = ['pickplace', 'push']
+    list_env_tags = ['pickplace']
     n_samples = 400
     bc_epochs = 500
     ids = [i for i in range(3)]
