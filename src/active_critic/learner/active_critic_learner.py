@@ -334,8 +334,10 @@ class ActiveCriticLearner(nn.Module):
                     self.next_critic_init = int(self.train_data.success.sum()) * 10
                 if self.train_data.success.sum() > self.next_critic_init:
                     self.policy.critic.init_model()
+                    self.policy.planner.init_model()
                     self.next_critic_init = self.train_data.success.sum() * 10   
                     self.scores.reset_min_score(self.scores.mean_critic)
+                    self.scores.reset_min_score(self.scores.mean_actor)
                     print('_____________________________________________________________init____________________________________________________')
                 self.train_critic = True
 
