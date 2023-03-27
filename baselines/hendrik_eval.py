@@ -516,10 +516,10 @@ if __name__ == '__main__':
     s = datetime.today().strftime('%Y-%m-%d')
 
     list_demonstrations = [4]
-    list_env_tags = ['push']
+    list_env_tags = ['pickplace', 'push']
     n_samples = 400
     bc_epochs = 500
-    ids = [i for i in range(1,4)]
+    ids = [i for i in range(3)]
     th.manual_seed(2)
 
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'

@@ -372,8 +372,8 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
-    demonstrations_list = [4]
-    th.manual_seed(2)
+    demonstrations_list = [15]
+    th.manual_seed(1)
     run_ids = [i for i in range(3)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
@@ -383,14 +383,14 @@ def run_eval_stats_env(device, weight_decay):
     env_tags = ['pickplace']
     val_everys = [12000]
     add_data_everys = [12000]
-    opt_modes = ['actor+plan']
+    opt_modes = ['actor']
     for run_id in run_ids:
         for demonstrations in demonstrations_list:
             for env_tag in env_tags:
                 for im_ph in imitation_phases:
                     for val_step, val_every in enumerate(val_everys):
                         for opt_mode in opt_modes:
-                            logname = f' sm manual_seed(2) no train inf eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            logname = f' sm manual_seed(1) no train inf eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                             print(f'____________________________________logname: {env_tag}  {logname}')
                             run_experiment(device=device,
                                         env_tag=env_tag,
