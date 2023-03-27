@@ -162,26 +162,11 @@ class ActiveCriticLearner(nn.Module):
         reward_loss, l2_dist = calcMSE(critic_result, reward, return_tensor=True)
 
         prediction_mask = steps > 0
-        print('________________________________________________________________________________________')
         critic_predicted_input_prev = self.policy.get_critic_input(obsvs=prev_observation[prediction_mask], acts=prev_proposed_actions[prediction_mask])
         critic_pred_result_prev = self.policy.critic.forward(critic_predicted_input_prev)
 
         critic_predicted_input_current = self.policy.get_critic_input(obsvs=obsv[prediction_mask], acts=prev_proposed_actions[prediction_mask])
         critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
-        print(f'num_obsv: {self.train_data.obsv.shape}')
-
-        print(f'actions: {actions}')
-        print(f'prev_proposed_actions: {prev_proposed_actions}')
-        print(f'prev_observation: {prev_observation}')
-        print(f'obsv: {obsv}')
-        print(f'critic_predicted_prev: {critic_pred_result_prev}')
-        print(f'critic_predicted_input_prev: {critic_predicted_input_prev}')
-        print(f'critic_predicted_current: {critic_pred_result_current}')
-        print(f'critic_predicted_input_current: {critic_predicted_input_current}')
-        print(f'equal? {critic_predicted_input_prev[0,0] == critic_predicted_input_current[0,0]}')
-        print(f'equal? {critic_pred_result_prev[0,0] == critic_pred_result_current[0,0]}')
-        print(f'steps: {steps}')
-        1/0
 
         pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
 
@@ -198,12 +183,8 @@ class ActiveCriticLearner(nn.Module):
             loss_critic = th.cat(
                 (loss_critic, l2_dist.reshape([-1])), dim=0)
         self.write_tboard_scalar(debug_dict={'lr actor': th.tensor(self.policy.critic.scheduler.get_last_lr()).mean()}, train=True)
-        print(f'actions critic: {actions}')
-        print(f'reward critic: {reward}')
-        print(f'prev_proposed_actions critic: {prev_proposed_actions}')
-        print(f'prev_observation critic: {prev_observation}')
-        print(f'steps critic: {steps}')
-        1/0
+        print(f'reward loss: {reward_loss}')
+        print(f'pred_loss loss: {pred_loss}')
         return loss_critic
 
     def add_training_data(self, policy=None, episodes = 1, seq_len = None):
