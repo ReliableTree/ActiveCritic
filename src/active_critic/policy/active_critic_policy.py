@@ -194,7 +194,8 @@ class ActiveCriticPolicy(BaseModel):
                 expected_succes_after=expected_success_opt)
 
     def make_action(self, action_seq, observation_seq, plans, current_step):
-        actor_input = self.get_actor_input(plans=plans, obsvs=observation_seq)
+        reward_label = th.ones([observation_seq.shape[0], observation_seq.shape[1], 1], device=observation_seq.device)
+        actor_input = self.get_actor_input(plans=plans, obsvs=observation_seq, rewards=reward_label)
         actions = self.actor.forward(actor_input)
         if self.args_obj.clip:
             actions = th.clamp(actions, min=self.clip_min, max=self.clip_max)
@@ -295,7 +296,7 @@ class ActiveCriticPolicy(BaseModel):
                 current_step=current_step,
                 plans=plans,
                 goals=goals,
-                current_opt_step=step
+                current_opt_step=step + current_step * self.args_obj.epoch_len
                 )
             if self.write_tboard_scalar is not None:
                 debug_dict = {
@@ -361,8 +362,10 @@ class ActiveCriticPolicy(BaseModel):
         return th.cat((acts, obsvs), dim=-1)
 
 
-    def get_actor_input(self, plans, obsvs):
-        return th.cat((plans, obsvs), dim=-1)
+    def get_actor_input(self, plans, obsvs, rewards:th.Tensor):
+        label = rewards.max(dim=1).values.unsqueeze(1)
+        label = label.repeat([1, obsvs.shape[1], 1])
+        return th.cat((plans, obsvs, label), dim=-1)
 
     def get_critic_input(self, obsvs, acts):
         return th.cat((obsvs, acts), dim=-1)

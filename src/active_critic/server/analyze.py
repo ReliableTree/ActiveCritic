@@ -99,7 +99,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode):
         acps.opt_steps = 5
     elif opt_mode == 'actor+plan':
         acps.inference_opt_lr = 1e-6
-        acps.opt_steps = 2
+        acps.opt_steps = 10
     else:
         1/0
 
@@ -155,7 +155,7 @@ def make_acl(
     tag = env_tag
     acla.logname = tag + logname
     acla.tboard = True
-    acla.batch_size = 2
+    acla.batch_size = 16
     acla.make_graphs = make_graphs
     number = 10
 
@@ -173,13 +173,13 @@ def make_acl(
         acla.val_every = val_every
         acla.add_data_every = add_data_every
 
-        acla.validation_episodes = 15 
-        acla.validation_rep = 2
+        acla.validation_episodes = 20 
+        acla.validation_rep = 1
         acla.training_epsiodes = training_episodes
         acla.actor_threshold = 1e-2
         acla.critic_threshold = 1e-2
         acla.min_critic_threshold = min_critic_threshold
-        acla.num_cpu = 15
+        acla.num_cpu = 20
 
     acla.patients = 40000
     acla.total_training_epsiodes = total_training_epsiodes
@@ -210,7 +210,7 @@ def run_experiment(
         total_training_epsiodes=20, 
         training_episodes=10, 
         min_critic_threshold=1e-4):
-    seq_len = 3
+    seq_len = 60
 
     acl, env, expert, seq_len, epsiodes, device = make_acl(
                             device,
@@ -240,7 +240,7 @@ def run_experiment(
             seq_len=seq_len)'''
         
         actions, observations, rewards, _, expected_rewards, _ = sample_new_episode(
-            policy=acl.policy,
+            policy=expert,
             env=acl.env,
             dense=True,
             extractor=acl.network_args.extractor,
@@ -250,15 +250,9 @@ def run_experiment(
     
     
         exp_trjs = th.ones([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
-        #actions_history = actions.unsqueeze(1).repeat([1, actions.shape[1], 1, 1])
-        actions_history = acl.policy.action_history
-
-        print(f'actions: {actions}')
-        print(f'actions history: {actions_history}')
-        print(f'observations : {observations}')
-        print(f'rewards: {rewards}')
+        actions_history = actions.unsqueeze(1).repeat([1, actions.shape[1], 1, 1])
+        print(rewards)
         acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos], action_history=actions_history[:demos])
-        print(f'num_obsv: {acl.train_data.obsv.shape}')
     acl.train(epochs=100000)
 
 def run_eval(device):
@@ -382,16 +376,16 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
-    demonstrations_list = [2]
+    demonstrations_list = [1]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 2
+    training_episodes = 10
     total_training_epsiodes = 10000
-    min_critic_threshold = 1e-1
+    min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['pickplace']
-    val_everys = [6000]
-    add_data_everys = [6000]
+    env_tags = ['reach']
+    val_everys = [1000]
+    add_data_everys = [1000]
     opt_modes = ['actor+plan']
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
@@ -415,7 +409,7 @@ def run_eval_stats_env(device, weight_decay):
                                         add_data_every = add_data_everys[val_step],
                                         opt_mode=opt_mode,
                                         make_graphs = True,
-                                        fast=True)
+                                        fast=False)
 
 if __name__ == '__main__':
     run_eval(device='cuda')
