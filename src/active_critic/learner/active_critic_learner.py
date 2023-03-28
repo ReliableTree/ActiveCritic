@@ -341,11 +341,11 @@ class ActiveCriticLearner(nn.Module):
 
                 self.virtual_step += self.network_args.training_epsiodes
 
-                if self.next_critic_init is None:
+                '''if self.next_critic_init is None:
                     self.next_critic_init = int(self.train_data.success.sum()) * 2
                 if self.train_data.success.sum() > self.next_critic_init:
                     self.policy.critic.init_model()
-                    self.next_critic_init *= 2
+                    self.next_critic_init *= 2'''
 
             elif (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every
