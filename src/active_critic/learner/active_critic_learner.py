@@ -540,7 +540,7 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize)
 
         for i in range(min(opt_actions.shape[0], 4)):
-            self.createGraphs([gen_actions[i], opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i) + fix)
+            self.createGraphs([gen_actions[i,0], opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i) + fix)
             labels = self.make_critic_score(rewards=rewards_run)
             self.createGraphs([labels[i].reshape([-1, 1]), self.policy.history.opt_scores[0][i].reshape([-1, 1]), self.policy.history.gen_scores[0][i].reshape([-1, 1])], 
                                 ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i) + fix)
