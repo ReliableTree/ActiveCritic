@@ -116,11 +116,11 @@ def make_dummy_vec_env(name, seq_len):
     max_episode_steps = seq_len
     env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
     env._freeze_rand_vec = False
-    reset_env = ResetCounterWrapper(env=env)
-    timelimit = TimeLimit(env=reset_env, max_episode_steps=max_episode_steps)
+    timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
     strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+    reset_env = ResetCounterWrapper(env=strict_time)
 
-    dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(strict_time)])
+    dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(reset_env)])
     vec_expert = ImitationLearningWrapper(
         policy=policy_dict[env_tag][0], env=dv1)
     return dv1, vec_expert
@@ -393,7 +393,9 @@ class REC_POMDP_Wrapper(gym.Wrapper):
 
         return obsv, rew, done, info
     
-def make_dummy_vec_env_rec_pomdp(name, seq_len):
+def make_dummy_vec_env_rec_pomdp(name, seq_len, dense):
+    if dense:
+        return make_dummy_vec_env(name=name, seq_len=seq_len)
     policy_dict = make_policy_dict()
 
     env_tag = name
@@ -411,7 +413,9 @@ def make_dummy_vec_env_rec_pomdp(name, seq_len):
         policy=policy_dict[env_tag][0], env=dv1)
     return dv1, vec_expert
 
-def make_dummy_vec_env_pomdp(name, seq_len, lookup_freq):
+def make_dummy_vec_env_pomdp(name, seq_len, lookup_freq, dense):
+    if dense:
+        return make_dummy_vec_env(name=name, seq_len=seq_len)
     policy_dict = make_policy_dict()
 
     env_tag = name
@@ -456,7 +460,9 @@ def sample_expert_transitions_rollouts(expert, env, num):
     )
     return flatten_trajectories(rollouts), rollouts
 
-def make_pomdp_rollouts(rollouts, lookup_frq, count_dim):
+def make_pomdp_rollouts(rollouts, lookup_frq, count_dim, dense):
+    if dense:
+        return rollouts
     inpt = th.zeros([1, rollouts[0].obs.shape[0], count_dim])
     positional_encoding = PositionalEncoding(d_model=10, dropout=0)
     pe = positional_encoding.forward(inpt).numpy()
@@ -502,7 +508,7 @@ def get_avr_succ_rew_det(env, learner, epsiodes, path, history, step):
             if done:
                 success.append(0)
     success = np.array(success)
-    rews = np.array(rews)
+    rews = np.array(rews)/10
     history = save_stat(success=success, history=history, step=step, path=path)
     return success, rews, history
 
@@ -531,11 +537,11 @@ def get_avr_succ_rew_det_rec(env, learner, epsiodes, path, history, step):
     history = save_stat(success=success, history=history, step=step, path=path)
     return success, rews, history
 
-def make_ppo_rec_data_loader(env, vec_expert, n_demonstrations, seq_len, device):
+def make_ppo_rec_data_loader(env, vec_expert, n_demonstrations, seq_len, device, dense):
     batch_size=16
     transitions, rollouts = sample_expert_transitions_rollouts(
         vec_expert.predict, env, n_demonstrations)
-    actions, observations, rewards = parse_sampled_transitions(transitions=transitions, extractor=DummyExtractor(), seq_len=seq_len, device='cuda')
+    actions, observations, rewards = parse_sampled_transitions(transitions=transitions, extractor=DummyExtractor(), seq_len=seq_len, device='cuda', dense=dense)
     inpt_obsv = observations[:,:1].repeat([1, observations.shape[1], 1])
     train_data = DatasetAC(batch_size=batch_size, device=device)
     train_data.add_data(obsv=inpt_obsv, actions=actions, reward=rewards, expert_trjs=rewards.reshape(-1))

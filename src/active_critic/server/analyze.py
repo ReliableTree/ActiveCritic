@@ -120,7 +120,7 @@ def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_epi
     wsm_critic_setup = make_wsm_setup(
         seq_len=seq_len, d_output=1, device=device, weight_decay=weight_decay)
     
-    wsm_critic_setup.sparse = True
+    wsm_critic_setup.sparse = False
 
     wsm_planner_setup = make_wsm_setup_tiny(
         seq_len=seq_len, d_output=d_plan, weight_decay=weight_decay, device=device)
@@ -395,7 +395,7 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
-    demonstrations_list = [1]
+    demonstrations_list = [0]
     run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
@@ -403,10 +403,10 @@ def run_eval_stats_env(device, weight_decay):
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']
-    val_everys = [2000]
-    add_data_everys = [2000]
+    val_everys = [1000]
+    add_data_everys = [1000]
     opt_modes = ['actor+plan']
-    opt_steps_list = [3]
+    opt_steps_list = [1]
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
