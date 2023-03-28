@@ -55,8 +55,7 @@ class ActiveCriticPolicyHistory:
 
 
     def add_value(self, history:list([th.Tensor]), value:th.Tensor, current_step:int):
-        pass
-        #history[0][-value.shape[0]:, current_step] = value
+        history[0][-value.shape[0]:, current_step] = value
 
 
 class ActiveCriticPolicy(BaseModel):
@@ -101,7 +100,7 @@ class ActiveCriticPolicy(BaseModel):
         self.history.new_epoch(self.history.gen_scores, size=scores_size, device=self.args_obj.device)
         self.history.new_epoch(self.history.opt_scores, size=scores_size, device=self.args_obj.device)
 
-        trj_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.action_space.shape[0]]
+        trj_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.args_obj.epoch_len, self.action_space.shape[0]]
         self.history.new_epoch(self.history.gen_trj, size=trj_size, device=self.args_obj.device)
         
         self.obs_seq = th.zeros(
@@ -161,9 +160,7 @@ class ActiveCriticPolicy(BaseModel):
         plans = th.zeros([observation_seq.shape[0], observation_seq.shape[1], self.planner.wsms.model_setup.d_output], device=self.args_obj.device, dtype=th.float32)
         actions = self.make_action(action_seq=action_seq, observation_seq=observation_seq, plans=plans, current_step=current_step)
 
-        for step in range(actions.shape[1]):
-            self.history.add_value(self.history.gen_trj, actions[:, step].detach(), current_step=step)
-
+        self.history.add_value(self.history.gen_trj, actions.detach(), current_step=current_step)
         critic_input = self.get_critic_input(obsvs=observation_seq, acts=actions)
 
         expected_success = self.critic.forward(
