@@ -161,7 +161,7 @@ class ActiveCriticLearner(nn.Module):
 
         obsv, actions, reward, expert_trjs, prev_proposed_actions, steps, prev_observation = data
 
-        if self.policy.args_obj.sparse:
+        if self.policy.critic.wsms.sparse:
             label = self.make_critic_score(reward)
         else:
             label = reward
@@ -272,7 +272,7 @@ class ActiveCriticLearner(nn.Module):
             self.policy.args_obj.optimize = opt_before
 
     def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic, loss_prediction):
-        self.train_data.onyl_positiv = self.policy.args_obj.sparse
+        self.train_data.onyl_positiv = self.policy.critic.wsms.sparse
         if len(self.train_data) > 0:
             for data in train_loader:
                 device_data = []
@@ -400,10 +400,10 @@ class ActiveCriticLearner(nn.Module):
             reward = self.train_data.reward
             b, _ = th.max(reward, dim=1)
             successfull_trj = (b == 1)
-            positive_examples = successfull_trj.sum()
+            positive_examples = int(successfull_trj.sum()/self.policy.args_obj.epoch_len)
 
             debug_dict = {
-                'Examples': th.tensor(int(len(self.train_data.obsv))),
+                'Examples': th.tensor(int(len(self.train_data.obsv)/self.policy.args_obj.epoch_len)),
                 'Positive Examples': positive_examples
             }
             if mean_critic is not None:

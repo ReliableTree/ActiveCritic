@@ -34,7 +34,6 @@ class ActiveCriticPolicySetup:
         self.optimizer_mode : str = None
         self.clip:bool = True
         self.buffer_size:int = None
-        self.sparse:bool = None
 
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
@@ -203,8 +202,8 @@ class ActiveCriticPolicy(BaseModel):
         critic_input = self.get_critic_input(obsvs=observation_seq, acts=actions)
 
         expected_success = self.critic.forward(
-            inputs=critic_input).max(dim=1)[0]  # batch_size, seq_len, 1
-
+            inputs=critic_input).max(dim=1)[0]  # batch_size, 1
+        expected_success = expected_success.reshape([-1,1])
 
         if not optimize:
             result = ACPOptResult(
@@ -331,8 +330,10 @@ class ActiveCriticPolicy(BaseModel):
         expected_success = th.zeros(
             size=[actions.shape[0], 1], dtype=th.float, device=actions.device)
         final_exp_success = th.clone(expected_success)
-        if self.args_obj.sparse:
+        if self.critic.wsms.sparse:
             goal_label = self.gl[:actions.shape[0], 0]
+            if self.current_step == 0 and self.critic.wsms.sparse:
+                print('use sparse critic')
         else:
             goal_label = self.gl[:actions.shape[0], :actions.shape[1]]
         step = 0
@@ -360,7 +361,7 @@ class ActiveCriticPolicy(BaseModel):
 
             if stop_opt:
                 final_actions[mask] = th.clone(optimized_actions[mask]).detach()
-                final_exp_success[mask] = th.clone(expected_success.max(dim=1)[0][mask]).detach()
+                final_exp_success[mask] = th.clone(expected_success.max(dim=1)[0].reshape([-1,1])[mask]).detach()
             else:
                 final_actions = optimized_actions
                 final_exp_success = expected_success
