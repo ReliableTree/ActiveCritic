@@ -107,6 +107,10 @@ class ActiveCriticLearner(nn.Module):
 
         self.next_critic_init = None
 
+        self.inter_path = os.path.join(self.network_args.data_path, self.logname, 'inter_models/')
+        if not os.path.exists(self.inter_path):
+            os.makedirs(self.inter_path)
+
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
         if len(train_data) > 0:
