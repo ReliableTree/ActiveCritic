@@ -33,12 +33,14 @@ class ActiveCriticPolicySetup:
         self.stop_opt: bool = None
         self.optimizer_mode : str = None
         self.clip:bool = True
+        self.buffer_size:int = None
 
 
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
         self.reset()
-
+        self.obsv_buffer = []
+        self.act_buffer = []
 
     def reset(self):
         self.gen_scores = []
@@ -50,6 +52,7 @@ class ActiveCriticPolicyHistory:
         new_field = th.zeros(size=size, device=device)
         if len(history) == 0:
             history.append(new_field)
+            history.append(0)
         else:
             history[0] = th.cat((history[0], new_field))
 
@@ -57,6 +60,9 @@ class ActiveCriticPolicyHistory:
     def add_value(self, history:list([th.Tensor]), value:th.Tensor, current_step:int):
         history[0][-value.shape[0]:, current_step] = value
 
+    def add_buffer_value(self, history:list([th.Tensor]), value:th.Tensor, current_step:int, index:int, training_mode:bool):
+        if training_mode:
+            history[0][index:index+value.shape[0], current_step] = value
 
 class ActiveCriticPolicy(BaseModel):
     def __init__(
@@ -77,13 +83,24 @@ class ActiveCriticPolicy(BaseModel):
         self.planner = planner
         self.args_obj = acps
         self.register_buffer('gl', th.ones(
-            size=[self.args_obj.epoch_len + 2, self.args_obj.epoch_len + 2, 1], dtype=th.float, device=acps.device))
+            size=[100, self.args_obj.epoch_len + 2, 1], dtype=th.float, device=acps.device))
         self.history = ActiveCriticPolicyHistory()
         self.clip_min = th.tensor(self.action_space.low, device=acps.device)
         self.clip_max = th.tensor(self.action_space.high, device=acps.device)
         self.n_inferred = 0
         self.write_tboard_scalar = write_tboard_scalar
         self.reset()
+
+        obsv_buffer_size = [self.args_obj.buffer_size, self.args_obj.epoch_len, self.args_obj.epoch_len, self.observation_space.shape[0]]
+        self.history.new_epoch(self.history.obsv_buffer, size=obsv_buffer_size, device=self.args_obj.device)
+        acts_buffer_size = [self.args_obj.buffer_size, self.args_obj.epoch_len, self.args_obj.epoch_len, self.action_space.shape[0]]
+        self.history.new_epoch(self.history.act_buffer, size=acts_buffer_size, device=self.args_obj.device)
+
+
+        self.buffer_index = None
+        self.buffer_filled_to = 0
+
+        self.training_mode = False
 
     def reset(self):
         self.last_goal = None
@@ -105,7 +122,15 @@ class ActiveCriticPolicy(BaseModel):
         
         self.obs_seq = th.zeros(
             size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
-            
+        
+        if self.training_mode:
+            if self.buffer_index is None:
+                self.buffer_index = 0
+            else:
+                self.buffer_index = (self.buffer_index + vec_obsv.shape[0])%(self.args_obj.buffer_size)
+                self.buffer_filled_to += vec_obsv.shape[0]
+                assert self.buffer_index + vec_obsv.shape[0] <= self.args_obj.buffer_size, 'Buffer size must be modulo 0'
+        
 
     def predict(
         self,
@@ -127,6 +152,13 @@ class ActiveCriticPolicy(BaseModel):
 
 
         self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
+        self.history.add_buffer_value(
+            self.history.obsv_buffer, 
+            value=th.clone(self.obs_seq.detach()), 
+            current_step=self.current_step, 
+            index=self.buffer_index,
+            training_mode=self.training_mode)
+
         #self.obs_seq = vec_obsv.repeat([1, self.obs_seq.shape[1], 1]).type(th.float)
         #if action_seq is None:
         self.current_result = self.forward(
@@ -135,7 +167,12 @@ class ActiveCriticPolicy(BaseModel):
             current_step=self.current_step,
             stop_opt=self.args_obj.stop_opt
             )
-        
+        self.history.add_buffer_value(
+            self.history.act_buffer, 
+            value=th.clone(self.current_result.gen_trj.detach()), 
+            current_step=self.current_step, 
+            index=self.buffer_index,
+            training_mode=self.training_mode)
         
         self.action_history[:, self.current_step] = th.clone(self.current_result.gen_trj.detach())
 
@@ -157,6 +194,8 @@ class ActiveCriticPolicy(BaseModel):
             stop_opt: bool
             ):
         
+        
+
         plans = th.zeros([observation_seq.shape[0], observation_seq.shape[1], self.planner.wsms.model_setup.d_output], device=self.args_obj.device, dtype=th.float32)
         actions = self.make_action(action_seq=action_seq, observation_seq=observation_seq, plans=plans, current_step=current_step)
 
@@ -166,15 +205,23 @@ class ActiveCriticPolicy(BaseModel):
         expected_success = self.critic.forward(
             inputs=critic_input).max(dim=1)[0]  # batch_size, seq_len, 1
 
+
         if not optimize:
             result = ACPOptResult(
                 gen_trj=actions, 
                 expected_succes_before=expected_success.detach(),
                 expected_succes_after=expected_success.detach())
             return result
-
         else:
-            opt_count = int(actions.shape[0]/2)
+            #opt_count = int(actions.shape[0]/2)
+            batch_size = actions.shape[0]
+            if (self.buffer_filled_to > 0) and (self.training_mode):
+                buffer_actions = self.history.act_buffer[0][:self.buffer_filled_to, self.current_step]
+                buffer_obsvs = self.history.obsv_buffer[0][:self.buffer_filled_to, self.current_step]
+                actions = th.cat((actions, buffer_actions), dim=0)
+                observation_seq = th.cat((observation_seq, buffer_obsvs), dim=0)
+                plans = th.zeros([observation_seq.shape[0], observation_seq.shape[1], self.planner.wsms.model_setup.d_output], device=self.args_obj.device, dtype=th.float32)
+
             actions_opt, expected_success_opt = self.optimize_act_sequence(
                 actions=actions, 
                 observations=observation_seq, 
@@ -182,8 +229,13 @@ class ActiveCriticPolicy(BaseModel):
                 plans=plans,
                 stop_opt=stop_opt
                 )
-            actions[:opt_count + 1] = actions_opt[:opt_count + 1]
-            expected_success_opt[opt_count + 1:] = expected_success[opt_count + 1:]
+            #actions[:opt_count + 1] = actions_opt[:opt_count + 1]
+            #expected_success_opt[opt_count + 1:] = expected_success[opt_count + 1:]
+            actions=actions_opt
+
+
+            actions = actions[:batch_size]
+            expected_success_opt = expected_success_opt[:batch_size]
 
             return ACPOptResult(
                 gen_trj=actions.detach(),

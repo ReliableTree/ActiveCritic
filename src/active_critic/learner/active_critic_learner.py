@@ -195,6 +195,7 @@ class ActiveCriticLearner(nn.Module):
             opt_before = self.policy.args_obj.optimize
             self.policy.args_obj.optimize = (self.policy.args_obj.optimize and self.network_args.start_critic)
             iterations = math.ceil(episodes/self.env.num_envs)
+            policy.training_mode = True
         else:
             opt_before = None
 
@@ -241,8 +242,12 @@ class ActiveCriticLearner(nn.Module):
         success = rewards.squeeze().max(-1).values
         success = (success == 1).type(th.float).mean()
 
+        sparse_reward, _ = rewards.max(dim=1)
+
 
         print(f'last rewards: {rewards.mean()}')
+        print(f'max last rewards: {sparse_reward.mean()}')
+
         print(f'last success: {success}')
         print(f'self.last_scores: {self.last_scores}')
         expert_trjs = th.zeros([episodes], dtype=th.bool, device=actions.device)
@@ -403,8 +408,8 @@ class ActiveCriticLearner(nn.Module):
                 max_actor = 0
 
             self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
-
-            self.global_step += max(int(self.train_data.virt_success.sum().detach().cpu()), self.network_args.batch_size)
+            self.train_data.onyl_positiv = False
+            self.global_step += len(self.train_data)
             '''if current_patients <= 0:
                 self.policy.critic.init_model()
                 print('reinit critic')
@@ -483,6 +488,8 @@ class ActiveCriticLearner(nn.Module):
 
 
     def run_validation(self, optimize):
+        self.policy.training_mode = False
+
         if optimize:
             fix = ' optimize'
             if self.last_trj is not None:
