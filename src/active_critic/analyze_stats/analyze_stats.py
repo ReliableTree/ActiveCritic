@@ -84,7 +84,7 @@ def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=N
         if plot_closest:
             # plot the experiments at those timesteps
             ax.plot(p_timesteps, mean_data, '-o', markersize=5, label=names[i])
-            ax.fill_between(p_timesteps, mean_data-std_data, mean_data+std_data, alpha=0.3)
+            ax.fill_between(p_timesteps, np.maximum(mean_data-std_data, 0), np.minimum(mean_data+std_data, 1), alpha=0.3)
         else:
             ax.plot(timesteps[i], mean_data, '-o', markersize=5, label=names[i])
             ax.fill_between(timesteps[i], mean_data-std_data, mean_data+std_data, alpha=0.3)
