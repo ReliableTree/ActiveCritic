@@ -161,10 +161,15 @@ class ActiveCriticLearner(nn.Module):
 
         obsv, actions, reward, expert_trjs, prev_proposed_actions, steps, prev_observation = data
 
+        if self.policy.args_obj.sparse:
+            label = self.make_critic_score(reward)
+        else:
+            label = reward
+
 
         critic_input = self.policy.get_critic_input(obsvs=obsv, acts=actions)
         critic_result = self.policy.critic.forward(critic_input)
-        reward_loss, l2_dist = calcMSE(critic_result, reward, return_tensor=True)
+        reward_loss, l2_dist = calcMSE(critic_result, label, return_tensor=True)
 
         prediction_mask = steps > 0
         critic_predicted_input_prev = self.policy.get_critic_input(obsvs=prev_observation[prediction_mask], acts=prev_proposed_actions[prediction_mask])
@@ -267,7 +272,7 @@ class ActiveCriticLearner(nn.Module):
             self.policy.args_obj.optimize = opt_before
 
     def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic, loss_prediction):
-        self.train_data.onyl_positiv = self.network_args.sparse
+        self.train_data.onyl_positiv = self.policy.args_obj.sparse
         if len(self.train_data) > 0:
             for data in train_loader:
                 device_data = []

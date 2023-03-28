@@ -34,7 +34,7 @@ class ActiveCriticPolicySetup:
         self.optimizer_mode : str = None
         self.clip:bool = True
         self.buffer_size:int = None
-
+        self.sparse:bool = None
 
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
@@ -331,7 +331,10 @@ class ActiveCriticPolicy(BaseModel):
         expected_success = th.zeros(
             size=[actions.shape[0], 1], dtype=th.float, device=actions.device)
         final_exp_success = th.clone(expected_success)
-        goal_label = self.gl[:actions.shape[0], :actions.shape[1]]
+        if self.args_obj.sparse:
+            goal_label = self.gl[:actions.shape[0], 0]
+        else:
+            goal_label = self.gl[:actions.shape[0], :actions.shape[1]]
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()
