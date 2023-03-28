@@ -225,7 +225,7 @@ def run_experiment(
         total_training_epsiodes=20, 
         training_episodes=10, 
         min_critic_threshold=1e-4):
-    seq_len = 60
+    seq_len = 100
 
     acl, env, expert, seq_len, epsiodes, device = make_acl(
                             device,
