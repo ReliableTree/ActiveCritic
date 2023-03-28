@@ -21,8 +21,6 @@ import copy
 import math
 import os
 
-from active_critic.learner.higher_learning import actor_step, critic_step
-
 class ACLScores:
     def __init__(self) -> None:
         self.mean_actor = [float('inf')]

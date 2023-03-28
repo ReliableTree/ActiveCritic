@@ -28,3 +28,4 @@ class ActiveCriticLearnerArgs:
         self.make_graphs:bool = None
         self.plan_decay = None
         self.train_inference:bool = None
+        self.sparse = None
