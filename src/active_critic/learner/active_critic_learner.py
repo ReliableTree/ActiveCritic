@@ -459,12 +459,11 @@ class ActiveCriticLearner(nn.Module):
         return labels
     
     def save_stat(self, success, rewards, expected_success, opt_exp, exp_dict):
-
         if exp_dict is None:
             exp_dict = {
             'success_rate':success.mean().cpu().numpy(),
             'expected_success' : expected_success.mean().cpu().numpy(),
-            'rewards': rewards.detach().cpu().numpy(),
+            'rewards': rewards.unsqueeze(0).detach().cpu().numpy(),
             'step':np.array(self.get_num_training_samples())
             }
             if opt_exp is not None:
@@ -474,7 +473,7 @@ class ActiveCriticLearner(nn.Module):
             exp_dict['success_rate'] = np.append(exp_dict['success_rate'], success.mean().cpu().numpy())
             exp_dict['expected_success'] = np.append(exp_dict['expected_success'], expected_success.mean().cpu().numpy())
             exp_dict['step'] = np.append(exp_dict['step'], np.array(self.get_num_training_samples()))
-            exp_dict['rewards'] = np.append(exp_dict['rewards'], np.array(rewards.detach().cpu().numpy()))
+            exp_dict['rewards'] = np.append(exp_dict['rewards'], np.array(rewards.unsqueeze(0).detach().cpu().numpy()), axis=0)
 
             if opt_exp is not None:
                 exp_dict['optimized_expected'] = np.append(exp_dict['optimized_expected'], opt_exp.mean().cpu().numpy())
