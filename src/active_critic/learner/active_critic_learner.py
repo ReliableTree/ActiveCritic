@@ -296,20 +296,20 @@ class ActiveCriticLearner(nn.Module):
                 next_val = self.global_step + self.network_args.val_every
                 if self.network_args.tboard:
                     print('_____________________________________________________________')
-                    th.save(self.policy.actor.state_dict(), 'actor_before')
-                    th.save(self.policy.planner.state_dict(), 'planner_before')
+                    th.save(self.policy.actor.state_dict(),self.inter_path +  'actor_before')
+                    th.save(self.policy.planner.state_dict(),self.inter_path +  'planner_before')
 
                     if self.set_best_actor:
-                        self.policy.actor.load_state_dict(th.load('best_actor'))
-                        self.policy.planner.load_state_dict(th.load('best_planner'))
+                        self.policy.actor.load_state_dict(th.load(self.inter_path + 'best_actor'))
+                        self.policy.planner.load_state_dict(th.load(self.inter_path + 'best_planner'))
 
                     self.policy.eval()
                     self.run_validation(optimize=True)
                     self.run_validation(optimize=False)
                     print(f'self.get_num_training_samples(): {self.get_num_training_samples()}')
                     print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
-                    self.policy.actor.load_state_dict(th.load('actor_before'), strict=False)
-                    self.policy.planner.load_state_dict(th.load('planner_before'), strict=False)
+                    self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'), strict=False)
+                    self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'), strict=False)
                     self.scores.reset_min_score(self.scores.mean_actor)
 
                     if self.get_num_training_samples()>= self.network_args.total_training_epsiodes:
@@ -318,15 +318,15 @@ class ActiveCriticLearner(nn.Module):
 
             if (not self.network_args.imitation_phase) and (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every
-                th.save(self.policy.actor.state_dict(), 'actor_before')
-                th.save(self.policy.planner.state_dict(), 'planner_before')
+                th.save(self.policy.actor.state_dict(),self.inter_path +  'actor_before')
+                th.save(self.policy.planner.state_dict(),self.inter_path +  'planner_before')
                 if self.set_best_actor:
-                    self.policy.actor.load_state_dict(th.load('best_actor'))
-                    self.policy.planner.load_state_dict(th.load('best_planner'))
+                    self.policy.actor.load_state_dict(th.load(self.inter_path + 'best_actor'))
+                    self.policy.planner.load_state_dict(th.load(self.inter_path + 'best_planner'))
 
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
-                self.policy.actor.load_state_dict(th.load('actor_before'), strict=False)
-                self.policy.planner.load_state_dict(th.load('planner_before'), strict=False)
+                self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'), strict=False)
+                self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'), strict=False)
 
                 self.virtual_step += self.network_args.training_epsiodes
 
@@ -387,8 +387,8 @@ class ActiveCriticLearner(nn.Module):
             
 
             if new_min:
-                th.save(self.policy.actor.state_dict(), 'best_actor')
-                th.save(self.policy.planner.state_dict(), 'best_planner')
+                th.save(self.policy.actor.state_dict(),self.inter_path +  'best_actor')
+                th.save(self.policy.planner.state_dict(),self.inter_path +  'best_planner')
                 self.set_best_actor = True
 
             reward = self.train_data.reward
