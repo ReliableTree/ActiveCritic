@@ -400,7 +400,7 @@ class ActiveCriticLearner(nn.Module):
             reward = self.train_data.reward
             b, _ = th.max(reward, dim=1)
             successfull_trj = (b == 1)
-            positive_examples = int(successfull_trj.sum()/self.policy.args_obj.epoch_len)
+            positive_examples = th.tensor(int(successfull_trj.sum()/self.policy.args_obj.epoch_len))
 
             debug_dict = {
                 'Examples': th.tensor(int(len(self.train_data.obsv)/self.policy.args_obj.epoch_len)),

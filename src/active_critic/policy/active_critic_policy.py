@@ -276,7 +276,6 @@ class ActiveCriticPolicy(BaseModel):
             optimizer = th.optim.AdamW(
                 [optimized_actions], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         elif self.args_obj.optimizer_mode == 'actor':
-            print('use actor opt mode')
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
@@ -285,8 +284,6 @@ class ActiveCriticPolicy(BaseModel):
                 self.actor.parameters(), lr=self.args_obj.inference_opt_lr, weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
                 )
         elif self.args_obj.optimizer_mode == 'actor+plan':
-            if current_step == 0:
-                print('use actor+plan opt mode')
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
@@ -339,7 +336,10 @@ class ActiveCriticPolicy(BaseModel):
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()
-        while (step <= self.args_obj.opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
+        num_opt_steps = self.args_obj.opt_steps
+        if self.current_step == 0:
+            num_opt_steps = num_opt_steps * 20
+        while (step <= num_opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
             mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success, plans = self.inference_opt_step(
                 org_actions=org_actions,
@@ -370,7 +370,6 @@ class ActiveCriticPolicy(BaseModel):
             with th.no_grad():
                 th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
         if (self.args_obj.optimizer_mode == 'actor' or self.args_obj.optimizer_mode == 'actor+plan') and self.current_step == self.args_obj.epoch_len - 1:
-            print('___________________loaded init actor__________________________')
             self.actor.load_state_dict(self.init_actor)
             self.planner.load_state_dict(self.init_planner)
         return final_actions, final_exp_success
