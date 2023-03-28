@@ -274,10 +274,7 @@ class ActiveCriticLearner(nn.Module):
             self.policy.args_obj.optimize = opt_before
 
     def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic, loss_prediction):
-        self.train_data.onyl_positiv = (self.policy.critic.wsms.sparse or (self.train_data.success.sum() > 0))
-        if self.train_data.onyl_positiv and (not self.first_switch):
-            print('only positive')
-            self.first_switch = True
+        self.train_data.onyl_positiv = self.policy.critic.wsms.sparse
         if len(self.train_data) > 0:
             for data in train_loader:
                 device_data = []
