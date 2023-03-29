@@ -141,7 +141,6 @@ class ActiveCriticLearner(nn.Module):
 
         h = time.perf_counter()
         add_results = []
-        print(f'____________________________dense training data: {self.network_args.dense}')
         for iteration in range(iterations):
             result = sample_new_episode(
                 policy=policy,
@@ -335,8 +334,6 @@ class ActiveCriticLearner(nn.Module):
                     self.policy.eval()
                     self.run_validation(optimize=True)
                     self.run_validation(optimize=False)
-                    print(f'self.get_num_training_samples(): {self.get_num_training_samples()}')
-                    print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
                     self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'), strict=False)
                     self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'), strict=False)
                     self.scores.reset_min_score(self.scores.mean_actor)
@@ -531,7 +528,6 @@ class ActiveCriticLearner(nn.Module):
                 self.policy.args_obj.opt_steps = min(opt_steps_before, 10 * self.train_data.success.sum())
             else:
                 self.policy.args_obj.opt_steps = 0'''
-            print(f'self.policy.args_obj.opt_steps: {self.policy.args_obj.opt_steps}')
         else:
             fix = ''
             
@@ -609,12 +605,6 @@ class ActiveCriticLearner(nn.Module):
 
         print(f'Success Rate: {success.mean()}' + fix)
         print(f'Reward: {sparse_reward.mean()}' + fix)
-        try:
-            print(
-                f'training samples: {int(len(self.train_data.obsv))}' + fix)
-            print(f'positive training samples: {int(self.train_data.success.sum())}' + fix)
-        except:
-            pass
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize, step=self.get_num_training_samples())
 
         self.policy.args_obj.optimize = pre_opt
@@ -631,7 +621,6 @@ class ActiveCriticLearner(nn.Module):
         if optimize:
             self.exp_dict_opt = exp_dict
             #self.policy.args_obj.opt_steps = opt_steps_before
-            print(f'self.policy.args_obj.opt_steps after: {self.policy.args_obj.opt_steps}')
         else:
             self.exp_dict = exp_dict
 

@@ -106,6 +106,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
     acps.optimize = True
     acps.stop_opt = True
     acps.clip = True
+    acps.optimize_at_beginning = False
 
     acps.optimizer_mode = opt_mode
     return acps
@@ -408,7 +409,7 @@ def run_eval_stats_env(device, weight_decay):
     val_everys = [6000]
     add_data_everys = [6000]
     opt_modes = ['actor+plan']
-    opt_steps_list = [3]
+    opt_steps_list = [100]
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
@@ -416,7 +417,7 @@ def run_eval_stats_env(device, weight_decay):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' strict budget load org actor {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                                logname = f' ceep optimizer {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,

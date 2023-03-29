@@ -34,7 +34,7 @@ class ActiveCriticPolicySetup:
         self.optimizer_mode : str = None
         self.clip:bool = True
         self.buffer_size:int = None
-
+        self.optimize_at_beginning = None
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
         self.reset()
@@ -242,6 +242,7 @@ class ActiveCriticPolicy(BaseModel):
                 plans=plans,
                 stop_opt=stop_opt
                 )
+            
             #actions[:opt_count + 1] = actions_opt[:opt_count + 1]
             #expected_success_opt[opt_count + 1:] = expected_success[opt_count + 1:]
             actions=actions_opt
@@ -287,28 +288,29 @@ class ActiveCriticPolicy(BaseModel):
         if self.args_obj.optimizer_mode == 'actions':
             optimized_actions = th.clone(actions.detach())
             optimized_actions.requires_grad_(True)
-            optimizer = th.optim.AdamW(
+            self.inf_optimizer = th.optim.AdamW(
                 [optimized_actions], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         elif self.args_obj.optimizer_mode == 'actor':
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
             plans = plans.detach()
-            optimizer = th.optim.AdamW(
+            self.inf_optimizer = th.optim.AdamW(
                 self.actor.parameters(), lr=self.args_obj.inference_opt_lr, weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
                 )
         elif self.args_obj.optimizer_mode == 'actor+plan':
-            optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
             plans = self.make_plans(acts=actions, obsvs=observations)
+            optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
 
-            lr = self.args_obj.inference_opt_lr
-            optimizer = th.optim.AdamW(
-                [{'params': self.actor.parameters()}, {'params': self.planner.parameters()}],
-                lr=lr,
-                weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
-            )
+            if self.current_step == 0:
+                lr = self.args_obj.inference_opt_lr
+                self.inf_optimizer = th.optim.AdamW(
+                    [{'params': self.actor.parameters()}, {'params': self.planner.parameters()}],
+                    lr=lr,
+                    weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
+                )
 
         elif self.args_obj.optimizer_mode == 'plan':
             print('use plan opt mode')
@@ -317,7 +319,7 @@ class ActiveCriticPolicy(BaseModel):
             observations = observations.detach()
             plans = plans.detach()
             plans.requires_grad = True
-            optimizer = th.optim.AdamW(
+            self.inf_optimizer = th.optim.AdamW(
                 [plans], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         elif self.args_obj.optimizer_mode == 'goal':
             print('use goal opt mode')
@@ -327,7 +329,7 @@ class ActiveCriticPolicy(BaseModel):
             plans = plans.detach()
             goals = th.clone(observations[:, :, -3:])
             goals.requires_grad = True
-            optimizer = th.optim.AdamW(
+            self.inf_optimizer = th.optim.AdamW(
                 [goals], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         else:
             print('Choose other optimizer mode')
@@ -337,25 +339,27 @@ class ActiveCriticPolicy(BaseModel):
         expected_success = th.zeros(
             size=[actions.shape[0], 1], dtype=th.float, device=actions.device)
         final_exp_success = th.clone(expected_success)
+
+        if self.args_obj.optimize_at_beginning and current_step > 0:
+            print('returned early')
+            return final_actions, final_exp_success
+        
         if self.critic.wsms.sparse:
             goal_label = self.gl[:actions.shape[0], 0]
-            if self.current_step == 0 and self.critic.wsms.sparse:
-                print('use sparse critic')
         else:
             goal_label = self.gl[:actions.shape[0], :actions.shape[1]]
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()
         num_opt_steps = self.args_obj.opt_steps
-        '''if self.current_step == 0:
-            num_opt_steps = num_opt_steps * 20'''
+        
         while (step <= num_opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
             mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success, plans = self.inference_opt_step(
                 org_actions=org_actions,
                 opt_actions=optimized_actions,
                 obs_seq=observations,
-                optimizer=optimizer,
+                optimizer=self.inf_optimizer,
                 goal_label=goal_label,
                 current_step=current_step,
                 plans=plans,
