@@ -154,7 +154,7 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
                 history=history,
                 step=learner.env.envs[0].reset_count)
             success_rate = success.mean()
-            print(f'success rate')
+            print(f'success rate: {success_rate}')
             tboard.addValidationScalar('Reward', value=th.tensor(
                 rews.mean()), stepid=learner.env.envs[0].reset_count)
             tboard.addValidationScalar('Success Rate', value=th.tensor(
