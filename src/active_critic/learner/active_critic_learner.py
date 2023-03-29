@@ -291,6 +291,7 @@ class ActiveCriticLearner(nn.Module):
                 device_data = []
                 for dat in data:
                     device_data.append(dat.to(self.network_args.device))
+
                 loss_critic, loss_prediction = critic_step(device_data, loss_critic, loss_prediction)
 
         return loss_actor, loss_critic, loss_prediction

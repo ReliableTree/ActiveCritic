@@ -111,8 +111,8 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
     return acps
 
 
-def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_episodes, opt_steps):
-    env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len)
+def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_episodes, opt_steps, sparse):
+    env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len, sparse=sparse)
     d_output = env.action_space.shape[0]
     d_plan = 1
     wsm_actor_setup = make_wsm_setup(
@@ -150,6 +150,7 @@ def make_acl(
         weight_decay, 
         make_graphs,
         opt_steps,
+        sparse,
         fast=False):
     device = device
     acla = ActiveCriticLearnerArgs()
@@ -202,10 +203,11 @@ def make_acl(
         tag=tag, 
         weight_decay=weight_decay, 
         training_episodes=acla.training_epsiodes,
-        opt_steps=opt_steps
+        opt_steps=opt_steps,
+        sparse=sparse
         )
     
-    eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len)
+    eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len, sparse=sparse)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
     ac.write_tboard_scalar = acl.write_tboard_scalar
     return acl, env, expert, seq_len, epsiodes, device
@@ -221,6 +223,7 @@ def run_experiment(
         add_data_every,
         opt_mode, 
         opt_steps,
+        sparse,
         weight_decay=1e-2, 
         demos=14, 
         make_graphs=False,
@@ -246,7 +249,8 @@ def run_experiment(
                             opt_mode=opt_mode,
                             make_graphs=make_graphs,
                             opt_steps=opt_steps,
-                            fast=fast)    
+                            fast=fast,
+                            sparse=sparse)    
     acl.network_args.num_expert_demos = demos
     if demos > 0:
         '''actions, observations, rewards, _, expected_rewards, _ = sample_new_episode(
@@ -396,17 +400,19 @@ def run_eval_stats_pp(device, weight_decay):
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
     demonstrations_list = [1]
-    run_ids = [i for i in range(2)]
+    run_ids = [i for i in range(3)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 500
+    total_training_epsiodes = 1000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['reach']
+    env_tags = ['reach', 'windowopen']
     val_everys = [1000]
     add_data_everys = [1000]
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
+    sparse = True
+    th.manual_seed(3)
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
@@ -431,7 +437,8 @@ def run_eval_stats_env(device, weight_decay):
                                             opt_mode=opt_mode,
                                             make_graphs = True,
                                             fast=False,
-                                            opt_steps=opt_steps)
+                                            opt_steps=opt_steps,
+                                            sparse=sparse)
 
 if __name__ == '__main__':
     run_eval(device='cuda')
