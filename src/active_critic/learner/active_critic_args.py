@@ -30,3 +30,4 @@ class ActiveCriticLearnerArgs:
         self.strict_learn_budget = None
 
         self.gamma_ind = None
+        self.use_eq_ind = None

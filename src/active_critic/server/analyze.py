@@ -98,7 +98,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
     elif opt_mode == 'actor+plan':
-        acps.inference_opt_lr = 1e-6
+        acps.inference_opt_lr = 1e-5
         acps.opt_steps = opt_steps
     else:
         1/0
@@ -106,7 +106,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
     acps.optimize = True
     acps.stop_opt = True
     acps.clip = True
-    acps.optimize_full_each_step = True
+    acps.optimize_full_each_step = False
 
     acps.optimizer_mode = opt_mode
     return acps
@@ -163,6 +163,7 @@ def make_acl(
     acla.tboard = True
     acla.batch_size = 16
     acla.make_graphs = make_graphs
+
     number = 10
 
     if fast:
@@ -194,6 +195,7 @@ def make_acl(
     acla.dense = True
     acla.strict_learn_budget =True
     acla.gamma_ind = 1
+    acla.use_eq_ind = True
 
 
     epsiodes = 30
@@ -402,14 +404,14 @@ def run_eval_stats_env(device, weight_decay):
     run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 500
+    total_training_epsiodes = 1000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']
     val_everys = [1000]
     add_data_everys = [1000]
     opt_modes = ['actor+plan']
-    opt_steps_list = [100]
+    opt_steps_list = [1]
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
@@ -417,7 +419,7 @@ def run_eval_stats_env(device, weight_decay):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' optimize full {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                                logname = f' eq ind strict budget {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,

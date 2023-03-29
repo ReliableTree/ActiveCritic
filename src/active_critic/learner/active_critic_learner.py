@@ -277,7 +277,8 @@ class ActiveCriticLearner(nn.Module):
             self.first_switch = True
         if len(self.train_data) > 0:
             weights = make_weights(len(self.train_data), gamma=self.network_args.gamma_ind, exp_ind=self.train_data.get_expt_trjs_ind())
-
+            if self.network_args.use_eq_ind:
+                weights = th.ones_like(weights)
             sampler = WeightedRandomSampler(weights=weights, num_samples=len(self.train_data), replacement=True)
             actor_loader = DataLoader(self.train_data, batch_size=self.network_args.batch_size, sampler=sampler)
             local_step = 0
@@ -297,6 +298,8 @@ class ActiveCriticLearner(nn.Module):
         if train_critic:
             self.train_data.onyl_positiv = False
             weights = make_weights(len(self.train_data), gamma=self.network_args.gamma_ind, exp_ind=self.train_data.get_expt_trjs_ind())
+            if self.network_args.use_eq_ind:
+                weights = th.ones_like(weights)
             sampler = WeightedRandomSampler(weights=weights, num_samples=len(self.train_data), replacement=True)
             critic_loader = DataLoader(self.train_data, batch_size=self.network_args.batch_size, sampler=sampler)
             local_step = 0
