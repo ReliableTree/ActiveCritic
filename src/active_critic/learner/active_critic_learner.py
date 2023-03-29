@@ -20,7 +20,6 @@ import pickle
 import copy
 import math
 
-from active_critic.learner.higher_learning import actor_step, critic_step
 
 class ACLScores:
     def __init__(self) -> None:
@@ -134,71 +133,7 @@ class ActiveCriticLearner(nn.Module):
         self.train_data.onyl_positiv = False
         self.train_loader = DataLoader(
             dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
-    
-
-    def actor_step(self, data, loss_actor):
-        obsv, actions, reward, expert_trjs, _, _, _ = data
-        plans = self.policy.make_plans(acts=actions, obsvs=obsv)
-        plans[expert_trjs] = 0
-
-        actor_input = self.policy.get_actor_input(plans=plans, obsvs=obsv, rewards=reward)
-        actor_result = self.policy.actor.forward(actor_input)
-        loss = calcMSE(actor_result, actions)
-        self.policy.actor.optimizer.zero_grad()
-        self.policy.planner.optimizer.zero_grad()
-        loss.backward()
-        self.policy.actor.optimizer.step()
-        self.policy.planner.optimizer.step()
-        loss = loss.detach()
-
-        if loss_actor is None:
-            loss_actor = loss.unsqueeze(0)
-        else:
-            loss_actor = th.cat(
-                (loss_actor, loss.unsqueeze(0)), dim=0)
-        self.write_tboard_scalar(debug_dict={'lr actor': th.tensor(self.policy.actor.scheduler.get_last_lr()).mean()}, train=True)
-        return loss_actor
-    
-    def critic_step(self, data, loss_critic, loss_prediction):
-
-        obsv, actions, reward, expert_trjs, prev_proposed_actions, steps, prev_observation = data
-
-        if self.policy.critic.wsms.sparse:
-            label = self.make_critic_score(reward)
-        else:
-            label = reward
-
-
-        critic_input = self.policy.get_critic_input(obsvs=obsv, acts=actions)
-        critic_result = self.policy.critic.forward(critic_input)
-        reward_loss, l2_dist = calcMSE(critic_result, label, return_tensor=True)
-
-        prediction_mask = steps > 0
-        critic_predicted_input_prev = self.policy.get_critic_input(obsvs=prev_observation[prediction_mask], acts=prev_proposed_actions[prediction_mask])
-        critic_pred_result_prev = self.policy.critic.forward(critic_predicted_input_prev)
-
-        critic_predicted_input_current = self.policy.get_critic_input(obsvs=obsv[prediction_mask], acts=prev_proposed_actions[prediction_mask])
-        critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
-
-        pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
-
-        loss = reward_loss + pred_loss
-
-
-        self.policy.critic.optimizer.zero_grad()
-        loss.backward()
-        self.policy.critic.optimizer.step()
-        loss = loss.detach()
-        if loss_critic is None:
-            loss_critic = l2_dist.reshape([-1])
-            loss_prediction = l2_pred.reshape([-1])
-        else:
-            loss_critic = th.cat(
-                (loss_critic, l2_dist.reshape([-1])), dim=0)
-            loss_prediction = th.cat(
-                (loss_prediction, l2_pred.reshape([-1])), dim=0)
-        self.write_tboard_scalar(debug_dict={'lr actor': th.tensor(self.policy.critic.scheduler.get_last_lr()).mean()}, train=True)
-        return loss_critic, loss_prediction
+        
 
     def add_training_data(self, policy=None, episodes = 1, seq_len = None):
         if policy is None:
@@ -273,26 +208,95 @@ class ActiveCriticLearner(nn.Module):
         if opt_before is not None:
             self.policy.args_obj.optimize = opt_before
 
-    def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic, loss_prediction):
+
+    def actor_step(self, data, loss_actor):
+        obsv, actions, reward, expert_trjs, _, _, _ = data
+        plans = self.policy.make_plans(acts=actions, obsvs=obsv)
+        plans[expert_trjs] = 0
+
+        actor_input = self.policy.get_actor_input(plans=plans, obsvs=obsv, rewards=reward)
+        actor_result = self.policy.actor.forward(actor_input)
+        loss = calcMSE(actor_result, actions)
+        self.policy.actor.optimizer.zero_grad()
+        self.policy.planner.optimizer.zero_grad()
+        loss.backward()
+        self.policy.actor.optimizer.step()
+        self.policy.planner.optimizer.step()
+        loss = loss.detach()
+
+        if loss_actor is None:
+            loss_actor = loss.unsqueeze(0)
+        else:
+            loss_actor = th.cat(
+                (loss_actor, loss.unsqueeze(0)), dim=0)
+        self.write_tboard_scalar(debug_dict={'lr actor': th.tensor(self.policy.actor.scheduler.get_last_lr()).mean()}, train=True)
+        return loss_actor
+    
+    def critic_step(self, data, loss_critic, loss_prediction):
+
+        obsv, actions, reward, expert_trjs, prev_proposed_actions, steps, prev_observation = data
+
+        if self.policy.critic.wsms.sparse:
+            label = self.make_critic_score(reward)
+        else:
+            label = reward
+
+
+        critic_input = self.policy.get_critic_input(obsvs=obsv, acts=actions)
+        critic_result = self.policy.critic.forward(critic_input)
+        reward_loss, l2_dist = calcMSE(critic_result, label, return_tensor=True)
+
+        prediction_mask = steps > 0
+        critic_predicted_input_prev = self.policy.get_critic_input(obsvs=prev_observation[prediction_mask], acts=prev_proposed_actions[prediction_mask])
+        critic_pred_result_prev = self.policy.critic.forward(critic_predicted_input_prev)
+
+        critic_predicted_input_current = self.policy.get_critic_input(obsvs=obsv[prediction_mask], acts=prev_proposed_actions[prediction_mask])
+        critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
+
+        pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
+
+        loss = reward_loss + pred_loss
+
+
+        self.policy.critic.optimizer.zero_grad()
+        loss.backward()
+        self.policy.critic.optimizer.step()
+        loss = loss.detach()
+        if loss_critic is None:
+            loss_critic = l2_dist.reshape([-1])
+            loss_prediction = l2_pred.reshape([-1])
+        else:
+            loss_critic = th.cat(
+                (loss_critic, l2_dist.reshape([-1])), dim=0)
+            loss_prediction = th.cat(
+                (loss_prediction, l2_pred.reshape([-1])), dim=0)
+        self.write_tboard_scalar(debug_dict={'lr actor': th.tensor(self.policy.critic.scheduler.get_last_lr()).mean()}, train=True)
+        return loss_critic, loss_prediction
+
+    def train_step(self, loss_actor, loss_critic, train_critic, loss_prediction):
         self.train_data.onyl_positiv = (self.policy.critic.wsms.sparse or (self.train_data.success.sum() > 0))
         if self.train_data.onyl_positiv and (not self.first_switch):
             print('only positive')
             self.first_switch = True
         if len(self.train_data) > 0:
-            for data in train_loader:
+            actor_loader = DataLoader(dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
+            for data in actor_loader:
                 device_data = []
                 for dat in data:
                     device_data.append(dat.to(self.network_args.device))
-                loss_actor = actor_step(device_data, loss_actor)
+                print(f'actor device: {dat.device}')
+                print(f'actor spet: {device_data[0].shape}')
+                loss_actor = self.actor_step(device_data, loss_actor)
 
         if train_critic:
             self.train_data.onyl_positiv = False
-            for data in train_loader:
+            critic_loader = DataLoader(self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
+            for data in critic_loader:
                 device_data = []
                 for dat in data:
                     device_data.append(dat.to(self.network_args.device))
 
-                loss_critic, loss_prediction = critic_step(device_data, loss_critic, loss_prediction)
+                loss_critic, loss_prediction = self.critic_step(device_data, loss_critic, loss_prediction)
 
         return loss_actor, loss_critic, loss_prediction
 
@@ -370,9 +374,6 @@ class ActiveCriticLearner(nn.Module):
             loss_prediction = None
 
             loss_actor, loss_critic, loss_prediction = self.train_step(
-                train_loader=self.train_loader,
-                actor_step=self.actor_step,
-                critic_step=self.critic_step,
                 loss_actor=loss_actor,
                 loss_critic=loss_critic,
                 train_critic=self.train_critic,
