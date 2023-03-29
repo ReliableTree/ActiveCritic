@@ -155,6 +155,7 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
                 history=history,
                 step=learner.env.envs[0].reset_count)
             success_rate = success.mean()
+            print(f'success rate: {success_rate}')
             tboard.addValidationScalar('Reward', value=th.tensor(
                 rews.mean()), stepid=learner.env.envs[0].reset_count)
             tboard.addValidationScalar('Success Rate', value=th.tensor(
@@ -169,8 +170,32 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, 
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
         name=env_tag, seq_len=seq_len, lookup_freq=1000)
+    
+        #reach
+    learning_rate = 7.3e-4
+    buffer_size = 300000
+    batch_size= 256
+    ent_coef= 'auto'
+    gamma= 0.98
+    tau= 0.02
+    train_freq= 8
+    gradient_steps= 8
+    use_sde = True
+    policy_kwargs= dict(log_std_init=-3, net_arch=[400, 300])
+
     tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env,
-                      device=device, learning_rate=lr)
+                      device=device, learning_rate=learning_rate,
+                      buffer_size=buffer_size,
+                      batch_size=batch_size,
+                      ent_coef=ent_coef,
+                      gamma=gamma,
+                      tau=tau,
+                      train_freq=train_freq,
+                      gradient_steps=gradient_steps,
+                      use_sde=use_sde,
+                      policy_kwargs=policy_kwargs)
+    '''tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env,
+                      device=device, learning_rate=lr)'''
     evaluate_learner(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
                      bc_epochs=bc_epochs, n_samples=n_samples, device=device, eval_every=1000, learner=tqc_learner)
 
@@ -519,7 +544,7 @@ if __name__ == '__main__':
     list_env_tags = ['drawerclose']
     n_samples = 1000
     bc_epochs = 0
-    ids = [i for i in range(2)]
+    ids = [i for i in range(4)]
     th.manual_seed(1)
 
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
