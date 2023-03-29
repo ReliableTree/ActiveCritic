@@ -485,14 +485,12 @@ def get_avr_succ_rew_det(env, learner, epsiodes, path, history, step):
         while not done:
             action, _ = learner.predict(obs, deterministic=True)
             obs, rew, done, info = env.step(action)
-            print(f'obsv: {obs}')
             rews.append(rew)
             if info[0]['success'] > 0:
                 success.append(info[0]['success'])
                 break
             if done:
                 success.append(0)
-        1/0
     success = np.array(success)
     rews = np.array(rews)
     history = save_stat(success=success, history=history, step=step, path=path)
