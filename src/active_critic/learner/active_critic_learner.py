@@ -98,7 +98,7 @@ class ActiveCriticLearner(nn.Module):
                 self.logname + ' optimized', data_path=network_args_obj.data_path)
         self.global_step = 0
 
-        self.train_data = DatasetAC(batch_size=self.network_args.batch_size, device=self.network_args.device)
+        self.train_data = DatasetAC(batch_size=self.network_args.batch_size, device='cpu')
         self.train_data.onyl_positiv = False
         self.exp_dict_opt = None
         self.exp_dict = None
@@ -279,32 +279,45 @@ class ActiveCriticLearner(nn.Module):
             print('only positive')
             self.first_switch = True
         if len(self.train_data) > 0:
+            local_step = 0
             for data in train_loader:
                 device_data = []
                 for dat in data:
                     device_data.append(dat.to(self.network_args.device))
+
                 loss_actor = actor_step(device_data, loss_actor)
+
+                local_step += device_data[0].shape[0]
+                
+                if self.network_args.strict_learn_budget:
+                    if (self.global_step + local_step >= self.next_add) or (self.global_step + local_step >= self.next_val):
+                        break
 
         if train_critic:
             self.train_data.onyl_positiv = False
+            local_step = 0
             for data in train_loader:
                 device_data = []
                 for dat in data:
                     device_data.append(dat.to(self.network_args.device))
                 loss_critic, loss_prediction = critic_step(device_data, loss_critic, loss_prediction)
-
-        return loss_actor, loss_critic, loss_prediction
+                local_step += device_data[0].shape[0]
+                
+                if self.network_args.strict_learn_budget:
+                    if (self.global_step + local_step >= self.next_add) or (self.global_step + local_step >= self.next_val):
+                        break
+        return loss_actor, loss_critic, loss_prediction, local_step
 
     def get_num_training_samples(self):
         #return int(len(self.train_data) - self.network_args.num_expert_demos)
         return self.virtual_step
 
     def train(self, epochs):
-        next_val = 0
-        next_add = 0
+        self.next_val = 0
+        self.next_add = 0
         for epoch in range(epochs):
-            if self.global_step >= next_val:
-                next_val = self.global_step + self.network_args.val_every
+            if self.global_step >= self.next_val:
+                self.next_val = self.global_step + self.network_args.val_every
                 if self.network_args.tboard:
                     print('_____________________________________________________________')
                     th.save(self.policy.actor.state_dict(),self.inter_path +  'actor_before')
@@ -327,8 +340,8 @@ class ActiveCriticLearner(nn.Module):
                         return None
 
 
-            if (not self.network_args.imitation_phase) and (self.global_step >= next_add):
-                next_add = self.global_step + self.network_args.add_data_every
+            if (not self.network_args.imitation_phase) and (self.global_step >= self.next_add):
+                self.next_add = self.global_step + self.network_args.add_data_every
                 th.save(self.policy.actor.state_dict(),self.inter_path +  'actor_before')
                 th.save(self.policy.planner.state_dict(),self.inter_path +  'planner_before')
                 if self.set_best_actor:
@@ -347,11 +360,11 @@ class ActiveCriticLearner(nn.Module):
                     self.policy.critic.init_model()
                     self.next_critic_init *= 2'''
 
-            elif (self.global_step >= next_add):
-                next_add = self.global_step + self.network_args.add_data_every
+            elif (self.global_step >= self.next_add):
+                self.next_add = self.global_step + self.network_args.add_data_every
                 self.virtual_step += self.network_args.training_epsiodes
-            if (self.network_args.imitation_phase) and (epoch >= next_add):
-                next_add += self.network_args.add_data_every
+            if (self.network_args.imitation_phase) and (epoch >= self.next_add):
+                self.next_add += self.network_args.add_data_every
                 self.network_args.total_training_epsiodes -= self.network_args.training_epsiodes
                 print(f'training now: {self.network_args.training_epsiodes}')
                 print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
@@ -368,7 +381,7 @@ class ActiveCriticLearner(nn.Module):
             loss_critic = None
             loss_prediction = None
 
-            loss_actor, loss_critic, loss_prediction = self.train_step(
+            loss_actor, loss_critic, loss_prediction, local_step = self.train_step(
                 train_loader=self.train_loader,
                 actor_step=self.actor_step,
                 critic_step=self.critic_step,
@@ -424,7 +437,7 @@ class ActiveCriticLearner(nn.Module):
 
             self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
             self.train_data.onyl_positiv = False
-            self.global_step += len(self.train_data)
+            self.global_step += local_step
             '''if current_patients <= 0:
                 self.policy.critic.init_model()
                 print('reinit critic')

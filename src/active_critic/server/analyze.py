@@ -191,6 +191,7 @@ def make_acl(
     acla.total_training_epsiodes = total_training_epsiodes
     acla.start_critic = True
     acla.dense = True
+    acla.strict_learn_budget =True
 
 
     epsiodes = 30
@@ -403,10 +404,10 @@ def run_eval_stats_env(device, weight_decay):
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']
-    val_everys = [3000]
-    add_data_everys = [3000]
+    val_everys = [1000]
+    add_data_everys = [1000]
     opt_modes = ['actor+plan']
-    opt_steps_list = [1, 3, 5]
+    opt_steps_list = [3]
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
@@ -414,7 +415,7 @@ def run_eval_stats_env(device, weight_decay):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' sparse only positive! {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                                logname = f' strict budget {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
