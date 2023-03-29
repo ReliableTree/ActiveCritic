@@ -193,10 +193,21 @@ class ActiveCriticPolicy(BaseModel):
             stop_opt: bool
             ):
         
-        
-
         plans = th.zeros([observation_seq.shape[0], observation_seq.shape[1], self.planner.wsms.model_setup.d_output], device=self.args_obj.device, dtype=th.float32)
+
+        current_actor = copy.deepcopy(self.actor.state_dict())
+        current_planner = copy.deepcopy(self.planner.state_dict())
+        if current_step > 0:
+            self.actor.load_state_dict(self.init_actor)
+            self.planner.load_state_dict(self.init_planner)
         actions = self.make_action(action_seq=action_seq, observation_seq=observation_seq, plans=plans, current_step=current_step)
+        if current_step == 0:
+            if self.planner.model is None:
+                with th.no_grad():
+                    plans = self.make_plans(acts=actions, obsvs=observation_seq)
+            self.init_actor = copy.deepcopy(self.actor.state_dict())
+            self.init_planner = copy.deepcopy(self.planner.state_dict())
+
 
         self.history.add_value(self.history.gen_trj, actions.detach(), current_step=current_step)
         critic_input = self.get_critic_input(obsvs=observation_seq, acts=actions)
@@ -213,6 +224,9 @@ class ActiveCriticPolicy(BaseModel):
             return result
         else:
             #opt_count = int(actions.shape[0]/2)
+            if current_step >0:
+                self.actor.load_state_dict(current_actor)
+                self.planner.load_state_dict(current_planner)
             batch_size = actions.shape[0]
             if (self.buffer_filled_to > 0) and (self.training_mode):
                 buffer_actions = self.history.act_buffer[0][:self.buffer_filled_to, self.current_step]
@@ -288,10 +302,6 @@ class ActiveCriticPolicy(BaseModel):
             actions = actions.detach()
             observations = observations.detach()
             plans = self.make_plans(acts=actions, obsvs=observations)
-
-            if current_step == 0:
-                self.init_actor = copy.deepcopy(self.actor.state_dict())
-                self.init_planner = copy.deepcopy(self.planner.state_dict())
 
             lr = self.args_obj.inference_opt_lr
             optimizer = th.optim.AdamW(

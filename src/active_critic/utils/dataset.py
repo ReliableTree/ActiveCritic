@@ -14,7 +14,7 @@ class DatasetAC(torch.utils.data.Dataset):
     def __len__(self):
         if self.obsv is not None:
             if self.onyl_positiv:
-                return self.virt_success.sum()
+                return int(self.virt_success.sum().cpu())
             else:
                 return len(self.virt_obsv)
         else:
@@ -27,6 +27,7 @@ class DatasetAC(torch.utils.data.Dataset):
         previous_steps = steps - 1
         previous_steps[previous_steps<0] = 0
         prev_proposed_acts = pick_action_from_history(action_histories=actions_history, steps=previous_steps)
+
         self.prev_proposed_acts = prev_proposed_acts.to(self.device)
         success = self.reward.reshape([obsv.shape[0], obsv.shape[1]]).max(-1).values
         self.success = (success == 1)
@@ -34,8 +35,15 @@ class DatasetAC(torch.utils.data.Dataset):
         self.steps = steps.reshape([-1]).to(self.device)
         self.make_virt_data()
 
+    def get_expt_trjs_ind(self):
+        if self.onyl_positiv:
+            return self.virt_expert_trjs[self.virt_success]
+        else:
+            return self.virt_expert_trjs
+
 
     def make_virt_data(self):
+
         if len(self.obsv) < self.batch_size:
             rep_fac = math.ceil(self.batch_size / len(self.obsv)) + 1
             self.virt_reward = self.reward.repeat([rep_fac, 1, 1])

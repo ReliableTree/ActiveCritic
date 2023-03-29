@@ -118,3 +118,8 @@ def pick_action_from_history(action_histories, steps):
             result_index = batch * len(steps[batch]) + i
             result[result_index] = action_histories[batch, timestep]
     return result
+
+def make_weights(len, gamma, exp_ind):
+    weights = th.exp(-gamma*th.arange(len, 0, -1) / len)
+    weights[exp_ind] = 1
+    return weights

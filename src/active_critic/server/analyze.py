@@ -192,6 +192,7 @@ def make_acl(
     acla.start_critic = True
     acla.dense = True
     acla.strict_learn_budget =True
+    acla.gamma_ind = 1
 
 
     epsiodes = 30
@@ -415,7 +416,7 @@ def run_eval_stats_env(device, weight_decay):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' strict budget {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                                logname = f' strict budget load org actor {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,

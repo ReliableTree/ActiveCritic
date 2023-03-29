@@ -568,7 +568,7 @@ if __name__ == '__main__':
     list_env_tags = ['drawerclose']
     n_samples = 1000
     bc_epochs = 0
-    ids = [i for i in range(3)]
+    ids = [i for i in range(4)]
     dense = False
     th.manual_seed(1)
 
