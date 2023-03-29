@@ -127,7 +127,7 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
         success, rews, history = get_avr_succ_rew_det(
             env=pomdp_env_val, 
             learner=learner.policy, 
-            epsiodes=100,
+            epsiodes=50,
             path=learner_stats_path,
             history=history,
             step=0)
@@ -150,7 +150,7 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
             success, rews, history = get_avr_succ_rew_det(
                 env=pomdp_env_val, 
                 learner=learner.policy, 
-                epsiodes=200,
+                epsiodes=50,
                 path=learner_stats_path,
                 history=history,
                 step=learner.env.envs[0].reset_count)
