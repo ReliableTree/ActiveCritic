@@ -34,7 +34,7 @@ class ActiveCriticPolicySetup:
         self.optimizer_mode : str = None
         self.clip:bool = True
         self.buffer_size:int = None
-        self.optimize_at_beginning = None
+        self.optimize_full_each_step = None
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
         self.reset()
@@ -224,7 +224,7 @@ class ActiveCriticPolicy(BaseModel):
             return result
         else:
             #opt_count = int(actions.shape[0]/2)
-            if current_step >0:
+            if (current_step >0) and (not self.args_obj.optimize_full_each_step):
                 self.actor.load_state_dict(current_actor)
                 self.planner.load_state_dict(current_planner)
             batch_size = actions.shape[0]
@@ -304,7 +304,7 @@ class ActiveCriticPolicy(BaseModel):
             plans = self.make_plans(acts=actions, obsvs=observations)
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
 
-            if self.current_step == 0:
+            if (self.current_step == 0) or self.args_obj.optimize_full_each_step:
                 lr = self.args_obj.inference_opt_lr
                 self.inf_optimizer = th.optim.AdamW(
                     [{'params': self.actor.parameters()}, {'params': self.planner.parameters()}],
@@ -339,10 +339,6 @@ class ActiveCriticPolicy(BaseModel):
         expected_success = th.zeros(
             size=[actions.shape[0], 1], dtype=th.float, device=actions.device)
         final_exp_success = th.clone(expected_success)
-
-        if self.args_obj.optimize_at_beginning and current_step > 0:
-            print('returned early')
-            return final_actions, final_exp_success
         
         if self.critic.wsms.sparse:
             goal_label = self.gl[:actions.shape[0], 0]
