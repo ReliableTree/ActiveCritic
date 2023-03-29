@@ -109,7 +109,7 @@ class ImitationLearningWrapper:
             actions.append(self.policy.get_action(obs))
         return actions
 
-def make_dummy_vec_env(name, seq_len):
+def make_dummy_vec_env(name, seq_len, sparse):
     policy_dict = make_policy_dict()
 
     env_tag = name
@@ -117,13 +117,14 @@ def make_dummy_vec_env(name, seq_len):
     env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
     env._freeze_rand_vec = False
     timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
-    strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+    strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1, sparse=sparse)
     reset_env = ResetCounterWrapper(env=strict_time)
 
     dv1 = DummyVecEnv([lambda: RolloutInfoWrapper(reset_env)])
     vec_expert = ImitationLearningWrapper(
         policy=policy_dict[env_tag][0], env=dv1)
     return dv1, vec_expert
+
 
 class ResetCounterWrapper(gym.Wrapper):
     def __init__(self, env: Env) -> None:
@@ -141,10 +142,12 @@ class ResetCounterWrapper(gym.Wrapper):
         return obsv, rew, done, info
 
 class StrictSeqLenWrapper(gym.Wrapper):
-    def __init__(self, env: Env, seq_len) -> None:
+    def __init__(self, env: Env, seq_len, sparse) -> None:
         super().__init__(env)
         self.seq_len = seq_len
         self.current_step = 0
+        self.sparse = sparse
+        self.success = float(0)
 
     def reset(self):
         self.current_step = 1
@@ -155,10 +158,16 @@ class StrictSeqLenWrapper(gym.Wrapper):
         obsv, rew, done, info = super().step(action)
         
         done = self.current_step == self.seq_len
-
-        return obsv, rew, done, info
-
-def make_vec_env(env_id, num_cpu, seq_len):
+        if info['success'] == 1:
+            self.success = float(10)
+        if self.sparse and not done:
+            return obsv, float(0), done, info
+        elif done:
+            return obsv, self.success, done, info
+        else:
+            return obsv, rew, done, info
+        
+def make_vec_env(env_id, num_cpu, seq_len, sparse):
     policy_dict = make_policy_dict()
 
     def make_env(env_id, rank, seed=0):
@@ -168,7 +177,7 @@ def make_vec_env(env_id, num_cpu, seq_len):
             env._freeze_rand_vec = False
             #rce = ResetCounterWrapper(env)
             timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
-            strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+            strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1, sparse=sparse)
             riw = RolloutInfoWrapper(strict_time)
             return riw
         return _init
@@ -178,7 +187,7 @@ def make_vec_env(env_id, num_cpu, seq_len):
         policy=policy_dict[env_id][0], env=env)
     return env, vec_expert
 
-def make_vec_env_pomdp(env_id, num_cpu, seq_len, lookup_freq):
+def make_vec_env_pomdp(env_id, num_cpu, seq_len, lookup_freq, sparse):
     policy_dict = make_policy_dict()
 
     def make_env(env_id, rank, seed=0):
@@ -188,7 +197,7 @@ def make_vec_env_pomdp(env_id, num_cpu, seq_len, lookup_freq):
             env._freeze_rand_vec = False
             reset_env = ResetCounterWrapper(env=env)
             timelimit = TimeLimit(env=reset_env, max_episode_steps=max_episode_steps)
-            strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+            strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1, sparse=sparse)
             riw = RolloutInfoWrapper(strict_time)
             pomdp = POMDP_Wrapper(env=riw, lookup_freq=lookup_freq, pe_dim=10, seq_len=seq_len+1)
             return pomdp
@@ -393,7 +402,7 @@ class REC_POMDP_Wrapper(gym.Wrapper):
 
         return obsv, rew, done, info
     
-def make_dummy_vec_env_rec_pomdp(name, seq_len, dense):
+def make_dummy_vec_env_rec_pomdp(name, seq_len, dense, sparse):
     if dense:
         return make_dummy_vec_env(name=name, seq_len=seq_len)
     policy_dict = make_policy_dict()
@@ -403,7 +412,7 @@ def make_dummy_vec_env_rec_pomdp(name, seq_len, dense):
     env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
     env._freeze_rand_vec = False
     timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
-    strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+    strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1, sparse=sparse)
     reset_env = ResetCounterWrapper(env=strict_time)
 
     rec_pomdp = REC_POMDP_Wrapper(env=reset_env)
@@ -413,9 +422,9 @@ def make_dummy_vec_env_rec_pomdp(name, seq_len, dense):
         policy=policy_dict[env_tag][0], env=dv1)
     return dv1, vec_expert
 
-def make_dummy_vec_env_pomdp(name, seq_len, lookup_freq, dense):
+def make_dummy_vec_env_pomdp(name, seq_len, lookup_freq, dense, sparse):
     if dense:
-        return make_dummy_vec_env(name=name, seq_len=seq_len)
+        return make_dummy_vec_env(name=name, seq_len=seq_len, sparse=sparse)
     policy_dict = make_policy_dict()
 
     env_tag = name
@@ -423,7 +432,7 @@ def make_dummy_vec_env_pomdp(name, seq_len, lookup_freq, dense):
     env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[policy_dict[env_tag][1]]()
     env._freeze_rand_vec = False
     timelimit = TimeLimit(env=env, max_episode_steps=max_episode_steps)
-    strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1)
+    strict_time = StrictSeqLenWrapper(timelimit, seq_len=seq_len + 1, sparse=sparse)
     reset_env = ResetCounterWrapper(env=strict_time)
 
     pomdp = POMDP_Wrapper(env=reset_env, lookup_freq=lookup_freq, pe_dim=10, seq_len=seq_len+1)
