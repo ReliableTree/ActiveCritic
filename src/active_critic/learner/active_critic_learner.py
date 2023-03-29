@@ -20,6 +20,7 @@ import pickle
 import copy
 import math
 
+from active_critic.learner.higher_learning import actor_step, critic_step
 
 class ACLScores:
     def __init__(self) -> None:
@@ -97,7 +98,7 @@ class ActiveCriticLearner(nn.Module):
                 self.logname + ' optimized', data_path=network_args_obj.data_path)
         self.global_step = 0
 
-        self.train_data = DatasetAC(batch_size=self.network_args.batch_size, device='cpu')
+        self.train_data = DatasetAC(batch_size=self.network_args.batch_size, device=self.network_args.device)
         self.train_data.onyl_positiv = False
         self.exp_dict_opt = None
         self.exp_dict = None
@@ -133,81 +134,7 @@ class ActiveCriticLearner(nn.Module):
         self.train_data.onyl_positiv = False
         self.train_loader = DataLoader(
             dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
-        
-
-    def add_training_data(self, policy=None, episodes = 1, seq_len = None):
-        if policy is None:
-            policy = self.policy
-            policy.eval()
-            opt_before = self.policy.args_obj.optimize
-            self.policy.args_obj.optimize = (self.policy.args_obj.optimize and self.network_args.start_critic)
-            iterations = math.ceil(episodes/self.env.num_envs)
-            policy.training_mode = True
-        else:
-            opt_before = None
-
-        h = time.perf_counter()
-        add_results = []
-        print(f'____________________________dense training data: {self.network_args.dense}')
-        for iteration in range(iterations):
-            result = sample_new_episode(
-                policy=policy,
-                env=self.env,
-                dense=self.network_args.dense,
-                extractor=self.network_args.extractor,
-                device=self.network_args.device,
-                episodes=self.env.num_envs,
-                seq_len=seq_len)
-            result_array = []
-            for res in result:
-                result_array.append(res)
-            add_results.append(result_array)
-        
-        for element in add_results[1:]:
-            for i, part in enumerate(element):
-                add_results[0][i] = th.cat((add_results[0][i], part), dim=0)
-        actions, observations, rewards, _, expected_rewards, action_history = add_results[0]
-        assert actions.shape[0] >= episodes, 'ASDSAD'
-        actions = actions[:episodes]
-        observations = observations[:episodes]
-        rewards = rewards[:episodes]
-        expected_rewards = expected_rewards[:episodes]
-        action_history = action_history[:episodes]
-        if self.last_trj_training is not None:
-            self.compare_expecations(self.last_trj_training, 'Training')
-        self.last_trj_training = [
-            observations[:1],
-            actions[:1],
-            rewards[:1],
-            expected_rewards[:1]
-        ]
-
-        debug_dict = {
-            'Training epoch time': th.tensor(time.perf_counter() - h)
-        }
-        self.write_tboard_scalar(debug_dict=debug_dict, train=True)
-        success = rewards.squeeze().max(-1).values
-        success = (success == 1).type(th.float).mean()
-
-        sparse_reward, _ = rewards.max(dim=1)
-
-
-        print(f'last rewards: {rewards.mean()}')
-        print(f'max last rewards: {sparse_reward.mean()}')
-
-        print(f'last success: {success}')
-        print(f'self.last_scores: {self.last_scores}')
-        expert_trjs = th.zeros([episodes], dtype=th.bool, device=actions.device)
-        self.add_data(
-            actions=actions,
-            observations=observations,
-            rewards=rewards,
-            expert_trjs=expert_trjs,
-            action_history=action_history
-        )
-        if opt_before is not None:
-            self.policy.args_obj.optimize = opt_before
-
+    
 
     def actor_step(self, data, loss_actor):
         obsv, actions, reward, expert_trjs, _, _, _ = data
@@ -273,30 +200,97 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict={'lr actor': th.tensor(self.policy.critic.scheduler.get_last_lr()).mean()}, train=True)
         return loss_critic, loss_prediction
 
-    def train_step(self, loss_actor, loss_critic, train_critic, loss_prediction):
+    def add_training_data(self, policy=None, episodes = 1, seq_len = None):
+        if policy is None:
+            policy = self.policy
+            policy.eval()
+            opt_before = self.policy.args_obj.optimize
+            self.policy.args_obj.optimize = (self.policy.args_obj.optimize and self.network_args.start_critic)
+            iterations = math.ceil(episodes/self.env.num_envs)
+            policy.training_mode = True
+        else:
+            opt_before = None
+
+        h = time.perf_counter()
+        add_results = []
+        for iteration in range(iterations):
+            result = sample_new_episode(
+                policy=policy,
+                env=self.env,
+                dense=self.network_args.dense,
+                extractor=self.network_args.extractor,
+                device=self.network_args.device,
+                episodes=self.env.num_envs,
+                seq_len=seq_len)
+            result_array = []
+            for res in result:
+                result_array.append(res)
+            add_results.append(result_array)
+        
+        for element in add_results[1:]:
+            for i, part in enumerate(element):
+                add_results[0][i] = th.cat((add_results[0][i], part), dim=0)
+        actions, observations, rewards, _, expected_rewards, action_history = add_results[0]
+        assert actions.shape[0] >= episodes, 'ASDSAD'
+        actions = actions[:episodes]
+        observations = observations[:episodes]
+        rewards = rewards[:episodes]
+        expected_rewards = expected_rewards[:episodes]
+        action_history = action_history[:episodes]
+        if self.last_trj_training is not None:
+            self.compare_expecations(self.last_trj_training, 'Training')
+        self.last_trj_training = [
+            observations[:1],
+            actions[:1],
+            rewards[:1],
+            expected_rewards[:1]
+        ]
+
+        debug_dict = {
+            'Training epoch time': th.tensor(time.perf_counter() - h)
+        }
+        self.write_tboard_scalar(debug_dict=debug_dict, train=True)
+        success = rewards.squeeze().max(-1).values
+        success = (success == 1).type(th.float).mean()
+
+        sparse_reward, _ = rewards.max(dim=1)
+
+        print(f'last rewards: {rewards.mean()}')
+        print(f'max last rewards: {sparse_reward.mean()}')
+
+        print(f'last success: {success}')
+        print(f'self.last_scores: {self.last_scores}')
+        expert_trjs = th.zeros([episodes], dtype=th.bool, device=actions.device)
+        self.add_data(
+            actions=actions,
+            observations=observations,
+            rewards=rewards,
+            expert_trjs=expert_trjs,
+            action_history=action_history
+        )
+        if opt_before is not None:
+            self.policy.args_obj.optimize = opt_before
+
+    def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic, loss_prediction):
         self.train_data.onyl_positiv = (self.policy.critic.wsms.sparse or (self.train_data.success.sum() > 0))
         if self.train_data.onyl_positiv and (not self.first_switch):
             print('only positive')
             self.first_switch = True
         if len(self.train_data) > 0:
-            actor_loader = DataLoader(dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
-            for data in actor_loader:
+            for data in train_loader:
                 device_data = []
                 for dat in data:
                     device_data.append(dat.to(self.network_args.device))
-                print(f'actor device: {dat.device}')
-                print(f'actor spet: {device_data[0].shape}')
-                loss_actor = self.actor_step(device_data, loss_actor)
+                loss_actor = actor_step(device_data, loss_actor)
 
         if train_critic:
             self.train_data.onyl_positiv = False
-            critic_loader = DataLoader(self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
-            for data in critic_loader:
+            for data in train_loader:
                 device_data = []
                 for dat in data:
                     device_data.append(dat.to(self.network_args.device))
 
-                loss_critic, loss_prediction = self.critic_step(device_data, loss_critic, loss_prediction)
+                loss_critic, loss_prediction = critic_step(device_data, loss_critic, loss_prediction)
 
         return loss_actor, loss_critic, loss_prediction
 
@@ -374,6 +368,9 @@ class ActiveCriticLearner(nn.Module):
             loss_prediction = None
 
             loss_actor, loss_critic, loss_prediction = self.train_step(
+                train_loader=self.train_loader,
+                actor_step=self.actor_step,
+                critic_step=self.critic_step,
                 loss_actor=loss_actor,
                 loss_critic=loss_critic,
                 train_critic=self.train_critic,

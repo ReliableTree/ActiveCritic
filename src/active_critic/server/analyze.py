@@ -253,14 +253,6 @@ def run_experiment(
                             sparse=sparse)    
     acl.network_args.num_expert_demos = demos
     if demos > 0:
-        '''actions, observations, rewards, _, expected_rewards, _ = sample_new_episode(
-            policy=expert,
-            env=acl.env,
-            dense=True,
-            extractor=acl.network_args.extractor,
-            device=acl.network_args.device,
-            episodes=demos,
-            seq_len=seq_len)'''
         
         actions, observations, rewards, _, expected_rewards, _ = sample_new_episode(
             policy=expert,
@@ -412,7 +404,7 @@ def run_eval_stats_env(device, weight_decay):
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = True
-    th.manual_seed(3)
+    th.manual_seed(0)
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:

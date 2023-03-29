@@ -147,10 +147,10 @@ class StrictSeqLenWrapper(gym.Wrapper):
         self.seq_len = seq_len
         self.current_step = 0
         self.sparse = sparse
-        self.success = float(0)
 
     def reset(self):
         self.current_step = 1
+        self.success = float(0)
         return super().reset()
 
     def step(self, action):
@@ -161,8 +161,11 @@ class StrictSeqLenWrapper(gym.Wrapper):
         if info['success'] == 1:
             self.success = float(10)
         if self.sparse and not done:
+            info['unscaled_reward'] = float(0)
             return obsv, float(0), done, info
         elif done:
+            info['unscaled_reward'] = self.success
+
             return obsv, self.success, done, info
         else:
             return obsv, rew, done, info
