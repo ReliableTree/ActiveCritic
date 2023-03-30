@@ -574,10 +574,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [0]
+    list_demonstrations = [1]
     list_env_tags = ['reach', 'windowopen']
     n_samples = 1000
-    bc_epochs = 0
+    bc_epochs = 500
     ids = [i for i in range(3)]
     dense = True
     sparse = True
