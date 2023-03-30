@@ -171,7 +171,6 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, 
         name=env_tag, seq_len=seq_len, lookup_freq=1000, dense=dense, sparse=sparse)
     
     #reach
-    learning_rate = 7.3e-4
     buffer_size = 300000
     batch_size= 256
     ent_coef= 'auto'
@@ -183,7 +182,7 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, 
     policy_kwargs= dict(log_std_init=-3, net_arch=[400, 300])
 
     tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env,
-                      device=device, learning_rate=learning_rate,
+                      device=device, learning_rate=lr,
                       buffer_size=buffer_size,
                       batch_size=batch_size,
                       ent_coef=ent_coef,
@@ -221,7 +220,6 @@ def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag, 
     n_steps= 512
     batch_size = 32
     gamma= 0.9
-    learning_rate= 0.000104019
     ent_coef= 7.52585e-08
     n_epochs= 5
     gae_lambda= 1.0
@@ -233,7 +231,7 @@ def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag, 
                       pomdp_env, 
                       verbose=0,
                       device=device, 
-                      learning_rate=learning_rate,
+                      learning_rate=lr,
                       batch_size=batch_size,
                       gamma=gamma,
                       ent_coef=ent_coef,
@@ -576,7 +574,7 @@ if __name__ == '__main__':
 
     list_demonstrations = [1]
     list_env_tags = ['reach', 'windowopen']
-    n_samples = 1000
+    n_samples = 5000
     bc_epochs = 500
     ids = [i for i in range(3)]
     dense = True
@@ -650,38 +648,40 @@ if __name__ == '__main__':
 
     elif args.learner == 'stats_PPO':
         print('running stats PPO')
-        for lr in [1e-4]:
-            for env_tag in list_env_tags:
-                for demos in list_demonstrations:
-                    stats_PPO(
-                        device=args.device,
-                        path=path,
-                        demonstration=demos,
-                        lr=lr,
-                        env_tag=env_tag,
-                        n_samples=n_samples,
-                        bc_epochs=bc_epochs,
-                        ids=ids,
-                        dense=dense,
-                        sparse=sparse
-                    )
+        lrs = [0.0005, 0.0005]
+        for env_i, env_tag in enumerate(list_env_tags):
+            lr = lrs[env_i]
+            for demos in list_demonstrations:
+                stats_PPO(
+                    device=args.device,
+                    path=path,
+                    demonstration=demos,
+                    lr=lr,
+                    env_tag=env_tag,
+                    n_samples=n_samples,
+                    bc_epochs=bc_epochs,
+                    ids=ids,
+                    dense=dense,
+                    sparse=sparse
+                )
     elif args.learner == 'stats_TQC':
         print('running stats TQC')
-        for lr in [5e-7]:
-            for env_tag in list_env_tags:
-                for demos in list_demonstrations:
-                    stats_TQC(
-                        device=args.device,
-                        path=path,
-                        demonstration=demos,
-                        lr=lr,
-                        env_tag=env_tag,
-                        n_samples=n_samples,
-                        bc_epochs=bc_epochs,
-                        ids=ids,
-                        dense=dense,
-                        sparse=sparse
-                    )
+        lrs = [7.3e-4, 1e-4]
+        for env_i, env_tag in enumerate(list_env_tags):
+            lr = lrs[env_i]
+            for demos in list_demonstrations:
+                stats_TQC(
+                    device=args.device,
+                    path=path,
+                    demonstration=demos,
+                    lr=lr,
+                    env_tag=env_tag,
+                    n_samples=n_samples,
+                    bc_epochs=bc_epochs,
+                    ids=ids,
+                    dense=dense,
+                    sparse=sparse
+                )
 
     elif args.learner == 'stats_TPR':
         print('running RPPO')
