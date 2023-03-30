@@ -151,6 +151,7 @@ def make_acl(
         make_graphs,
         opt_steps,
         sparse,
+        max_epoch_steps,
         fast=False):
     device = device
     acla = ActiveCriticLearnerArgs()
@@ -192,6 +193,7 @@ def make_acl(
     acla.total_training_epsiodes = total_training_epsiodes
     acla.start_critic = True
     acla.dense = True
+    acla.max_epoch_steps = max_epoch_steps
 
 
     epsiodes = 30
@@ -225,6 +227,7 @@ def run_experiment(
         opt_steps,
         sparse,
         seq_len,
+        max_epoch_steps,
         weight_decay=1e-2, 
         demos=14, 
         make_graphs=False,
@@ -250,7 +253,8 @@ def run_experiment(
                             make_graphs=make_graphs,
                             opt_steps=opt_steps,
                             fast=fast,
-                            sparse=sparse)    
+                            sparse=sparse,
+                            max_epoch_steps=max_epoch_steps)    
     acl.network_args.num_expert_demos = demos
     if demos > 0:
         
@@ -394,7 +398,7 @@ def run_eval_stats_env(device, weight_decay):
     demonstrations_list = [1]
     run_ids = [i for i in range(3)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 10  
+    training_episodes = 2  
     total_training_epsiodes = 1000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
@@ -404,8 +408,9 @@ def run_eval_stats_env(device, weight_decay):
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = True
-    seq_len = 100
-    th.manual_seed(0)
+    seq_len = 10
+    max_epoch_steps = 40000
+    th.manual_seed(1)
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
@@ -413,7 +418,7 @@ def run_eval_stats_env(device, weight_decay):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' only positive {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                                logname = f' max compute budget only positive {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
@@ -429,10 +434,11 @@ def run_eval_stats_env(device, weight_decay):
                                             add_data_every = add_data_everys[val_step],
                                             opt_mode=opt_mode,
                                             make_graphs = True,
-                                            fast=False,
+                                            fast=True,
                                             opt_steps=opt_steps,
                                             sparse=sparse,
-                                            seq_len=seq_len)
+                                            seq_len=seq_len,
+                                            max_epoch_steps=max_epoch_steps)
 
 if __name__ == '__main__':
     run_eval(device='cuda')

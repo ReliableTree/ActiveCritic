@@ -27,3 +27,4 @@ class ActiveCriticLearnerArgs:
         self.start_critic:int = None
         self.make_graphs:bool = None
         self.dense:bool = None
+        self.max_epoch_steps = None

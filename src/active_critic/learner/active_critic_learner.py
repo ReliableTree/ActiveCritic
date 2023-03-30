@@ -281,16 +281,20 @@ class ActiveCriticLearner(nn.Module):
     def train_step(self, train_loader, loss_actor, loss_critic, train_critic, loss_prediction):
 
         self.train_data.onyl_positiv = False
+        local_step = 0
         for data in train_loader:
             device_data = []
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
+            local_step += dat.shape[0]
             self.train_data.onyl_positiv = (self.policy.critic.wsms.sparse or (self.train_data.success.sum() > 0))
             self.train_data.onyl_positiv = True
             loss_actor = self.actor_step(device_data, loss_actor)
             self.train_data.onyl_positiv = False
             if train_critic:
                 loss_critic, loss_prediction = self.critic_step(device_data, loss_critic, loss_prediction)
+            if local_step > self.network_args.max_epoch_steps:
+                return loss_actor, loss_critic, loss_prediction
 
         return loss_actor, loss_critic, loss_prediction
 
