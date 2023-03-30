@@ -224,6 +224,7 @@ def run_experiment(
         opt_mode, 
         opt_steps,
         sparse,
+        seq_len,
         weight_decay=1e-2, 
         demos=14, 
         make_graphs=False,
@@ -231,7 +232,6 @@ def run_experiment(
         total_training_epsiodes=20, 
         training_episodes=10, 
         min_critic_threshold=1e-4):
-    seq_len = 100
 
     acl, env, expert, seq_len, epsiodes, device = make_acl(
                             device,
@@ -391,20 +391,21 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
-    demonstrations_list = [4]
-    run_ids = [i for i in range(3)]
+    demonstrations_list = [1]
+    run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 10
+    training_episodes = 10  
     total_training_epsiodes = 2000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['pickplace', 'push']
+    env_tags = ['reach']
     val_everys = [1000]
     add_data_everys = [1000]
     opt_modes = ['actor+plan']
-    opt_steps_list = [3]
+    opt_steps_list = [0]
     sparse = True
-    th.manual_seed(0)
+    seq_len = 100
+    th.manual_seed(4)
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
             for im_ph in imitation_phases:
@@ -430,7 +431,8 @@ def run_eval_stats_env(device, weight_decay):
                                             make_graphs = True,
                                             fast=False,
                                             opt_steps=opt_steps,
-                                            sparse=sparse)
+                                            sparse=sparse,
+                                            seq_len=seq_len)
 
 if __name__ == '__main__':
     run_eval(device='cuda')
