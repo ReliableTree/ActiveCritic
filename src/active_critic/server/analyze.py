@@ -395,14 +395,14 @@ def run_eval_stats_env(device, weight_decay):
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10  
-    total_training_epsiodes = 2000
+    total_training_epsiodes = 1000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']
     val_everys = [1000]
     add_data_everys = [1000]
     opt_modes = ['actor+plan']
-    opt_steps_list = [0]
+    opt_steps_list = [3]
     sparse = True
     seq_len = 100
     th.manual_seed(4)
