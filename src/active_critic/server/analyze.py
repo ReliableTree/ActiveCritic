@@ -399,7 +399,7 @@ def run_eval_stats_env(device, weight_decay):
     run_ids = [i for i in range(3)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 500
+    total_training_epsiodes = 1000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['windowopen']
@@ -409,7 +409,7 @@ def run_eval_stats_env(device, weight_decay):
     opt_steps_list = [3]
     sparse = True
     seq_len = 100
-    max_epoch_steps = 40000
+    max_epoch_steps = 50000
     th.manual_seed(1)
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
@@ -418,7 +418,7 @@ def run_eval_stats_env(device, weight_decay):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' max compute budget only positive {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                                logname = f' reset {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
