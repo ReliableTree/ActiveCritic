@@ -98,7 +98,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
     elif opt_mode == 'actor+plan':
-        acps.inference_opt_lr = 1e-6
+        acps.inference_opt_lr = 5e-7
         acps.opt_steps = opt_steps
     else:
         1/0
@@ -395,18 +395,18 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
-    demonstrations_list = [1]
-    run_ids = [i for i in range(3)]
+    demonstrations_list = [4]
+    run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 1000
+    total_training_epsiodes = 5000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
+    env_tags = ['pickplace']
     val_everys = [1000]
     add_data_everys = [1000]
     opt_modes = ['actor+plan']
-    opt_steps_list = [3]
+    opt_steps_list = [1]
     sparse = True
     seq_len = 100
     max_epoch_steps = 50000
