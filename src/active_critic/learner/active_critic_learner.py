@@ -204,7 +204,7 @@ class ActiveCriticLearner(nn.Module):
         if opt_before is not None:
             self.policy.args_obj.optimize = opt_before
 
-        if self.train_data.success.sum() == 0:
+        if self.train_data.success.sum() < self.network_args.explore_until:
             self.policy.actor.init_model()
             self.policy.critic.init_model()
             self.policy.planner.init_model()
