@@ -144,7 +144,7 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
             success.mean()), stepid=learner.env.envs[0].reset_count)
 
         while learner.env.envs[0].reset_count <= n_samples:
-            learner.learn(eval_every, log_interval=1, progress_bar=True, reset_num_timesteps=False)
+            learner.learn(eval_every, log_interval=1, reset_num_timesteps=False)
             print(learner.env.envs[0].reset_count)
             success, rews, history = get_avr_succ_rew_det(
                 env=pomdp_env_val, 
