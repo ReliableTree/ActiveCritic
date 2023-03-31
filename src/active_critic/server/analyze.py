@@ -319,7 +319,7 @@ def run_eval_stats_env(device, weight_decay):
                                             val_every=val_every,
                                             add_data_every = add_data_everys[val_step],
                                             opt_mode=opt_mode,
-                                            make_graphs = True,
+                                            make_graphs = False,
                                             fast=False,
                                             opt_steps=opt_steps,
                                             sparse=sparse,
