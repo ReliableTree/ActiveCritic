@@ -156,17 +156,6 @@ def make_acl(
         fast=False):
     device = device
     acla = ActiveCriticLearnerArgs()
-    acla.data_path = data_path
-    acla.device = device
-    acla.extractor = DummyExtractor()
-    acla.imitation_phase = imitation_phase
-    tag = env_tag
-    acla.logname = tag + logname
-    acla.tboard = True
-    acla.batch_size = 16
-    acla.make_graphs = make_graphs
-    acla.explore_until = explore_until
-    number = 10
 
     if fast:
         acla.val_every = val_every
@@ -190,13 +179,22 @@ def make_acl(
         acla.min_critic_threshold = min_critic_threshold
         acla.num_cpu = 20
 
-
-    acla.patients = 40000
+    acla.data_path = data_path
+    acla.device = device
+    acla.extractor = DummyExtractor()
+    acla.imitation_phase = imitation_phase
+    tag = env_tag
+    acla.logname = tag + logname
+    acla.tboard = True
+    acla.batch_size = 16
+    acla.make_graphs = make_graphs
+    acla.explore_until = explore_until
     acla.total_training_epsiodes = total_training_epsiodes
     acla.start_critic = True
     acla.dense = True
     acla.max_epoch_steps = max_epoch_steps
 
+    acla.use_pred_loss = False
 
     epsiodes = 30
     ac, acps, env, expert = setup_ac(
@@ -399,23 +397,23 @@ def run_eval_stats_pp(device, weight_decay):
 
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
-    demonstrations_list = [0]
+    demonstrations_list = [1]
     run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
     total_training_epsiodes = 2000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['drawerclose']
+    env_tags = ['reach']
     val_everys = [1000]
     add_data_everys = [1000]
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = True
     seq_len = 50
-    max_epoch_steps = 50000
+    max_epoch_steps = 30000
     manual_seed = 0
-    explore_until = 100
+    explore_until = 0
     th.manual_seed(manual_seed)
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
@@ -424,7 +422,7 @@ def run_eval_stats_env(device, weight_decay):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' ms {manual_seed} explore_until {explore_until} {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                                logname = f' ms {manual_seed}  explore_until {explore_until} {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,

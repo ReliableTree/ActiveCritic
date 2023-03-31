@@ -255,16 +255,20 @@ class ActiveCriticLearner(nn.Module):
         critic_result = self.policy.critic.forward(critic_input)
         reward_loss, l2_dist = calcMSE(critic_result, label, return_tensor=True)
 
-        prediction_mask = steps > 0
-        critic_predicted_input_prev = self.policy.get_critic_input(obsvs=prev_observation[prediction_mask], acts=prev_proposed_actions[prediction_mask])
-        critic_pred_result_prev = self.policy.critic.forward(critic_predicted_input_prev)
+        if self.network_args.use_pred_loss:
+            prediction_mask = steps > 0
+            critic_predicted_input_prev = self.policy.get_critic_input(obsvs=prev_observation[prediction_mask], acts=prev_proposed_actions[prediction_mask])
+            critic_pred_result_prev = self.policy.critic.forward(critic_predicted_input_prev)
 
-        critic_predicted_input_current = self.policy.get_critic_input(obsvs=obsv[prediction_mask], acts=prev_proposed_actions[prediction_mask])
-        critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
+            critic_predicted_input_current = self.policy.get_critic_input(obsvs=obsv[prediction_mask], acts=prev_proposed_actions[prediction_mask])
+            critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
 
-        pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
+            pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
 
-        loss = reward_loss + pred_loss
+            loss = reward_loss + pred_loss
+        else:
+            l2_pred = th.zeros_like(l2_dist)
+            loss = reward_loss
 
 
         self.policy.critic.optimizer.zero_grad()
@@ -369,9 +373,6 @@ class ActiveCriticLearner(nn.Module):
 
             max_actor = float('inf')
             mean_critic = float('inf')
-            current_patients = self.network_args.patients
-            #while ((max_actor > self.network_args.actor_threshold) or (max_critic > self.network_args.critic_threshold and (not self.network_args.imitation_phase))) and current_patients > 0:
-            current_patients -= len(self.train_data)
 
             loss_actor = None
             loss_critic = None

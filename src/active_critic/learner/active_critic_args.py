@@ -29,3 +29,4 @@ class ActiveCriticLearnerArgs:
         self.dense:bool = None
         self.max_epoch_steps = None
         self.explore_until = None
+        self.use_pred_loss = None
