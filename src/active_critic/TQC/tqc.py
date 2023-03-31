@@ -106,6 +106,7 @@ class TQC(OffPolicyAlgorithm):
         seed: Optional[int] = None,
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
+        expert=None
     ):
 
         super().__init__(
@@ -134,6 +135,7 @@ class TQC(OffPolicyAlgorithm):
             optimize_memory_usage=optimize_memory_usage,
             supported_action_spaces=(gym.spaces.Box),
             support_multi_env=True,
+            expert=expert
         )
 
         self.target_entropy = target_entropy

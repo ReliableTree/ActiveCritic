@@ -152,6 +152,7 @@ def make_acl(
         opt_steps,
         sparse,
         max_epoch_steps,
+        explore_until,
         fast=False):
     device = device
     acla = ActiveCriticLearnerArgs()
@@ -164,7 +165,7 @@ def make_acl(
     acla.tboard = True
     acla.batch_size = 16
     acla.make_graphs = make_graphs
-    acla.explore_until = 10
+    acla.explore_until = explore_until
     number = 10
 
     if fast:
@@ -229,6 +230,7 @@ def run_experiment(
         sparse,
         seq_len,
         max_epoch_steps,
+        explore_until,
         weight_decay=1e-2, 
         demos=14, 
         make_graphs=False,
@@ -255,6 +257,7 @@ def run_experiment(
                             opt_steps=opt_steps,
                             fast=fast,
                             sparse=sparse,
+                            explore_until=explore_until,
                             max_epoch_steps=max_epoch_steps)    
     acl.network_args.num_expert_demos = demos
     if demos > 0:
@@ -400,7 +403,7 @@ def run_eval_stats_env(device, weight_decay):
     run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 500
+    total_training_epsiodes = 2000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['drawerclose']
@@ -409,9 +412,10 @@ def run_eval_stats_env(device, weight_decay):
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = True
-    seq_len = 100
-    max_epoch_steps = 10000
-    manual_seed = 1
+    seq_len = 50
+    max_epoch_steps = 50000
+    manual_seed = 0
+    explore_until = 100
     th.manual_seed(manual_seed)
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
@@ -420,7 +424,7 @@ def run_eval_stats_env(device, weight_decay):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' ms {manual_seed} explore_until {10} reset {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                                logname = f' ms {manual_seed} explore_until {explore_until} {env_tag} opt steps: {opt_steps} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
@@ -440,7 +444,8 @@ def run_eval_stats_env(device, weight_decay):
                                             opt_steps=opt_steps,
                                             sparse=sparse,
                                             seq_len=seq_len,
-                                            max_epoch_steps=max_epoch_steps)
+                                            max_epoch_steps=max_epoch_steps,
+                                            explore_until=explore_until)
 
 if __name__ == '__main__':
     run_eval(device='cuda')

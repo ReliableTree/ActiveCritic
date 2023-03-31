@@ -144,7 +144,7 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
             success.mean()), stepid=learner.env.envs[0].reset_count)
 
         while learner.env.envs[0].reset_count <= n_samples:
-            learner.learn(eval_every)
+            learner.learn(eval_every, log_interval=1, progress_bar=True, reset_num_timesteps=False)
             print(learner.env.envs[0].reset_count)
             success, rews, history = get_avr_succ_rew_det(
                 env=pomdp_env_val, 
@@ -161,20 +161,19 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
                 success_rate), stepid=learner.env.envs[0].reset_count)
 
 
-def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, bc_epochs, dense, sparse):
-    seq_len=100
+def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, bc_epochs, dense, sparse, seq_len, learning_starts):
     env_tag = env_tag
-    logname = f'TQC_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_n_samples_{n_samples}_id_{id}'
+    logname = f'TQC_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_n_samples_{n_samples}_seqlen_{seq_len}_learning_starts_{learning_starts}_id_{id}'
     print(logname)
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
         name=env_tag, seq_len=seq_len, lookup_freq=1000, dense=dense, sparse=sparse)
     
     #reach
-    buffer_size = 300000
+    buffer_size = 1000000
     batch_size= 256
     ent_coef= 'auto'
-    gamma= 0.98
+    gamma= 0.999
     tau= 0.02
     train_freq= 8
     gradient_steps= 8
@@ -191,7 +190,11 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, 
                       train_freq=train_freq,
                       gradient_steps=gradient_steps,
                       use_sde=use_sde,
-                      policy_kwargs=policy_kwargs)
+                      policy_kwargs=policy_kwargs,
+                      learning_starts=learning_starts,
+                      expert=pomdp_vec_expert)
+    
+
     evaluate_learner(
         env_tag, 
         logname_save_path=logname_save_path, 
@@ -207,10 +210,9 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, 
         sparse=sparse)
 
 
-def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag, bc_epochs, dense, sparse):
-    seq_len=100
+def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag, bc_epochs, dense, sparse, seq_len):
     env_tag = env_tag
-    logname = f'PPO_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_n_samples_{n_samples}_id_{id}'
+    logname = f'PPO_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_n_samples_{n_samples}_seqlen_{seq_len}_id_{id}'
     print(logname)
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
@@ -239,7 +241,8 @@ def run_eval_PPO(device, lr, demonstrations, save_path, n_samples, id, env_tag, 
                       max_grad_norm=max_grad_norm,
                       vf_coef=vf_coef,
                       n_steps=n_steps,
-                      n_epochs=n_epochs)
+                      n_epochs=n_epochs,
+                      )
 
     evaluate_learner(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
                      bc_epochs=bc_epochs, n_samples=n_samples, device=device, eval_every=1000, learner=PPO_learner, dense=dense, sparse=sparse)
@@ -257,13 +260,24 @@ def run_tune_TQC(device):
                 demonstrations += 2
         lr = lr * 0.4
 
-def stats_PPO(device, path, demonstration, lr, env_tag, n_samples, ids, bc_epochs, dense, sparse):
+def stats_PPO(device, path, demonstration, lr, env_tag, n_samples, ids, bc_epochs, dense, sparse, seq_len):
     for id in ids:
-        run_eval_PPO(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=n_samples, id=id, env_tag=env_tag, bc_epochs=bc_epochs, dense=dense, sparse=sparse)
+        run_eval_PPO(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=n_samples, id=id, env_tag=env_tag, bc_epochs=bc_epochs, dense=dense, sparse=sparse, seq_len=seq_len)
 
-def stats_TQC(device, path, demonstration, lr, env_tag, n_samples, bc_epochs, ids, dense, sparse):
+def stats_TQC(device, path, demonstration, lr, env_tag, n_samples, bc_epochs, ids, dense, sparse, seq_len, learning_starts):
     for id in ids:
-        run_eval_TQC(device=device, lr=lr, demonstrations=demonstration, save_path=path, n_samples=n_samples, id=id, env_tag=env_tag, bc_epochs=bc_epochs, dense=dense, sparse=sparse)
+        run_eval_TQC(device=device, 
+                     lr=lr, 
+                     demonstrations=demonstration, 
+                     save_path=path, 
+                     n_samples=n_samples, 
+                     id=id, 
+                     env_tag=env_tag, 
+                     bc_epochs=bc_epochs, 
+                     dense=dense, 
+                     sparse=sparse, 
+                     seq_len=seq_len,
+                     learning_starts=learning_starts)
 
 def run_tune_PPO(device):
     lr = 1e-4
@@ -572,14 +586,16 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [0]
-    list_env_tags = ['windowopen']
-    n_samples = 5000
-    bc_epochs = 0
+    list_demonstrations = [1]
+    list_env_tags = ['reach']
+    n_samples = 2000
+    bc_epochs = 500
     ids = [i for i in range(3)]
     dense = True
     sparse = True
     th.manual_seed(0)
+    seq_len = 100
+    learning_starts = 100
 
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
 
@@ -662,7 +678,8 @@ if __name__ == '__main__':
                     bc_epochs=bc_epochs,
                     ids=ids,
                     dense=dense,
-                    sparse=sparse
+                    sparse=sparse,
+                    seq_len=seq_len
                 )
     elif args.learner == 'stats_TQC':
         print('running stats TQC')
@@ -680,7 +697,9 @@ if __name__ == '__main__':
                     bc_epochs=bc_epochs,
                     ids=ids,
                     dense=dense,
-                    sparse=sparse
+                    sparse=sparse,
+                    seq_len=seq_len,
+                    learning_starts=learning_starts
                 )
 
     elif args.learner == 'stats_TPR':
@@ -716,7 +735,7 @@ if __name__ == '__main__':
                     )
 
         print('running stats TQC')
-        for lr in [5e-7]:
+        for lr in [1e-7]:
             for env_tag in list_env_tags:
                 for demos in list_demonstrations:
                     stats_TQC(

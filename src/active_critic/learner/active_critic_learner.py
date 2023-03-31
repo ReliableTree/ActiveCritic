@@ -204,7 +204,7 @@ class ActiveCriticLearner(nn.Module):
         if opt_before is not None:
             self.policy.args_obj.optimize = opt_before
 
-        if (self.train_data.success.sum()/self.policy.args_obj.epoch_len) < self.network_args.explore_until:
+        if self.get_num_training_samples() < self.network_args.explore_until:
             self.policy.actor.init_model()
             self.policy.critic.init_model()
             self.policy.planner.init_model()
@@ -299,6 +299,7 @@ class ActiveCriticLearner(nn.Module):
             if train_critic:
                 loss_critic, loss_prediction = self.critic_step(device_data, loss_critic, loss_prediction)
             if local_step > self.network_args.max_epoch_steps:
+                print('max steps in learning reached')
                 return loss_actor, loss_critic, loss_prediction
 
         return loss_actor, loss_critic, loss_prediction
