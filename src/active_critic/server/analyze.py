@@ -407,7 +407,7 @@ def run_eval_stats_env(device, weight_decay):
     val_everys = [1000]
     add_data_everys = [1000]
     opt_modes = ['actor+plan']
-    opt_steps_list = [1]
+    opt_steps_list = [3]
     sparse = True
     seq_len = 100
     max_epoch_steps = 10000
@@ -435,7 +435,7 @@ def run_eval_stats_env(device, weight_decay):
                                             val_every=val_every,
                                             add_data_every = add_data_everys[val_step],
                                             opt_mode=opt_mode,
-                                            make_graphs = False,
+                                            make_graphs = True,
                                             fast=False,
                                             opt_steps=opt_steps,
                                             sparse=sparse,
