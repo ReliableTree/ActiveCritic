@@ -50,6 +50,7 @@ from datetime import datetime
 from sb3_contrib import RecurrentPPO
 from active_critic.PPO_Recurrent.ppo_recurrent_bc import Rec_PPO_BC
 import time
+import numpy as np
 
 def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, logname, eval_every, dense, sparse, learner: TQC = None):
     history = None
@@ -596,6 +597,7 @@ if __name__ == '__main__':
     sparse = True
     ms = 2
     th.manual_seed(ms)
+    np.random.seed(ms)
     seq_len = 100
     learning_starts = 3000
 
