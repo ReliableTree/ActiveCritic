@@ -592,11 +592,12 @@ if __name__ == '__main__':
     ids = [i for i in range(3)]
     dense_list = [True, False]
     sparse = True
-    th.manual_seed(0)
+    ms = 2
+    th.manual_seed(ms)
     seq_len = 100
     learning_starts = 3000
 
-    path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
+    path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + f'{ms}_' + '/'
 
     print(f'___________stats: list_demonstrations {list_demonstrations} list_env_tags {list_env_tags}')
     print(f'list dense: {dense_list}')
