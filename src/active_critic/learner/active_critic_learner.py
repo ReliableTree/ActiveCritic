@@ -141,6 +141,7 @@ class ActiveCriticLearner(nn.Module):
             self.policy.args_obj.optimize = (self.policy.args_obj.optimize and self.network_args.start_critic)
             iterations = math.ceil(episodes/self.env.num_envs)
             policy.training_mode = True
+
         else:
             opt_before = None
 
@@ -154,7 +155,8 @@ class ActiveCriticLearner(nn.Module):
                 extractor=self.network_args.extractor,
                 device=self.network_args.device,
                 episodes=self.env.num_envs,
-                seq_len=seq_len)
+                seq_len=seq_len,
+                start_training=self.get_num_training_samples()>self.network_args.explore_until)
             result_array = []
             for res in result:
                 result_array.append(res)
@@ -354,11 +356,14 @@ class ActiveCriticLearner(nn.Module):
 
                 self.virtual_step += self.network_args.training_epsiodes
 
-                if self.next_critic_init is None:
-                    self.next_critic_init = int(self.train_data.success.sum()) * 2
-                if self.train_data.success.sum() > self.next_critic_init:
+                '''if self.next_critic_init is None:
+                    self.next_critic_init = self.get_num_training_samples() * 10
+                if self.get_num_training_samples() > self.next_critic_init:
                     self.policy.critic.init_model()
-                    self.next_critic_init *= 2
+                    self.policy.actor.init_model()
+                    self.policy.planner.init_model()
+                    self.next_critic_init = 10 * self.get_num_training_samples()
+                    print('______________________________init models___________________________________')'''
 
             elif (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every
@@ -542,7 +547,8 @@ class ActiveCriticLearner(nn.Module):
                 extractor=self.network_args.extractor,
                 device=self.network_args.device,
                 episodes=self.network_args.validation_episodes,
-                return_gen_trj=True)
+                return_gen_trj=True,
+                start_training=self.get_num_training_samples()> self.network_args.explore_until)
             if rewards_cumm is None:
                 rewards_cumm = rewards_run
             else:
@@ -706,7 +712,8 @@ class ActiveCriticLearner(nn.Module):
             dense=self.network_args.dense,
             extractor=self.network_args.extractor,
             episodes=1,
-            device=self.network_args.device)
+            device=self.network_args.device,
+            start_training=True)
         self.load_state_dict(th.load(
             path + "policy_network", map_location=device))
         self.policy.actor.optimizer.load_state_dict(

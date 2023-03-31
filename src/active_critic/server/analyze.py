@@ -280,7 +280,7 @@ def run_experiment(
 def run_eval_stats_env(device, weight_decay):
     imitation_phases = [False]
     demonstrations_list = [0]
-    run_ids = [i for i in range(2)]
+    run_ids = [i for i in range(3)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
     total_training_epsiodes = 1000
@@ -293,8 +293,8 @@ def run_eval_stats_env(device, weight_decay):
     opt_steps_list = [3]
     sparse = True
     seq_len = 100
-    max_epoch_steps = 30000
-    manual_seed = 3
+    max_epoch_steps = 5000
+    manual_seed = 0
     explore_until = 30
     th.manual_seed(manual_seed)
     for demonstrations in demonstrations_list:
@@ -304,7 +304,7 @@ def run_eval_stats_env(device, weight_decay):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' ms {manual_seed} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' rand act ms {manual_seed} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
@@ -319,7 +319,7 @@ def run_eval_stats_env(device, weight_decay):
                                             val_every=val_every,
                                             add_data_every = add_data_everys[val_step],
                                             opt_mode=opt_mode,
-                                            make_graphs = False,
+                                            make_graphs = True,
                                             fast=False,
                                             opt_steps=opt_steps,
                                             sparse=sparse,

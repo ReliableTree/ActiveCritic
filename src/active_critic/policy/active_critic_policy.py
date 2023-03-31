@@ -100,6 +100,7 @@ class ActiveCriticPolicy(BaseModel):
         self.buffer_filled_to = 0
 
         self.training_mode = False
+        self.start_training = True
 
     def reset(self):
         self.last_goal = None
@@ -136,54 +137,59 @@ class ActiveCriticPolicy(BaseModel):
         observation: Union[th.Tensor, Dict[str, th.Tensor]],
         state: Optional[Tuple[np.ndarray, ...]] = None,
         episode_start: Optional[np.ndarray] = None,
-        deterministic: bool = False,
+        deterministic: bool = False
     ) -> th.Tensor:
         vec_obsv = self.args_obj.extractor.forward(
             observation).to(self.args_obj.device).unsqueeze(1)
+            
         if (self.last_goal is None) or (self.args_obj.new_epoch(self.last_goal, vec_obsv)):
-            self.reset_epoch(vec_obsv=vec_obsv)
-            action_seq = None
-            #T observations x T actions timesteps
-            self.action_history = th.zeros([vec_obsv.shape[0], self.args_obj.epoch_len, self.args_obj.epoch_len, self.action_space.shape[0]], device=self.args_obj.device, dtype=th.float)
+                self.reset_epoch(vec_obsv=vec_obsv)
+                action_seq = None
+                #T observations x T actions timesteps
+                self.action_history = th.zeros([vec_obsv.shape[0], self.args_obj.epoch_len, self.args_obj.epoch_len, self.action_space.shape[0]], device=self.args_obj.device, dtype=th.float)
         else:
             self.current_step += 1
-            action_seq = self.current_result.gen_trj
+            if self.start_training:
+                action_seq = self.current_result.gen_trj
+
+        if self.start_training:
+            self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
+            self.history.add_buffer_value(
+                self.history.obsv_buffer, 
+                value=th.clone(self.obs_seq.detach()), 
+                current_step=self.current_step, 
+                index=self.buffer_index,
+                training_mode=self.training_mode)
 
 
-        self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
-        self.history.add_buffer_value(
-            self.history.obsv_buffer, 
-            value=th.clone(self.obs_seq.detach()), 
-            current_step=self.current_step, 
-            index=self.buffer_index,
-            training_mode=self.training_mode)
-
-        #self.obs_seq = vec_obsv.repeat([1, self.obs_seq.shape[1], 1]).type(th.float)
-        #if action_seq is None:
-        self.current_result = self.forward(
-            observation_seq=self.obs_seq, action_seq=action_seq, 
-            optimize=self.args_obj.optimize, 
-            current_step=self.current_step,
-            stop_opt=self.args_obj.stop_opt
-            )
-        self.history.add_buffer_value(
-            self.history.act_buffer, 
-            value=th.clone(self.current_result.gen_trj.detach()), 
-            current_step=self.current_step, 
-            index=self.buffer_index,
-            training_mode=self.training_mode)
-        
-        self.action_history[:, self.current_step] = th.clone(self.current_result.gen_trj.detach())
-
-        if self.current_step == 0:
-            if self.args_obj.optimize:
-                self.history.add_value(
-                    history=self.history.opt_scores, 
-                    value=self.current_result.expected_succes_after[:, 0].detach(), 
-                    current_step=self.current_step
+            #self.obs_seq = vec_obsv.repeat([1, self.obs_seq.shape[1], 1]).type(th.float)
+            #if action_seq is None:
+            self.current_result = self.forward(
+                observation_seq=self.obs_seq, action_seq=action_seq, 
+                optimize=self.args_obj.optimize, 
+                current_step=self.current_step,
+                stop_opt=self.args_obj.stop_opt
                 )
-            self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
-        return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
+            self.history.add_buffer_value(
+                self.history.act_buffer, 
+                value=th.clone(self.current_result.gen_trj.detach()), 
+                current_step=self.current_step, 
+                index=self.buffer_index,
+                training_mode=self.training_mode)
+            
+            self.action_history[:, self.current_step] = th.clone(self.current_result.gen_trj.detach())
+
+            if self.current_step == 0:
+                if self.args_obj.optimize:
+                    self.history.add_value(
+                        history=self.history.opt_scores, 
+                        value=self.current_result.expected_succes_after[:, 0].detach(), 
+                        current_step=self.current_step
+                    )
+                self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
+            return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
+        else:
+            return np.random.rand(vec_obsv.shape[0], self.action_space.shape[0]) * 2 - 1
 
     def forward(self, 
             observation_seq: th.Tensor, 
@@ -214,13 +220,13 @@ class ActiveCriticPolicy(BaseModel):
         else:
             #opt_count = int(actions.shape[0]/2)
             batch_size = actions.shape[0]
-            if (self.buffer_filled_to > 0) and (self.training_mode):
+            '''if (self.buffer_filled_to > 0) and (self.training_mode):
                 buffer_actions = self.history.act_buffer[0][:self.buffer_filled_to, self.current_step]
                 buffer_obsvs = self.history.obsv_buffer[0][:self.buffer_filled_to, self.current_step]
                 actions = th.cat((actions, buffer_actions), dim=0)
                 observation_seq = th.cat((observation_seq, buffer_obsvs), dim=0)
                 plans = th.zeros([observation_seq.shape[0], observation_seq.shape[1], self.planner.wsms.model_setup.d_output], device=self.args_obj.device, dtype=th.float32)
-
+            '''
             actions_opt, expected_success_opt = self.optimize_act_sequence(
                 actions=actions, 
                 observations=observation_seq, 
