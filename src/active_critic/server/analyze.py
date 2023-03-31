@@ -194,7 +194,7 @@ def make_acl(
     acla.dense = True
     acla.max_epoch_steps = max_epoch_steps
 
-    acla.use_pred_loss = False
+    acla.use_pred_loss = True
 
     epsiodes = 30
     ac, acps, env, expert = setup_ac(
@@ -286,7 +286,7 @@ def run_eval_stats_env(device, weight_decay):
     total_training_epsiodes = 2000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['reach']
+    env_tags = ['push']
     val_everys = [1000]
     add_data_everys = [1000]
     opt_modes = ['actor+plan']
