@@ -152,7 +152,6 @@ class StrictSeqLenWrapper(gym.Wrapper):
         self.current_step = 1
         self.success = float(0)
         obs = super().reset()
-        print(f'obs: {obs}')
         return obs
 
     def step(self, action):
