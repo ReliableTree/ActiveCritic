@@ -293,7 +293,7 @@ def run_eval_stats_env(device, weight_decay):
     opt_steps_list = [3]
     sparse = True
     seq_len = 100
-    max_epoch_steps = 5000
+    max_epoch_steps = 15000
     manual_seed = 0
     explore_until = 30
     th.manual_seed(manual_seed)
