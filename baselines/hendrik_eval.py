@@ -684,7 +684,7 @@ if __name__ == '__main__':
                     )
     elif args.learner == 'stats_TQC':
         print('running stats TQC')
-        lrs = [5e-7]
+        lrs = [5e-5]
         for env_i, env_tag in enumerate(list_env_tags):
             lr = lrs[env_i]
             for dense in dense_list:
