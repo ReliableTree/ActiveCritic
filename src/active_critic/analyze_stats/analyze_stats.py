@@ -49,7 +49,7 @@ def file_crawler(path, substrings, exclude=[]):
     print(f'for path: {path}: {len(result)}')
     return result
 
-def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=None, plot_closest=False):
+def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=None, plot_closest=False, loc=None):
     # create figure and axis objects
     fig, ax = plt.subplots()
 
@@ -93,14 +93,17 @@ def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=N
     ax.set_xlabel('Number Sampled Trajectories')
     ax.set_ylabel('Success Rate')
     ax.set_title(plot_name)
-    ax.legend()
+    if loc is None:
+        ax.legend()
+    else:
+        ax.legend(loc = loc)
     if path is not None:
         # create directory if it doesn't exist
         os.makedirs(path, exist_ok=True)
         # save the plot
         plt.savefig(os.path.join(path, plot_name + '.png'))
 
-def make_plot(paths, includes, excludes, names, plot_name, save_path = None, plot_closest=False, mean = True, find_closest = False):
+def make_plot(paths, includes, excludes, names, plot_name, save_path = None, plot_closest=False, mean = True, find_closest = False, loc=None):
     abs_file_path_list = []
     
     for i in range(len(paths)):
@@ -117,5 +120,6 @@ def make_plot(paths, includes, excludes, names, plot_name, save_path = None, plo
         plot_name=plot_name,
         path=save_path,
         plot_closest=plot_closest,
-        mean=mean
+        mean=mean,
+        loc=loc
         )
