@@ -595,7 +595,7 @@ if __name__ == '__main__':
     ids = [i for i in range(3)]
     dense_list = [True]
     sparse = True
-    ms = 5
+    ms = 6
     th.manual_seed(ms)
     np.random.seed(ms)
     seq_len = 100
