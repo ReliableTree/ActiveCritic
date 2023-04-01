@@ -568,7 +568,7 @@ def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
                       )
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=500, n_samples=n_samples, device=device, learner=PPO_learner, pomdp_env=pomdp_env, eval_every=2048)
+                     bc_epochs=500, n_samples=n_samples, device=device, learner=PPO_learner, pomdp_env=pomdp_env, eval_every=2048, dense=dense, sparse=sparse)
     
 def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_tag, dense,  sparse):
     seq_len=100
