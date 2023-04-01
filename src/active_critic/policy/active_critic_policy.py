@@ -87,6 +87,7 @@ class ActiveCriticPolicy(BaseModel):
         self.n_inferred = 0
         self.write_tboard_scalar = write_tboard_scalar
         self.train_inference = False
+        self.start_training = True
 
         self.reset()
     def reset(self):
@@ -120,34 +121,36 @@ class ActiveCriticPolicy(BaseModel):
     ) -> th.Tensor:
         vec_obsv = self.args_obj.extractor.forward(
             observation).to(self.args_obj.device).unsqueeze(1)
+            
         if (self.last_goal is None) or (self.args_obj.new_epoch(self.last_goal, vec_obsv)):
             self.reset_epoch(vec_obsv=vec_obsv)
             action_seq = None
         else:
             self.current_step += 1
-            action_seq = self.current_result.gen_trj
-
+            if self.start_training:
+                action_seq = self.current_result.gen_trj
 
         #self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
         self.obs_seq = vec_obsv.repeat([1, self.obs_seq.shape[1], 1]).type(th.float)
-        if action_seq is None:
-            self.current_result = self.forward(
-                observation_seq=self.obs_seq, action_seq=action_seq, 
-                optimize=self.args_obj.optimize, 
-                current_step=self.current_step,
-                stop_opt=self.args_obj.stop_opt
-                )
+        if self.start_training:
+            if action_seq is None:
+                self.current_result = self.forward(
+                    observation_seq=self.obs_seq, action_seq=action_seq, 
+                    optimize=self.args_obj.optimize, 
+                    current_step=self.current_step,
+                    stop_opt=self.args_obj.stop_opt
+                    )
 
-        if self.current_step == 0:
-            if self.args_obj.optimize:
-                self.history.add_value(
-                    history=self.history.opt_scores, 
-                    value=self.current_result.expected_succes_after[:, 0].detach(), 
-                    current_step=self.current_step
-                )
-            self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
-        return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
-
+            if self.current_step == 0:
+                if self.args_obj.optimize:
+                    self.history.add_value(
+                        history=self.history.opt_scores, 
+                        value=self.current_result.expected_succes_after[:, 0].detach(), 
+                        current_step=self.current_step
+                    )
+                self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
+            return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
+        
     def forward(self, 
             observation_seq: th.Tensor, 
             action_seq: th.Tensor, 
