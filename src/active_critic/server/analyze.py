@@ -390,7 +390,7 @@ def run_eval_stats_env(device, weight_decay):
                 for im_ph in imitation_phases:
                     for val_step, val_every in enumerate(val_everys):
                         for opt_mode in opt_modes:
-                            logname = f' history eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
+                            logname = f' sp_obs history eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
                             print(f'____________________________________logname: {env_tag}  {logname}')
                             run_experiment(device=device,
                                         env_tag=env_tag,
