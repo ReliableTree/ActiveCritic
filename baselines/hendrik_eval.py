@@ -164,9 +164,10 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
                 success_rate), stepid=learner.env.envs[0].reset_count)
 
 
-def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, bc_epochs, dense, sparse, seq_len, learning_starts):
+def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, bc_epochs, dense, sparse):
+    seq_len=100
     env_tag = env_tag
-    logname = f'TQC_{env_tag}_dense_{dense}_lr_{lr}_demonstrations_{demonstrations}_n_samples_{n_samples}_seqlen_{seq_len}_learning_starts_{learning_starts}_id_{id}'
+    logname = f'TQC_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_n_samples_{n_samples}_id_{id}'
     print(logname)
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
@@ -193,10 +194,7 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, 
                       train_freq=train_freq,
                       gradient_steps=gradient_steps,
                       use_sde=use_sde,
-                      policy_kwargs=policy_kwargs,
-                      learning_starts=learning_starts)
-    
-
+                      policy_kwargs=policy_kwargs)
     evaluate_learner(
         env_tag, 
         logname_save_path=logname_save_path, 
@@ -545,8 +543,29 @@ def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
         name=env_tag, seq_len=seq_len, lookup_freq=2048, dense=dense)
-    PPO_learner = PPO("MlpPolicy", pomdp_env, verbose=0,
-                      device=device, learning_rate=lr)
+    n_steps= 512
+    batch_size = 32
+    gamma= 0.9
+    ent_coef= 7.52585e-08
+    n_epochs= 5
+    gae_lambda= 1.0
+    max_grad_norm= 0.9
+    vf_coef= 0.950368
+
+    PPO_learner = PPO("MlpPolicy", 
+                      pomdp_env, 
+                      verbose=0,
+                      device=device, 
+                      learning_rate=lr,
+                      batch_size=batch_size,
+                      gamma=gamma,
+                      ent_coef=ent_coef,
+                      gae_lambda=gae_lambda,
+                      max_grad_norm=max_grad_norm,
+                      vf_coef=vf_coef,
+                      n_steps=n_steps,
+                      n_epochs=n_epochs,
+                      )
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
                      bc_epochs=500, n_samples=n_samples, device=device, learner=PPO_learner, pomdp_env=pomdp_env, eval_every=2048)
@@ -557,11 +576,30 @@ def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
         name=env_tag, seq_len=seq_len, lookup_freq=50000, dense=dense)
-    TQC_learner = TQC(policy='MlpPolicy', env=pomdp_env,
-        device=device, learning_rate=lr)
+    buffer_size = 300000
+    batch_size= 256
+    ent_coef= 'auto'
+    gamma= 0.98
+    tau= 0.02
+    train_freq= 8
+    gradient_steps= 8
+    use_sde = False
+    policy_kwargs= dict(log_std_init=-3, net_arch=[400, 300])
+
+    tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env,
+                      device=device, learning_rate=lr,
+                      buffer_size=buffer_size,
+                      batch_size=batch_size,
+                      ent_coef=ent_coef,
+                      gamma=gamma,
+                      tau=tau,
+                      train_freq=train_freq,
+                      gradient_steps=gradient_steps,
+                      use_sde=use_sde,
+                      policy_kwargs=policy_kwargs)
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=500, n_samples=n_samples, device=device, learner=TQC_learner, pomdp_env=pomdp_env, eval_every=2000, dense=dense)
+                     bc_epochs=500, n_samples=n_samples, device=device, learner=tqc_learner, pomdp_env=pomdp_env, eval_every=2000, dense=dense)
 
 def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples, env_tag, ids):
     for id in ids:
@@ -588,8 +626,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [0]
-    list_env_tags = ['windowopen' ]
+    list_demonstrations = [1]
+    list_env_tags = ['windowopen', 'reach']
     n_samples = 5000
     bc_epochs = 0
     ids = [i for i in range(3)]
@@ -623,7 +661,7 @@ if __name__ == '__main__':
         run_tune_PPO(device=args.device)
     elif args.learner == 'stats_GAIL_TQC':
         print('running GAIL + TQC')
-        lrs = [1e-7]
+        lrs = [7.3e-4]
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
@@ -689,7 +727,7 @@ if __name__ == '__main__':
                     )
     elif args.learner == 'stats_TQC':
         print('running stats TQC')
-        lrs = [5e-5]
+        lrs = [7.3e-4]
         for env_i, env_tag in enumerate(list_env_tags):
             lr = lrs[env_i]
             for dense in dense_list:
