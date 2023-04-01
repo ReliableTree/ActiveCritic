@@ -152,7 +152,7 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
             success, rews, history = get_avr_succ_rew_det(
                 env=pomdp_env_val, 
                 learner=learner.policy, 
-                epsiodes=50,
+                epsiodes=10,
                 path=learner_stats_path,
                 history=history,
                 step=learner.env.envs[0].reset_count)
@@ -173,10 +173,10 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, 
         name=env_tag, seq_len=seq_len, lookup_freq=1000, dense=dense, sparse=sparse)
     
     #reach
-    buffer_size = 1000000
+    buffer_size = 300000
     batch_size= 256
     ent_coef= 'auto'
-    gamma= 0.999
+    gamma= 0.98
     tau= 0.02
     train_freq= 8
     gradient_steps= 8
@@ -588,18 +588,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [4]
-    list_env_tags = ['pickplace']
+    list_demonstrations = [0]
+    list_env_tags = ['windowopen']
     n_samples = 5000
-    bc_epochs = 500
+    bc_epochs = 0
     ids = [i for i in range(3)]
     dense_list = [True]
     sparse = True
-    ms = 0
+    ms = 5
     th.manual_seed(ms)
     np.random.seed(ms)
     seq_len = 100
-    learning_starts = 3000
+    learning_starts = 100
 
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + f'{ms}_' + '/'
 
