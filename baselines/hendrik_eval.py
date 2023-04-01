@@ -291,13 +291,13 @@ def run_tune_PPO(device):
                 demonstrations += 2
         lr = lr * 0.4
 
-def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, logname, learner, pomdp_env, eval_every, dense):
+def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epochs, n_samples, device, logname, learner, pomdp_env, eval_every, dense, sparse):
     history = None
     lookup_freq = 1000
     if not os.path.exists(logname_save_path):
         os.makedirs(logname_save_path)
-    env, vec_expert = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
-    val_env, _ = make_dummy_vec_env(name=env_tag, seq_len=seq_len)
+    env, vec_expert = make_dummy_vec_env(name=env_tag, seq_len=seq_len, sparse=sparse)
+    val_env, _ = make_dummy_vec_env(name=env_tag, seq_len=seq_len, sparse=sparse)
     if bc_epochs > 0:
         transitions, rollouts = sample_expert_transitions_rollouts(
             vec_expert.predict, val_env, n_demonstrations)
@@ -321,7 +321,7 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
                 policy=learner.policy)
 
         pomdp_env_val, pomdp_vec_expert = make_dummy_vec_env_pomdp(
-            name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq, dense=dense)
+            name=env_tag, seq_len=seq_len, lookup_freq=lookup_freq, dense=dense, sparse=sparse)
         bc_file_path = logname_save_path+'bc_best'
         bc_stats_path = logname_save_path + 'bc_stats_gail'
         #if (not os.path.isfile(bc_file_path)):
@@ -537,12 +537,12 @@ def stats_RPPO(device, lr, demonstrations, save_path, n_samples, env_tag, bc_mul
             dense=dense
         )
             
-def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_tag, dense):
+def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_tag, dense, sparse):
     seq_len=100
-    logname = f'PPO_GAIL_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
+    logname = f'PPO_GAIL_sparse_{sparse}_desne_{dense}_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
-        name=env_tag, seq_len=seq_len, lookup_freq=2048, dense=dense)
+        name=env_tag, seq_len=seq_len, lookup_freq=2048, dense=dense, sparse=sparse)
     n_steps= 512
     batch_size = 32
     gamma= 0.9
@@ -570,12 +570,12 @@ def run_eval_PPO_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
                      bc_epochs=500, n_samples=n_samples, device=device, learner=PPO_learner, pomdp_env=pomdp_env, eval_every=2048)
     
-def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_tag, dense):
+def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_tag, dense,  sparse):
     seq_len=100
-    logname = f'TQC_GAIL_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
+    logname = f'TQC_GAIL_sparse_{sparse}_desne_{dense}_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_id_{id}'
     logname_save_path = os.path.join(save_path, logname + '/')
     pomdp_env, pomdp_vec_expert = make_dummy_vec_env_pomdp(
-        name=env_tag, seq_len=seq_len, lookup_freq=50000, dense=dense)
+        name=env_tag, seq_len=seq_len, lookup_freq=50000, dense=dense, sparse=sparse)
     buffer_size = 300000
     batch_size= 256
     ent_coef= 'auto'
@@ -599,15 +599,15 @@ def run_eval_TQC_GAIL(device, lr, demonstrations, save_path, n_samples, id, env_
                       policy_kwargs=policy_kwargs)
 
     evaluate_GAIL(env_tag, logname_save_path=logname_save_path, logname=logname, seq_len=seq_len, n_demonstrations=demonstrations,
-                     bc_epochs=500, n_samples=n_samples, device=device, learner=tqc_learner, pomdp_env=pomdp_env, eval_every=2000, dense=dense)
+                     bc_epochs=500, n_samples=n_samples, device=device, learner=tqc_learner, pomdp_env=pomdp_env, eval_every=2000, dense=dense, sparse=sparse)
 
-def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples, env_tag, ids):
+def stats_GAIL_PPO(device, lr, demonstrations, save_path, n_samples, env_tag, ids, dense, sparse):
     for id in ids:
-        run_eval_PPO_GAIL(device=device, lr=lr, demonstrations=demonstrations, save_path=save_path, n_samples=n_samples, id=id, env_tag=env_tag)
+        run_eval_PPO_GAIL(device=device, lr=lr, demonstrations=demonstrations, save_path=save_path, n_samples=n_samples, id=id, env_tag=env_tag, dense=dense, sparse=sparse)
 
-def stats_GAIL_TQC(device, lr, demonstrations, save_path, n_samples, env_tag, ids, dense):
+def stats_GAIL_TQC(device, lr, demonstrations, save_path, n_samples, env_tag, ids, dense, sparse):
     for id in ids:
-        run_eval_TQC_GAIL(device=device, lr=lr, demonstrations=demonstrations, save_path=save_path, n_samples=n_samples, id=id, env_tag=env_tag, dense=dense)
+        run_eval_TQC_GAIL(device=device, lr=lr, demonstrations=demonstrations, save_path=save_path, n_samples=n_samples, id=id, env_tag=env_tag, dense=dense,  sparse= sparse)
 
 if __name__ == '__main__':
     import argparse
@@ -632,6 +632,7 @@ if __name__ == '__main__':
     bc_epochs = 0
     ids = [i for i in range(3)]
     dense_list = [True]
+    dense = True
     sparse = True
     ms = 6
     th.manual_seed(ms)
@@ -665,7 +666,7 @@ if __name__ == '__main__':
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
-                    stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=n_samples, env_tag=env_tag, ids=ids)
+                    stats_GAIL_TQC(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=n_samples, env_tag=env_tag, ids=ids, dense=dense, sparse=sparse)
 
     elif args.learner == 'stats_GAIL_PPO':
         print('running GAIL + PPO')
@@ -674,7 +675,7 @@ if __name__ == '__main__':
         for env_tag in list_env_tags:
             for demonstrations in list_demonstrations:
                 for lr in lrs:
-                    stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=n_samples, env_tag=env_tag, ids=ids)
+                    stats_GAIL_PPO(device=args.device, lr=lr, demonstrations=demonstrations, save_path=path, n_samples=n_samples, env_tag=env_tag, ids=ids, dense=dense, sparse=sparse)
 
     elif args.learner == 'RPPO':
         print('running RPPO')
