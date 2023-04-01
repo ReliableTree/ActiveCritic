@@ -588,14 +588,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [0]
-    list_env_tags = ['drawerclose']
-    n_samples = 1000
-    bc_epochs = 0
+    list_demonstrations = [4]
+    list_env_tags = ['pickplace']
+    n_samples = 5000
+    bc_epochs = 500
     ids = [i for i in range(3)]
-    dense_list = [True, False]
+    dense_list = [True]
     sparse = True
-    ms = 2
+    ms = 0
     th.manual_seed(ms)
     np.random.seed(ms)
     seq_len = 100
