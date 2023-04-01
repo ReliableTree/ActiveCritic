@@ -29,3 +29,4 @@ class ActiveCriticLearnerArgs:
         self.plan_decay = None
         self.train_inference:bool = None
         self.sparse = None
+        self.start_training = None

@@ -150,6 +150,8 @@ class ActiveCriticPolicy(BaseModel):
                     )
                 self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
             return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
+        else:
+            return np.random.rand(vec_obsv.shape[0], self.action_space.shape[0]) * 2 - 1
         
     def forward(self, 
             observation_seq: th.Tensor, 

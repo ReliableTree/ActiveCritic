@@ -192,6 +192,7 @@ class ActiveCriticLearner(nn.Module):
 
         h = time.perf_counter()
         add_results = []
+        start_training = self.get_num_training_samples()>self.network_args.start_training
         for iteration in range(iterations):
             result = sample_new_episode(
                 policy=policy,
@@ -199,7 +200,8 @@ class ActiveCriticLearner(nn.Module):
                 extractor=self.network_args.extractor,
                 device=self.network_args.device,
                 episodes=self.env.num_envs,
-                seq_len=seq_len)
+                seq_len=seq_len,
+                start_training=start_training)
             result_array = []
             for res in result:
                 result_array.append(res)
@@ -512,6 +514,7 @@ class ActiveCriticLearner(nn.Module):
 
         h = time.perf_counter()
         rewards_cumm = None
+        start_training = self.get_num_training_samples()>self.network_args.start_training
 
         for i in range(self.network_args.validation_rep):
             opt_actions, gen_actions, observations, rewards_run, expected_rewards_before, expected_rewards_after = sample_new_episode(
@@ -520,7 +523,8 @@ class ActiveCriticLearner(nn.Module):
                 extractor=self.network_args.extractor,
                 device=self.network_args.device,
                 episodes=self.network_args.validation_episodes,
-                return_gen_trj=True)
+                return_gen_trj=True,
+                start_training=start_training)
             if rewards_cumm is None:
                 rewards_cumm = rewards_run
             else:
