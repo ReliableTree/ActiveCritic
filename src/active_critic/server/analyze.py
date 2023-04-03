@@ -283,7 +283,7 @@ def run_eval_stats_env(device, weight_decay):
     run_ids = [i for i in range(3)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 5000
+    total_training_epsiodes = 1000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['windowopen']
@@ -294,7 +294,7 @@ def run_eval_stats_env(device, weight_decay):
     sparse = True
     seq_len = 100
     max_epoch_steps = 15000
-    manual_seed = 1
+    manual_seed = 0
     explore_until = 100
     th.manual_seed(manual_seed)
     for demonstrations in demonstrations_list:
@@ -319,7 +319,7 @@ def run_eval_stats_env(device, weight_decay):
                                             val_every=val_every,
                                             add_data_every = add_data_everys[val_step],
                                             opt_mode=opt_mode,
-                                            make_graphs = True,
+                                            make_graphs = False,
                                             fast=False,
                                             opt_steps=opt_steps,
                                             sparse=sparse,
