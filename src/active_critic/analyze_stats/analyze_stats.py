@@ -2,6 +2,7 @@ import pickle
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+import math
 
 def parse_data(paths, find_closest):
     result_dict = {}
@@ -49,7 +50,7 @@ def file_crawler(path, substrings, exclude=[]):
     print(f'for path: {path}: {len(result)}')
     return result
 
-def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=None, plot_closest=False, loc=None):
+def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=None, plot_closest=False, loc=None, total_plot_points=1, mark_every = None):
     # create figure and axis objects
     fig, ax = plt.subplots()
 
@@ -82,11 +83,33 @@ def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=N
 
         # plot mean data as a line and shade area between ±1 standard deviation
         if plot_closest:
+            if (mark_every is not None) and (total_plot_points is not None):
+                print(f'mark_every: {mark_every},  total_plot_points: {total_plot_points}')
+                1/0
+            if total_plot_points is not None:
+                mark_every_calc = math.ceil(len(p_timesteps) / total_plot_points)
+            else:
+                mark_every_calc = mark_every
+            p_timesteps_steps = np.arange(p_timesteps.shape[0])
+
             # plot the experiments at those timesteps
-            ax.plot(p_timesteps, mean_data, '-o', markersize=5, label=names[i])
+            use_steps = p_timesteps_steps % mark_every_calc == 0
+
+            ax.plot(p_timesteps[use_steps], mean_data[use_steps], label=names[i])
             ax.fill_between(p_timesteps, np.maximum(mean_data-std_data, 0), np.minimum(mean_data+std_data, 1), alpha=0.3)
         else:
-            ax.plot(timesteps[i], mean_data, '-o', markersize=5, label=names[i])
+            if mark_every is not None and total_plot_points is not None:
+                print(f'mark_every: {mark_every},  total_plot_points: {total_plot_points}')
+                1/0
+            if total_plot_points is not None:
+                mark_every_calc = math.ceil(len(timesteps[i]) / total_plot_points)
+            else:
+                mark_every_calc = mark_every
+            timesteps_steps = np.arange(timesteps[i].shape[0])
+
+            use_steps = timesteps_steps % mark_every_calc == 0
+
+            ax.plot(timesteps[i][use_steps], mean_data[use_steps], label=names[i], markevery=1)
             ax.fill_between(timesteps[i],np.maximum(mean_data-std_data, 0), np.minimum(mean_data+std_data, 1), alpha=0.3)
 
     # add labels, title, and legend to the plot
@@ -103,7 +126,19 @@ def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=N
         # save the plot
         plt.savefig(os.path.join(path, plot_name + '.png'))
 
-def make_plot(paths, includes, excludes, names, plot_name, save_path = None, plot_closest=False, mean = True, find_closest = False, loc=None):
+def make_plot(
+        paths, 
+        includes, 
+        excludes, 
+        names, 
+        plot_name, 
+        save_path = None, 
+        plot_closest=False, 
+        mean = True, 
+        find_closest = False, 
+        loc=None,
+        total_plot_points=1,
+        mark_every = None):
     abs_file_path_list = []
     
     for i in range(len(paths)):
@@ -121,5 +156,7 @@ def make_plot(paths, includes, excludes, names, plot_name, save_path = None, plo
         path=save_path,
         plot_closest=plot_closest,
         mean=mean,
-        loc=loc
+        loc=loc,
+        total_plot_points=total_plot_points,
+        mark_every=mark_every
         )
