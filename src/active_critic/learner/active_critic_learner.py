@@ -360,14 +360,14 @@ class ActiveCriticLearner(nn.Module):
 
                 self.virtual_step += self.network_args.training_epsiodes
 
-                '''if self.next_critic_init is None:
+                if self.next_critic_init is None:
                     self.next_critic_init = self.get_num_training_samples() * 10
                 if self.get_num_training_samples() > self.next_critic_init:
                     self.policy.critic.init_model()
                     self.policy.actor.init_model()
                     self.policy.planner.init_model()
                     self.next_critic_init = 10 * self.get_num_training_samples()
-                    print('______________________________init models___________________________________')'''
+                    print('______________________________init models___________________________________')
 
             elif (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every
