@@ -294,7 +294,7 @@ def run_eval_stats_env(device, weight_decay):
     sparse = True
     seq_len = 100
     max_epoch_steps = 15000
-    manual_seed = 0
+    manual_seed = 2
     explore_until = 100
     th.manual_seed(manual_seed)
     for demonstrations in demonstrations_list:
