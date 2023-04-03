@@ -350,6 +350,10 @@ class ActiveCriticLearner(nn.Module):
                     self.policy.actor.load_state_dict(th.load(self.inter_path + 'best_actor'))
                     self.policy.planner.load_state_dict(th.load(self.inter_path + 'best_planner'))
 
+                if self.train_data.success.sum() == 0:
+                    self.policy.actor.init_model()
+                    self.policy.planner.init_model()
+                    print(f'resinit actor')
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
                 self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'), strict=False)
                 self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'), strict=False)
