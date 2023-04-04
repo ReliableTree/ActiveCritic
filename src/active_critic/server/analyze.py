@@ -321,7 +321,7 @@ def run_eval_stats_env(device, ms):
                                             add_data_every = add_data_everys[val_step],
                                             opt_mode=opt_mode,
                                             make_graphs = False,
-                                            fast=False,
+                                            fast=True,
                                             opt_steps=opt_steps,
                                             sparse=sparse,
                                             seq_len=seq_len,

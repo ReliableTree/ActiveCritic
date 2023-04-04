@@ -129,6 +129,7 @@ class ActiveCriticLearner(nn.Module):
             actions_history=action_history,
             steps=steps
             )
+
         self.train_data.onyl_positiv = False
         self.train_loader = DataLoader(
             dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
@@ -349,11 +350,10 @@ class ActiveCriticLearner(nn.Module):
                 if self.set_best_actor:
                     self.policy.actor.load_state_dict(th.load(self.inter_path + 'best_actor'))
                     self.policy.planner.load_state_dict(th.load(self.inter_path + 'best_planner'))
-
                 if (self.train_data.success is not None) and (self.train_data.success.sum() == 0):
                     self.policy.actor.init_model()
                     self.policy.planner.init_model()
-                    print(f'resinit actor')
+                    print(f'_________________________reinit actor__________________________________________')
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
                 self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'), strict=False)
                 self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'), strict=False)
