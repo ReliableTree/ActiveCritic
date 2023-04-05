@@ -98,7 +98,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
     elif opt_mode == 'actor+plan':
-        acps.inference_opt_lr = 1e-5
+        acps.inference_opt_lr = 1e-6
         acps.opt_steps = opt_steps
     else:
         1/0
@@ -294,7 +294,7 @@ def run_eval_stats_env(device, ms):
     opt_steps_list = [3]
     sparse = True
     seq_len = 100
-    max_epoch_steps = 15000
+    max_epoch_steps = 10000
     manual_seed = ms
     explore_until = 100
     th.manual_seed(manual_seed)
