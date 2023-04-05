@@ -448,7 +448,7 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
         success, rews, history = get_avr_succ_rew_det_rec(
             env=pomdp_env_val, 
             learner=learner.policy, 
-            epsiodes=50,
+            epsiodes=30,
             path=learner_stats_path,
             history=history,
             step=learner.env.envs[0].reset_count)
