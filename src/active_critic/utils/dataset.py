@@ -2,7 +2,7 @@ import torch
 import math
 from active_critic.utils.pytorch_utils import pick_action_from_history
 class DatasetAC(torch.utils.data.Dataset):
-    def __init__(self, batch_size, device='cpu'):
+    def __init__(self, batch_size, device='cpu', max_size = None):
         self.device = device
         self.obsv = None
         self.actions = None
@@ -10,6 +10,7 @@ class DatasetAC(torch.utils.data.Dataset):
         self.success = None
         self.onyl_positiv = None
         self.batch_size = batch_size
+        self.max_size = max_size
 
     def __len__(self):
         if self.obsv is not None:
@@ -89,7 +90,18 @@ class DatasetAC(torch.utils.data.Dataset):
             self.steps = torch.cat((
                 self.steps, steps.reshape([-1]).to(self.device)
             ), dim=0)
+        self.trunc_data()
         self.make_virt_data()
+
+    def trunc_data(self):
+        if self.max_size is not None:
+            self.reward = self.reward[-self.max_size:]
+            self.obsv = self.obsv[-self.max_size:]
+            self.actions = self.actions[-self.max_size:]
+            self.success = self.success[-self.max_size:]
+            self.expert_trjs = self.expert_trjs[-self.max_size:]
+            self.prev_proposed_acts = self.prev_proposed_acts[-self.max_size:]
+            self.steps = self.steps[-self.max_size:]
 
     def __getitem__(self, index):
         assert self.onyl_positiv is not None, 'traindata only positiv not set'
