@@ -296,7 +296,7 @@ def run_eval_stats_env(device, ms):
     seq_len = 100
     max_epoch_steps = 10000
     manual_seed = ms
-    explore_until = 100
+    explore_until = 0
     th.manual_seed(manual_seed)
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
