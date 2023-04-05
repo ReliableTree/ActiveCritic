@@ -452,6 +452,7 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
             path=learner_stats_path,
             history=history,
             step=learner.env.envs[0].reset_count)
+        print(f'success rate: {success.mean()}')
         success_rate = success.mean()
         tboard.addValidationScalar('Reward', value=th.tensor(
             rews.mean()), stepid=learner.env.envs[0].reset_count)
@@ -540,12 +541,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [0]
-    list_env_tags = ['drawerclose']
-    n_samples = 1000
-    bc_epochs = 0
+    list_demonstrations = [15]
+    list_env_tags = ['pickplace']
+    n_samples = 400
+    bc_epochs = 500
     ids = [i for i in range(4)]
-    th.manual_seed(1)
+    th.manual_seed(0)
 
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + '/'
 
