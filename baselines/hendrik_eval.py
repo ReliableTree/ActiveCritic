@@ -542,9 +542,9 @@ if __name__ == '__main__':
     s = datetime.today().strftime('%Y-%m-%d')
 
     list_demonstrations = [15]
-    list_env_tags = ['pickplace']
+    list_env_tags = ['windowopen']
     n_samples = 400
-    bc_epochs = 500
+    bc_epochs = 800
     ids = [i for i in range(4)]
     th.manual_seed(0)
 
