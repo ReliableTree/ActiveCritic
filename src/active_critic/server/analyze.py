@@ -294,7 +294,7 @@ def run_eval_stats_env(device, ms):
     opt_steps_list = [3]
     sparse = True
     seq_len = 100
-    max_epoch_steps = 20000
+    max_epoch_steps = 30000
     manual_seed = ms
     explore_until = 0
     th.manual_seed(manual_seed)
