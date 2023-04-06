@@ -101,7 +101,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
         acps.opt_steps = 5
     elif opt_mode == 'actor+plan':
         acps.inference_opt_lr = 1e-6
-        acps.opt_steps = 100
+        acps.opt_steps = 1
     else:
         1/0
 
