@@ -164,8 +164,8 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
                 success_rate), stepid=learner.env.envs[0].reset_count)
 
 
-def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, bc_epochs, dense, sparse):
-    seq_len=100
+def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, bc_epochs, dense, sparse, seq_len, learning_starts):
+    seq_len=seq_len
     env_tag = env_tag
     logname = f'TQC_{env_tag}_lr_{lr}_demonstrations_{demonstrations}_n_samples_{n_samples}_id_{id}'
     print(logname)
@@ -185,16 +185,18 @@ def run_eval_TQC(device, lr, demonstrations, save_path, n_samples, id, env_tag, 
     policy_kwargs= dict(log_std_init=-3, net_arch=[400, 300])
 
     tqc_learner = TQC(policy='MlpPolicy', env=pomdp_env,
-                      device=device, learning_rate=lr,
-                      buffer_size=buffer_size,
-                      batch_size=batch_size,
-                      ent_coef=ent_coef,
-                      gamma=gamma,
-                      tau=tau,
-                      train_freq=train_freq,
-                      gradient_steps=gradient_steps,
-                      use_sde=use_sde,
-                      policy_kwargs=policy_kwargs)
+                        learning_starts=learning_starts,
+                        device=device, 
+                        learning_rate=lr,
+                        buffer_size=buffer_size,
+                        batch_size=batch_size,
+                        ent_coef=ent_coef,
+                        gamma=gamma,
+                        tau=tau,
+                        train_freq=train_freq,
+                        gradient_steps=gradient_steps,
+                        use_sde=use_sde,
+                        policy_kwargs=policy_kwargs)
     evaluate_learner(
         env_tag, 
         logname_save_path=logname_save_path, 
@@ -626,15 +628,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
     s = datetime.today().strftime('%Y-%m-%d')
 
-    list_demonstrations = [1]
-    list_env_tags = ['windowopen', 'reach']
+    list_demonstrations = [0]
+    list_env_tags = ['reach']
     n_samples = 5000
     bc_epochs = 0
     ids = [i for i in range(3)]
     dense_list = [True]
     dense = True
     sparse = True
-    ms = 6
+    ms = 0
     th.manual_seed(ms)
     np.random.seed(ms)
     seq_len = 100
