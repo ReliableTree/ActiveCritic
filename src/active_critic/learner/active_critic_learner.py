@@ -323,6 +323,7 @@ class ActiveCriticLearner(nn.Module):
         for epoch in range(epochs):
             if self.global_step >= next_val:
                 next_val = self.global_step + self.network_args.val_every
+                print(f'current run stats: {self.logname}')
                 if self.network_args.tboard:
                     print('_____________________________________________________________')
                     th.save(self.policy.actor.state_dict(),self.inter_path +  'actor_before')
