@@ -195,7 +195,7 @@ def make_acl(
     acla.max_epoch_steps = max_epoch_steps
 
     acla.use_pred_loss = True
-    acla.explore_cautious_until = 1
+    acla.explore_cautious_until = 3
 
     epsiodes = 30
     ac, acps, env, expert = setup_ac(

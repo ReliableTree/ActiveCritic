@@ -141,7 +141,11 @@ class ActiveCriticLearner(nn.Module):
             policy = self.policy
             policy.eval()
             opt_before = self.policy.args_obj.optimize
-            self.policy.args_obj.optimize = (self.policy.args_obj.optimize and self.network_args.start_critic)
+            self.policy.args_obj.optimize = (
+                self.policy.args_obj.optimize and 
+                self.network_args.start_critic and 
+                (self.get_num_pos_samples()>self.network_args.explore_cautious_until))
+            print(f'policy oprimisation mode: {self.policy.args_obj.optimize}')
             iterations = math.ceil(episodes/self.env.num_envs)
             policy.training_mode = True
 
