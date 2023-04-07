@@ -171,6 +171,7 @@ class StrictSeqLenWrapper(gym.Wrapper):
         else:
             return obsv, rew, done, info
         
+
 def make_vec_env(env_id, num_cpu, seq_len, sparse):
     policy_dict = make_policy_dict()
 
