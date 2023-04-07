@@ -30,3 +30,4 @@ class ActiveCriticLearnerArgs:
         self.max_epoch_steps = None
         self.explore_until = None
         self.use_pred_loss = None
+        self.explore_cautious_until = None

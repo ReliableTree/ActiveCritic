@@ -213,7 +213,15 @@ class ActiveCriticLearner(nn.Module):
             self.policy.actor.init_model()
             self.policy.critic.init_model()
             self.policy.planner.init_model()
+            self.policy.args_obj.inference_opt_lr = 1e-6
             print('__________________________________reinit model_________________________________')
+        
+        if self.network_args.explore_cautious_until < self.get_num_pos_samples():
+            self.policy.args_obj.inference_opt_lr = 1e-5
+            print('higher lr in optimizer')
+
+
+
 
     def actor_step(self, data, loss_actor):
         obsv, actions, reward, expert_trjs, _, _, _, success = data
@@ -314,8 +322,10 @@ class ActiveCriticLearner(nn.Module):
         return loss_actor, loss_critic, loss_prediction
 
     def get_num_training_samples(self):
-        #return int(len(self.train_data) - self.network_args.num_expert_demos)
         return self.virtual_step
+    
+    def get_num_pos_samples(self):
+        return int(self.train_data.success.sum() / self.policy.args_obj.epoch_len)
 
     def train(self, epochs):
         next_val = 0
@@ -618,7 +628,7 @@ class ActiveCriticLearner(nn.Module):
         try:
             print(
                 f'training samples: {int(len(self.train_data.obsv))}' + fix)
-            print(f'positive training samples: {int(self.train_data.success.sum())}' + fix)
+            print(f'positive training samples: {int(self.train_data.success.sum()/self.policy.args_obj.epoch_len)}' + fix)
         except:
             pass
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize, step=self.get_num_training_samples())

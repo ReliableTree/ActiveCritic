@@ -98,7 +98,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
     elif opt_mode == 'actor+plan':
-        acps.inference_opt_lr = 1e-5
+        acps.inference_opt_lr = 1e-6
         acps.opt_steps = opt_steps
     else:
         1/0
@@ -195,6 +195,7 @@ def make_acl(
     acla.max_epoch_steps = max_epoch_steps
 
     acla.use_pred_loss = True
+    acla.explore_cautious_until = 1
 
     epsiodes = 30
     ac, acps, env, expert = setup_ac(
@@ -305,7 +306,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' ms {manual_seed} trainin eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
