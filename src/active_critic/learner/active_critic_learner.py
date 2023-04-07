@@ -335,6 +335,8 @@ class ActiveCriticLearner(nn.Module):
         return self.virtual_step
     
     def get_num_pos_samples(self):
+        if self.train_data.success is None:
+            return 0
         return int(self.train_data.success.sum() / self.policy.args_obj.epoch_len)
 
     def train(self, epochs):
