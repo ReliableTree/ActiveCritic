@@ -1,11 +1,25 @@
 import gym
 from gym import envs
 import numpy as np
+import time
+from active_critic.utils.gym_utils import make_policy_dict
+from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
 
 if __name__ == '__main__':
-    env = gym.make('Hopper-v2')
-    result = env.reset()
-    for i in range(300):
-        obs, rew, done, info = env.step(np.array([1,1,0]))
-        print(rew)
-        print(done)
+    pd = make_policy_dict()
+    asd = pd['pickplace']
+    expert, env_id = asd
+    env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[env_id]()
+    env._freeze_rand_vec = False
+
+    for i in range(10):
+        done = False
+        obs = env.reset()
+
+        while not done:
+            action = expert.get_action(obs)
+            obs, rew, done, info = env.step(action)
+            done = info['success'] == 1
+            h = time.perf_counter()
+            while time.perf_counter() - h < 0.1:
+                env.render()
