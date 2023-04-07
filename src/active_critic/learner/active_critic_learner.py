@@ -96,7 +96,7 @@ class ActiveCriticLearner(nn.Module):
                 self.logname + ' optimized', data_path=network_args_obj.data_path)
         self.global_step = 0
 
-        self.train_data = DatasetAC(batch_size=self.network_args.batch_size, device='cpu', max_size=self.network_args.max_epoch_steps)
+        self.train_data = DatasetAC(batch_size=self.network_args.batch_size, device='cpu', max_size=None)
         self.train_data.onyl_positiv = False
         self.exp_dict_opt = None
         self.exp_dict = None
