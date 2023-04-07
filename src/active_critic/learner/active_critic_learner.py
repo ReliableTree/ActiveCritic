@@ -219,6 +219,12 @@ class ActiveCriticLearner(nn.Module):
         if self.network_args.explore_cautious_until < self.get_num_pos_samples():
             self.policy.args_obj.inference_opt_lr = 1e-5
             print('higher lr in optimizer')
+        else:
+            self.policy.actor.init_model()
+            self.policy.critic.init_model()
+            self.policy.planner.init_model()
+            self.policy.args_obj.inference_opt_lr = 1e-6
+            print('__________________________________reinit model_________________________________')
 
 
 
