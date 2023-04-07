@@ -403,74 +403,77 @@ class ActiveCriticLearner(nn.Module):
                 print(f'training now: {self.network_args.training_epsiodes}')
                 print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
 
-            self.policy.train()
+            if self.get_num_pos_samples() > self.network_args.explore_cautious_until:
+                self.policy.train()
 
-            max_actor = float('inf')
-            mean_critic = float('inf')
+                max_actor = float('inf')
+                mean_critic = float('inf')
 
-            loss_actor = None
-            loss_critic = None
-            loss_prediction = None
+                loss_actor = None
+                loss_critic = None
+                loss_prediction = None
 
-            loss_actor, loss_critic, loss_prediction = self.train_step(
-                train_loader=self.train_loader,
-                loss_actor=loss_actor,
-                loss_critic=loss_critic,
-                train_critic=self.train_critic,
-                loss_prediction=loss_prediction
-            )
+                loss_actor, loss_critic, loss_prediction = self.train_step(
+                    train_loader=self.train_loader,
+                    loss_actor=loss_actor,
+                    loss_critic=loss_critic,
+                    train_critic=self.train_critic,
+                    loss_prediction=loss_prediction
+                )
 
-            new_min = self.scores.update_min_score(
-                self.scores.mean_actor, max_actor)
-            if loss_actor is not None:
-                max_actor = th.max(loss_actor)
+                new_min = self.scores.update_min_score(
+                    self.scores.mean_actor, max_actor)
+                if loss_actor is not None:
+                    max_actor = th.max(loss_actor)
+                else:
+                    max_actor = None
+
+                
+                if loss_critic is not None:
+                    mean_critic = th.mean(loss_critic)
+                    mean_prediction = th.mean(loss_prediction)
+                    self.scores.update_min_score(
+                    self.scores.mean_critic, mean_critic)
+                    self.train_critic = (mean_critic>self.network_args.min_critic_threshold)
+                else:
+                    mean_critic = None
+
+                
+
+                if new_min:
+                    th.save(self.policy.actor.state_dict(),self.inter_path +  'best_actor')
+                    th.save(self.policy.planner.state_dict(),self.inter_path +  'best_planner')
+                    self.set_best_actor = True
+
+                reward = self.train_data.reward
+                b, _ = th.max(reward, dim=1)
+                successfull_trj = (b == 1)
+                positive_examples = th.tensor(int(successfull_trj.sum()/self.policy.args_obj.epoch_len))
+
+                debug_dict = {
+                    'Examples': th.tensor(int(len(self.train_data.obsv)/self.policy.args_obj.epoch_len)),
+                    'Positive Examples': positive_examples
+                }
+                if mean_critic is not None:
+                    debug_dict['Loss Critic'] = mean_critic
+                    debug_dict['Loss Prediction'] = mean_prediction
+                else:
+                    mean_critic = 0
+
+                if max_actor is not None:
+                    debug_dict['Loss Actor'] = max_actor
+                else:
+                    max_actor = 0
+
+                self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
+                self.train_data.onyl_positiv = False
+                self.global_step += len(self.train_data)
+                '''if current_patients <= 0:
+                    self.policy.critic.init_model()
+                    print('reinit critic')
+                    self.network_args.patients *= 2'''
             else:
-                max_actor = None
-
-            
-            if loss_critic is not None:
-                mean_critic = th.mean(loss_critic)
-                mean_prediction = th.mean(loss_prediction)
-                self.scores.update_min_score(
-                self.scores.mean_critic, mean_critic)
-                self.train_critic = (mean_critic>self.network_args.min_critic_threshold)
-            else:
-                mean_critic = None
-
-            
-
-            if new_min:
-                th.save(self.policy.actor.state_dict(),self.inter_path +  'best_actor')
-                th.save(self.policy.planner.state_dict(),self.inter_path +  'best_planner')
-                self.set_best_actor = True
-
-            reward = self.train_data.reward
-            b, _ = th.max(reward, dim=1)
-            successfull_trj = (b == 1)
-            positive_examples = th.tensor(int(successfull_trj.sum()/self.policy.args_obj.epoch_len))
-
-            debug_dict = {
-                'Examples': th.tensor(int(len(self.train_data.obsv)/self.policy.args_obj.epoch_len)),
-                'Positive Examples': positive_examples
-            }
-            if mean_critic is not None:
-                debug_dict['Loss Critic'] = mean_critic
-                debug_dict['Loss Prediction'] = mean_prediction
-            else:
-                mean_critic = 0
-
-            if max_actor is not None:
-                debug_dict['Loss Actor'] = max_actor
-            else:
-                max_actor = 0
-
-            self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
-            self.train_data.onyl_positiv = False
-            self.global_step += len(self.train_data)
-            '''if current_patients <= 0:
-                self.policy.critic.init_model()
-                print('reinit critic')
-                self.network_args.patients *= 2'''
+                self.global_step = min(next_add, next_val)
 
 
 
