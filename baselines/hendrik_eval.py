@@ -640,7 +640,7 @@ if __name__ == '__main__':
     th.manual_seed(ms)
     np.random.seed(ms)
     seq_len = 100
-    learning_starts = 100
+    learning_starts = 20000
 
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + f'{ms}_' + '/'
 
