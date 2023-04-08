@@ -166,7 +166,6 @@ class StrictSeqLenWrapper(gym.Wrapper):
             return obsv, float(0), done, info
         elif done:
             info['unscaled_reward'] = self.success
-            print(f'success: {self.success}')
 
             return obsv, self.success, done, info
         else:
@@ -302,7 +301,7 @@ def fill_arrays(inpt, seq_len):
             d.append(epoch)
     return np.array(d)
 
-def sample_expert_transitions(policy, env, episodes):
+def sample_expert_transitions(policy, env, episodes, set_deterministic):
 
     expert = policy
     print(f"Sampling transitions. {episodes}")
@@ -313,7 +312,8 @@ def sample_expert_transitions(policy, env, episodes):
         make_sample_until(min_timesteps=None, min_episodes=episodes),
         unwrap=True,
         exclude_infos=False,
-        deterministic_policy =True
+        deterministic_policy =True,
+        set_deterministic=set_deterministic
     )
     return flatten_trajectories(rollouts)
 
@@ -521,6 +521,7 @@ def get_avr_succ_rew_det(env, learner, epsiodes, path, history, step, seq_len, d
         policy=learner,
         env=env,
         episodes=epsiodes,
+        set_deterministic=True
     )
     actions, observations, rewards = parse_sampled_transitions(transitions=transitions, extractor=DummyExtractor(), seq_len=seq_len, device=learner.device, dense=dense)
     success = (rewards.reshape([-1, seq_len]).max(dim=1).values == 1)
