@@ -3,7 +3,7 @@ from active_critic.learner.active_critic_learner import ActiveCriticLearner, ACL
 from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 from active_critic.utils.gym_utils import make_dummy_vec_env, make_vec_env, parse_sampled_transitions, sample_expert_transitions, DummyExtractor, new_epoch_reach, sample_new_episode
-from active_critic.utils.pytorch_utils import make_part_obs_data, count_parameters
+from active_critic.utils.pytorch_utils import make_part_obs_data, count_parameters, get_steps_from_actions
 from active_critic.utils.dataset import DatasetAC
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -22,8 +22,6 @@ from gym import Env
 import random
 
 from datetime import datetime
-
-
 def make_wsm_setup(seq_len, d_output, weight_decay, device='cuda'):
     wsm = WholeSequenceModelSetup()
     wsm.model_setup = ModelSetup()
@@ -35,7 +33,7 @@ def make_wsm_setup(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 200
     wsm.model_setup.nlayers = 5
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout = 0.1
+    wsm.model_setup.dropout = 0
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -53,7 +51,7 @@ def make_wsm_setup_small(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 64
     wsm.model_setup.nlayers = 3
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout = 0.1
+    wsm.model_setup.dropout = 0
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -71,7 +69,7 @@ def make_wsm_setup_tiny(seq_len, d_output, weight_decay, device='cuda'):
     wsm.model_setup.d_model = 1
     wsm.model_setup.nlayers = 1
     wsm.model_setup.seq_len = seq_len
-    wsm.model_setup.dropout =0.1
+    wsm.model_setup.dropout =0
     wsm.lr = 1e-4
     wsm.model_setup.device = device
     wsm.optimizer_class = th.optim.AdamW
@@ -80,7 +78,7 @@ def make_wsm_setup_tiny(seq_len, d_output, weight_decay, device='cuda'):
 
 
 
-def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
+def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
     acps = ActiveCriticPolicySetup()
     acps.device = device
     acps.epoch_len = seq_len
@@ -94,19 +92,18 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 100
     elif opt_mode == 'actions':
-        acps.inference_opt_lr = 1e-4
-        acps.opt_steps = 100
+        acps.inference_opt_lr = 1e-3
+        acps.opt_steps = 5
     elif opt_mode == 'goal':
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
     elif opt_mode == 'actor+plan':
         acps.inference_opt_lr = 1e-6
-        acps.opt_steps = 1
+        acps.opt_steps = opt_steps
     else:
         1/0
 
     acps.optimize = True
-    acps.batch_size = 32
     acps.stop_opt = True
     acps.clip = True
 
@@ -114,18 +111,22 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, batch_size=32):
     return acps
 
 
-def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode):
-    env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len)
+def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_episodes, opt_steps, sparse):
+    env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len, sparse=sparse)
     d_output = env.action_space.shape[0]
     d_plan = 1
     wsm_actor_setup = make_wsm_setup(
         seq_len=seq_len, d_output=d_output, device=device, weight_decay=weight_decay)
     wsm_critic_setup = make_wsm_setup(
         seq_len=seq_len, d_output=1, device=device, weight_decay=weight_decay)
-    wsm_planner_setup = make_wsm_setup_small(
+    
+    wsm_critic_setup.sparse = True
+
+    wsm_planner_setup = make_wsm_setup_tiny(
         seq_len=seq_len, d_output=d_plan, weight_decay=weight_decay, device=device)
     acps = make_acps(
-        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device, opt_mode=opt_mode)
+        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device, opt_mode=opt_mode, opt_steps=opt_steps)
+    acps.buffer_size = 2*training_episodes
     actor = WholeSequenceModel(wsm_actor_setup)
     critic = CriticSequenceModel(wsm_critic_setup)
     planner = WholeSequenceModel(wsm_planner_setup)
@@ -148,20 +149,13 @@ def make_acl(
         min_critic_threshold, 
         weight_decay, 
         make_graphs,
-        start_training,
+        opt_steps,
+        sparse,
+        max_epoch_steps,
+        explore_until,
         fast=False):
     device = device
     acla = ActiveCriticLearnerArgs()
-    acla.data_path = data_path
-    acla.device = device
-    acla.extractor = DummyExtractor()
-    acla.imitation_phase = imitation_phase
-    tag = env_tag
-    acla.logname = tag + logname
-    acla.tboard = True
-    acla.batch_size = 16
-    acla.make_graphs = make_graphs
-    number = 10
 
     if fast:
         acla.val_every = val_every
@@ -177,24 +171,46 @@ def make_acl(
         acla.val_every = val_every
         acla.add_data_every = add_data_every
 
-        acla.validation_episodes = 15 
-        acla.validation_rep = 3
+        acla.validation_episodes = 20 
+        acla.validation_rep = 1
         acla.training_epsiodes = training_episodes
         acla.actor_threshold = 1e-2
         acla.critic_threshold = 1e-2
         acla.min_critic_threshold = min_critic_threshold
-        acla.num_cpu = 15
+        acla.num_cpu = 20
 
-    acla.plan_decay = 0.1
-    acla.patients = 40000
+    acla.data_path = data_path
+    acla.device = device
+    acla.extractor = DummyExtractor()
+    acla.imitation_phase = imitation_phase
+    tag = env_tag
+    acla.logname = tag + logname
+    acla.tboard = True
+    acla.batch_size = 16
+    acla.make_graphs = make_graphs
+    acla.explore_until = explore_until
     acla.total_training_epsiodes = total_training_epsiodes
     acla.start_critic = True
-    acla.train_inference = False
-    acla.start_training = start_training
+    acla.dense = True
+    acla.max_epoch_steps = max_epoch_steps
+
+    acla.use_pred_loss = True
+    acla.explore_cautious_until = 3
 
     epsiodes = 30
-    ac, acps, env, expert = setup_ac(seq_len=seq_len, num_cpu=min(acla.num_cpu, acla.training_epsiodes), device=device, opt_mode=opt_mode, tag=tag, weight_decay=weight_decay)
-    eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len)
+    ac, acps, env, expert = setup_ac(
+        seq_len=seq_len, 
+        num_cpu=min(acla.num_cpu, acla.training_epsiodes), 
+        device=device, 
+        opt_mode=opt_mode, 
+        tag=tag, 
+        weight_decay=weight_decay, 
+        training_episodes=acla.training_epsiodes,
+        opt_steps=opt_steps,
+        sparse=sparse
+        )
+    
+    eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len, sparse=sparse)
     acl = ActiveCriticLearner(ac_policy=ac, env=env, eval_env=eval_env, network_args_obj=acla)
     ac.write_tboard_scalar = acl.write_tboard_scalar
     return acl, env, expert, seq_len, epsiodes, device
@@ -209,7 +225,11 @@ def run_experiment(
         val_every, 
         add_data_every,
         opt_mode, 
-        start_training,
+        opt_steps,
+        sparse,
+        seq_len,
+        max_epoch_steps,
+        explore_until,
         weight_decay=1e-2, 
         demos=14, 
         make_graphs=False,
@@ -217,7 +237,6 @@ def run_experiment(
         total_training_epsiodes=20, 
         training_episodes=10, 
         min_critic_threshold=1e-4):
-    seq_len = 100
 
     acl, env, expert, seq_len, epsiodes, device = make_acl(
                             device,
@@ -234,66 +253,79 @@ def run_experiment(
                             add_data_every = add_data_every,
                             opt_mode=opt_mode,
                             make_graphs=make_graphs,
+                            opt_steps=opt_steps,
                             fast=fast,
-                            start_training=start_training)    
+                            sparse=sparse,
+                            explore_until=explore_until,
+                            max_epoch_steps=max_epoch_steps)    
     acl.network_args.num_expert_demos = demos
-
     if demos > 0:
-        actions, observations, rewards, _, expected_rewards = sample_new_episode(
+        
+        actions, observations, rewards, _, expected_rewards, _ = sample_new_episode(
             policy=expert,
             env=acl.env,
+            dense=True,
             extractor=acl.network_args.extractor,
             device=acl.network_args.device,
             episodes=demos,
             seq_len=seq_len)
     
+    
         exp_trjs = th.ones([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
-
-        acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos])
-
-    acl.train_data.last_success_is_role = False
-
+        actions_history = actions.unsqueeze(1).repeat([1, actions.shape[1], 1, 1])
+        print(rewards)
+        acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos], action_history=actions_history[:demos])
     acl.train(epochs=100000)
 
-def run_eval_stats_env(device, weight_decay):
-    imitation_phases = [True]
-    demonstrations_list = [15]
-    manual_seed = 1
-    th.manual_seed(manual_seed)
-    np.random.seed(manual_seed)
-    run_ids = [i for i in range(4)]
+
+def run_eval_stats_env(device, ms):
+    weight_decay = 1e-2
+    imitation_phases = [False]
+    demonstrations_list = [0]
+    run_ids = [i for i in range(2)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 400
-    min_critic_threshold = 5e-5
+    total_training_epsiodes = 2000
+    min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
-    val_everys = [6000]
-    add_data_everys = [6000]
+    env_tags = ['reach']
+    val_everys = [1000]
+    add_data_everys = [1000]
     opt_modes = ['actor+plan']
-    start_training = 0
-    for run_id in run_ids:
-        for demonstrations in demonstrations_list:
-            for env_tag in env_tags:
-                for im_ph in imitation_phases:
-                    for val_step, val_every in enumerate(val_everys):
+    opt_steps_list = [3]
+    sparse = True
+    seq_len = 100
+    max_epoch_steps = 30000
+    manual_seed = ms
+    explore_until = 0
+    th.manual_seed(manual_seed)
+    for demonstrations in demonstrations_list:
+        for env_tag in env_tags:
+            for im_ph in imitation_phases:
+                for val_step, val_every in enumerate(val_everys):
+                    for run_id in run_ids:
                         for opt_mode in opt_modes:
-                            logname = f' training {start_training} history eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, training_episodes: {training_episodes}, min critic: {min_critic_threshold}, wd: {weight_decay}, val_every: {val_every} run id: {run_id}'
-                            print(f'____________________________________logname: {env_tag}  {logname}')
-                            run_experiment(device=device,
-                                        env_tag=env_tag,
-                                        logname=logname,
-                                        data_path=data_path,
-                                        demos=demonstrations,
-                                        imitation_phase=im_ph,
-                                        total_training_epsiodes=total_training_epsiodes,
-                                        training_episodes=training_episodes,
-                                        min_critic_threshold=min_critic_threshold,
-                                        weight_decay = weight_decay,
-                                        val_every=val_every,
-                                        add_data_every = add_data_everys[val_step],
-                                        opt_mode=opt_mode,
-                                        make_graphs = False,
-                                        start_training=start_training,
-                                        fast=False)
+                            for opt_steps in opt_steps_list:
+                                logname = f' ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                print(f'____________________________________logname: {logname}')
+                                run_experiment(device=device,
+                                            env_tag=env_tag,
+                                            logname=logname,
+                                            data_path=data_path,
+                                            demos=demonstrations,
+                                            imitation_phase=im_ph,
+                                            total_training_epsiodes=total_training_epsiodes,
+                                            training_episodes=training_episodes,
+                                            min_critic_threshold=min_critic_threshold,
+                                            weight_decay = weight_decay,
+                                            val_every=val_every,
+                                            add_data_every = add_data_everys[val_step],
+                                            opt_mode=opt_mode,
+                                            make_graphs = True,
+                                            fast=False,
+                                            opt_steps=opt_steps,
+                                            sparse=sparse,
+                                            seq_len=seq_len,
+                                            max_epoch_steps=max_epoch_steps,
+                                            explore_until=explore_until)
 
