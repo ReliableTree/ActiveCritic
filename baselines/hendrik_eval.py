@@ -651,7 +651,7 @@ if __name__ == '__main__':
     list_env_tags = ['reach']
     n_samples = 5000
     bc_epochs = 0
-    ids = [i for i in range(3)]
+    ids = [i for i in range(4)]
     dense_list = [True]
     dense = True
     sparse = True
