@@ -101,7 +101,9 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
                 epsiodes=50,
                 path=bc_stats_path,
                 history=history,
-                step=i)
+                step=i,
+                seq_len=seq_len,
+                dense=dense)
             success_rate = success.mean()
             print(f'success rate: {success_rate}')
             tboard.addValidationScalar(
@@ -132,7 +134,10 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
             epsiodes=100,
             path=learner_stats_path,
             history=history,
-            step=0)
+            step=0,
+            seq_len=seq_len,
+            dense=dense)
+        print(f'init success: {success.mean()}')
         
         tboard.addValidationScalar(
             'Reloaded Success Rate', value=th.tensor(success.mean()), stepid=0)
@@ -155,7 +160,9 @@ def evaluate_learner(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
                 epsiodes=10,
                 path=learner_stats_path,
                 history=history,
-                step=learner.env.envs[0].reset_count)
+                step=learner.env.envs[0].reset_count,
+                seq_len=seq_len,
+                dense=dense)
             success_rate = success.mean()
             print(f'success rate: {success_rate}')
             tboard.addValidationScalar('Reward', value=th.tensor(
@@ -342,7 +349,9 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
                 epsiodes=50,
                 path=bc_stats_path,
                 history=history,
-                step=i)
+                step=i,
+                seq_len=seq_len,
+                dense=dense)
             success_rate = success.mean()
             tboard.addValidationScalar(
                 'Reward', value=th.tensor(rews.mean()), stepid=i*fac)
@@ -384,7 +393,9 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
             epsiodes=50,
             path=learner_stats_path,
             history=history,
-            step=0)
+            step=0,
+            seq_len=seq_len,
+            dense=dense)
         
         tboard.addValidationScalar(
             'Reloaded Success Rate', value=th.tensor(success.mean()), stepid=0)
@@ -407,7 +418,9 @@ def evaluate_GAIL(env_tag, logname_save_path, seq_len, n_demonstrations, bc_epoc
                 epsiodes=50,
                 path=learner_stats_path,
                 history=history,
-                step=learner.env.envs[0].reset_count)
+                step=learner.env.envs[0].reset_count,
+                seq_len=seq_len,
+                dense=dense)
             success_rate = success.mean()
             tboard.addValidationScalar('Reward', value=th.tensor(
                 rews.mean()), stepid=learner.env.envs[0].reset_count)
@@ -451,7 +464,9 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
                 epsiodes=50,
                 path=bc_stats_path,
                 history=history,
-                step=i)
+                step=i,
+                seq_len=seq_len,
+                dense=dense)
             print(f'success: {success.mean()}')
             success_rate = success.mean()
             tboard.addValidationScalar(
@@ -476,7 +491,9 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
         epsiodes=50,
         path=learner_stats_path,
         history=history,
-        step=0)
+        step=0,
+        seq_len=seq_len,
+        dense=dense)
     
     tboard.addValidationScalar(
         'Reloaded Success Rate', value=th.tensor(success.mean()), stepid=0)
@@ -497,7 +514,9 @@ def evaluate_Rec_PPO(env_tag, logname_save_path, seq_len, n_demonstrations, bc_e
             epsiodes=50,
             path=learner_stats_path,
             history=history,
-            step=learner.env.envs[0].reset_count)
+            step=learner.env.envs[0].reset_count,
+            seq_len=seq_len,
+            dense=dense)
         success_rate = success.mean()
         tboard.addValidationScalar('Reward', value=th.tensor(
             rews.mean()), stepid=learner.env.envs[0].reset_count)
@@ -640,7 +659,7 @@ if __name__ == '__main__':
     th.manual_seed(ms)
     np.random.seed(ms)
     seq_len = 100
-    learning_starts = 20000
+    learning_starts = 1000
 
     path = '/data/bing/hendrik/Baselines_Stats_GAIL_' + s + f'{ms}_' + '/'
 

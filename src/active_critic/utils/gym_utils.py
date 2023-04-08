@@ -166,6 +166,7 @@ class StrictSeqLenWrapper(gym.Wrapper):
             return obsv, float(0), done, info
         elif done:
             info['unscaled_reward'] = self.success
+            print(f'success: {self.success}')
 
             return obsv, self.success, done, info
         else:
@@ -311,7 +312,8 @@ def sample_expert_transitions(policy, env, episodes):
         env,
         make_sample_until(min_timesteps=None, min_episodes=episodes),
         unwrap=True,
-        exclude_infos=False
+        exclude_infos=False,
+        deterministic_policy =True
     )
     return flatten_trajectories(rollouts)
 
@@ -360,7 +362,7 @@ def sample_new_episode(policy:ActiveCriticPolicy,
         if return_gen_trj:
             return actions, policy.history.gen_trj[0][:episodes], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes], action_history
         else:
-            return actions, observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes], action_history
+            return actions[:episodes], observations[:episodes], rewards[:episodes], expected_rewards_before[:episodes], expected_rewards_after[:episodes], action_history[:episodes]
         
 class POMDP_Wrapper(gym.Wrapper):
     def __init__(self, env, lookup_freq, pe_dim, seq_len) -> None:
@@ -514,29 +516,23 @@ def save_stat(success, history, step, path):
     return history
 
 
-def get_avr_succ_rew_det(env, learner, epsiodes, path, history, step):
-    success = []
-    rews = []
-    for i in range(epsiodes):
-        obs = env.reset()
-        done = False
-        while not done:
-            action, _ = learner.predict(obs, deterministic=True)
-            obs, rew, done, info = env.step(action)
-            rews.append(rew)
-            if info[0]['success'] > 0:
-                success.append(info[0]['success'])
-                break
-            if done:
-                success.append(0)
-    success = np.array(success)
-    rews = np.array(rews)/10
+def get_avr_succ_rew_det(env, learner, epsiodes, path, history, step, seq_len, dense):
+    transitions = sample_expert_transitions(
+        policy=learner,
+        env=env,
+        episodes=epsiodes,
+    )
+    actions, observations, rewards = parse_sampled_transitions(transitions=transitions, extractor=DummyExtractor(), seq_len=seq_len, device=learner.device, dense=dense)
+    success = (rewards.reshape([-1, seq_len]).max(dim=1).values == 1)
+    success = success.type(th.float).detach().cpu().numpy()
+    rews = rewards.detach().cpu().numpy()
     history = save_stat(success=success, history=history, step=step, path=path)
     return success, rews, history
 
 def get_avr_succ_rew_det_rec(env, learner, epsiodes, path, history, step):
     success = []
     rews = []
+
     for i in range(epsiodes):
         obs = env.reset()
         done = False
@@ -558,6 +554,8 @@ def get_avr_succ_rew_det_rec(env, learner, epsiodes, path, history, step):
     rews = np.array(rews)
     history = save_stat(success=success, history=history, step=step, path=path)
     return success, rews, history
+
+
 
 def make_ppo_rec_data_loader(env, vec_expert, n_demonstrations, seq_len, device, dense):
     batch_size=16
