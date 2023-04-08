@@ -361,6 +361,7 @@ def generate_trajectories(
     while np.any(active):
         acts = get_actions(obs)
         obs, rews, dones, infos = venv.step(acts)
+        print(f'rew: {rews}')
 
         # If an environment is inactive, i.e. the episode completed for that
         # environment after `sample_until(trajectories)` was true, then we do

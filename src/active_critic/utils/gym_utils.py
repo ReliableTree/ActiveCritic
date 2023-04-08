@@ -106,7 +106,6 @@ class ImitationLearningWrapper:
     def predict(self, obsv, deterministic=None):
         actions = []
         for obs in obsv:
-            print(f'obsv: {obs }')
             actions.append(self.policy.get_action(obs))
         return actions
 
