@@ -337,7 +337,7 @@ def sample_new_episode(policy:ActiveCriticPolicy,
             seq_len = seq_len
             
         transitions = sample_expert_transitions(
-            policy.predict, env, episodes)
+            policy.predict, env, episodes, set_deterministic=False)
 
         datas = parse_sampled_transitions(
             transitions=transitions, seq_len=seq_len, extractor=extractor, device=device, dense=dense)
