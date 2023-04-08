@@ -113,19 +113,20 @@ def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=N
             ax.fill_between(timesteps[i],np.maximum(mean_data-std_data, 0), np.minimum(mean_data+std_data, 1), alpha=0.3)
 
     # add labels, title, and legend to the plot
-    ax.set_xlabel('Number Sampled Trajectories')
-    ax.set_ylabel('Success Rate')
-    ax.set_title(plot_name)
+    fontsize = 20
+    ax.set_xlabel('Number Sampled Trajectories', fontsize=fontsize)
+    ax.set_ylabel('Success Rate', fontsize=fontsize)
+    ax.set_title(plot_name, fontsize=fontsize)
+    ax.tick_params(axis='both', which='major', labelsize=14)
     if loc is None:
-        ax.legend()
+        ax.legend(fontsize=14)
     else:
-        ax.legend(loc = loc)
+        ax.legend(loc = loc, fontsize=14)
     if path is not None:
         # create directory if it doesn't exist
         os.makedirs(path, exist_ok=True)
         # save the plot
-        plt.savefig(os.path.join(path, plot_name + '.png'))
-
+        plt.savefig(os.path.join(path, plot_name + '.png'), bbox_inches='tight')
 def make_plot(
         paths, 
         includes, 
