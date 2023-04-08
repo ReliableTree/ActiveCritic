@@ -201,7 +201,9 @@ class ActiveCriticLearner(nn.Module):
                 device=self.network_args.device,
                 episodes=self.env.num_envs,
                 seq_len=seq_len,
-                start_training=start_training)
+                start_training=start_training,
+                set_deterministic=False)
+
             result_array = []
             for res in result:
                 result_array.append(res)
@@ -524,7 +526,8 @@ class ActiveCriticLearner(nn.Module):
                 device=self.network_args.device,
                 episodes=self.network_args.validation_episodes,
                 return_gen_trj=True,
-                start_training=start_training)
+                start_training=start_training,
+                set_deterministic=False)
             if rewards_cumm is None:
                 rewards_cumm = rewards_run
             else:
@@ -688,7 +691,9 @@ class ActiveCriticLearner(nn.Module):
             env=self.env,
             extractor=self.network_args.extractor,
             episodes=1,
-            device=self.network_args.device)
+            device=self.network_args.device,
+            set_deterministic=False)
+
         self.load_state_dict(th.load(
             path + "policy_network", map_location=device))
         self.policy.actor.optimizer.load_state_dict(

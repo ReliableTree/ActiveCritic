@@ -284,7 +284,7 @@ def fill_arrays(inpt, seq_len):
             d.append(epoch)
     return np.array(d)
 
-def sample_expert_transitions(policy, env, episodes):
+def sample_expert_transitions(policy, env, episodes, set_deterministic):
 
     expert = policy
     print(f"Sampling transitions. {episodes}")
@@ -294,12 +294,22 @@ def sample_expert_transitions(policy, env, episodes):
         env,
         make_sample_until(min_timesteps=None, min_episodes=episodes),
         unwrap=True,
-        exclude_infos=False
+        exclude_infos=False,
+        set_deterministic=set_deterministic
     )
     return flatten_trajectories(rollouts)
 
 
-def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str, episodes:int=1, return_gen_trj = False, seq_len = None, start_training=None):
+def sample_new_episode(
+        policy:ActiveCriticPolicy, 
+        env:Env, 
+        extractor, 
+        device:str, 
+        episodes:int=1, 
+        return_gen_trj = False, 
+        seq_len = None, 
+        start_training=None,
+        set_deterministic=True):
 
         try:
             policy.eval()
@@ -311,7 +321,7 @@ def sample_new_episode(policy:ActiveCriticPolicy, env:Env, extractor, device:str
             seq_len = seq_len
             
         transitions = sample_expert_transitions(
-            policy.predict, env, episodes)
+            policy.predict, env, episodes, set_deterministic=set_deterministic)
 
         datas = parse_sampled_transitions(
             transitions=transitions, seq_len=seq_len, extractor=extractor, device=device)

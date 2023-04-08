@@ -245,7 +245,8 @@ def run_experiment(
             extractor=acl.network_args.extractor,
             device=acl.network_args.device,
             episodes=demos,
-            seq_len=seq_len)
+            seq_len=seq_len,
+            set_deterministic=False)
     
         exp_trjs = th.ones([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
 
