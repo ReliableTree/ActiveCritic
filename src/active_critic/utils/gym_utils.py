@@ -126,6 +126,8 @@ def make_dummy_vec_env(name, seq_len, sparse):
     return dv1, vec_expert
 
 
+
+
 class ResetCounterWrapper(gym.Wrapper):
     def __init__(self, env: Env) -> None:
         super().__init__(env)
@@ -171,6 +173,7 @@ class StrictSeqLenWrapper(gym.Wrapper):
         else:
             return obsv, rew, done, info
         
+
 
 def make_vec_env(env_id, num_cpu, seq_len, sparse):
     policy_dict = make_policy_dict()
