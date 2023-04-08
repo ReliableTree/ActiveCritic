@@ -309,6 +309,7 @@ def generate_trajectories(
     policy: AnyPolicy,
     venv: VecEnv,
     sample_until: GenTrajTerminationFn,
+    set_deterministic,
     *,
     deterministic_policy: bool = False,
     rng: np.random.RandomState = np.random,
@@ -335,7 +336,11 @@ def generate_trajectories(
         may be collected to avoid biasing process towards short episodes; the user
         should truncate if required.
     """
-    get_actions = _policy_to_callable(policy, venv, deterministic_policy)
+    if set_deterministic:
+        get_actions = _policy_to_callable(policy, venv, deterministic_policy)
+    else:
+        get_actions = _policy_to_callable(policy, venv)
+
 
     # Collect rollout tuples.
     trajectories = []
@@ -547,6 +552,7 @@ def rollout(
     policy: AnyPolicy,
     venv: VecEnv,
     sample_until: GenTrajTerminationFn,
+    set_deterministic,
     *,
     unwrap: bool = True,
     exclude_infos: bool = True,
@@ -579,7 +585,7 @@ def rollout(
         may be collected to avoid biasing process towards short episodes; the user
         should truncate if required.
     """
-    trajs = generate_trajectories(policy, venv, sample_until, **kwargs)
+    trajs = generate_trajectories(policy, venv, sample_until,set_deterministic, **kwargs)
     if unwrap:
         trajs = [unwrap_traj(traj) for traj in trajs]
     if exclude_infos:
