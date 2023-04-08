@@ -648,10 +648,10 @@ if __name__ == '__main__':
     s = datetime.today().strftime('%Y-%m-%d')
 
     list_demonstrations = [0]
-    list_env_tags = ['reach']
+    list_env_tags = ['reach', 'windowopen']
     n_samples = 5000
     bc_epochs = 0
-    ids = [i for i in range(4)]
+    ids = [i for i in range(3)]
     dense_list = [True]
     dense = True
     sparse = True
