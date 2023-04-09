@@ -158,6 +158,7 @@ class StrictSeqLenWrapper(gym.Wrapper):
 
     def step(self, action):
         self.current_step += 1
+        print(f'current step: {self.current_step}')
         obsv, rew, done, info = super().step(action)
         
         done = self.current_step == self.seq_len
