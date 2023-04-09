@@ -118,3 +118,15 @@ def pick_action_from_history(action_histories, steps):
             result_index = batch * len(steps[batch]) + i
             result[result_index] = action_histories[batch, timestep]
     return result
+
+def diff_boundaries(actions, low, high):
+    high_mask = actions > high
+    low_mask = actions < low
+    high_bound = th.square(th.where(high_mask, actions - high, th.zeros_like(actions))).sum()
+    low_bound = th.square(th.where(low_mask, actions - low, th.zeros_like(actions))).sum()
+    normalizing = th.sum(high_mask) + th.sum(low_mask)
+    if normalizing > 0:
+        com = (high_bound + low_bound) / normalizing
+    else:
+        com = th.zeros([1], device=actions.device, requires_grad=True)
+    return com

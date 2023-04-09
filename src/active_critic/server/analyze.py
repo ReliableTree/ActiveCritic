@@ -105,7 +105,8 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
 
     acps.optimize = True
     acps.stop_opt = True
-    acps.clip = True
+    acps.clip = False
+    acps.use_diff_boundaries = True
 
     acps.optimizer_mode = opt_mode
     return acps
@@ -196,6 +197,7 @@ def make_acl(
 
     acla.use_pred_loss = True
     acla.explore_cautious_until = 3
+
 
     epsiodes = 30
     ac, acps, env, expert = setup_ac(

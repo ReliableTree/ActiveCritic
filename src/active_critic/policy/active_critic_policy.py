@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel, CriticSequenceModel
-from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq
+from active_critic.utils.pytorch_utils import diff_boundaries
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -34,6 +34,7 @@ class ActiveCriticPolicySetup:
         self.optimizer_mode : str = None
         self.clip:bool = True
         self.buffer_size:int = None
+        self.use_diff_boundaries = None
 
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
@@ -408,6 +409,12 @@ class ActiveCriticPolicy(BaseModel):
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
+        if self.args_obj.use_diff_boundaries:
+            diff_bound_loss = diff_boundaries(
+                actions=opt_actions[:, self.current_step:], 
+                low=th.tensor(self.action_space.low, device=opt_actions.device), 
+                high = th.tensor(self.action_space.high, device=opt_actions.device))
+            critic_loss = critic_loss + diff_bound_loss
         optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()
