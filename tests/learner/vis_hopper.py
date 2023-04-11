@@ -7,7 +7,7 @@ from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
 
 if __name__ == '__main__':
     pd = make_policy_dict()
-    asd = pd['pickplace']
+    asd = pd['reach']
     expert, env_id = asd
     env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[env_id]()
     env._freeze_rand_vec = False
@@ -21,5 +21,5 @@ if __name__ == '__main__':
             obs, rew, done, info = env.step(action)
             done = info['success'] == 1
             h = time.perf_counter()
-            while time.perf_counter() - h < 0.1:
+            while time.perf_counter() - h < 0.5:
                 env.render()
