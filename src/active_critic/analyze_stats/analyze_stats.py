@@ -53,7 +53,19 @@ def file_crawler(path, substrings, exclude=[]):
     print(f'for path: {path}: {len(result)}')
     return result
 
-def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=None, plot_closest=False, loc=None, total_plot_points=1, mark_every = None):
+def plot_experiment_data(
+        timesteps, 
+        experiments, 
+        names, 
+        plot_name, 
+        mean,  
+        path=None, 
+        plot_closest=False, 
+        loc=None, 
+        total_plot_points=1, 
+        mark_every = None,
+        font_size = 14,
+        legend_font_size=14):
     # create figure and axis objects
     fig, ax = plt.subplots()
 
@@ -116,15 +128,14 @@ def plot_experiment_data(timesteps, experiments, names, plot_name, mean,  path=N
             ax.fill_between(timesteps[i],np.maximum(mean_data-std_data, 0), np.minimum(mean_data+std_data, 1), alpha=0.3)
 
     # add labels, title, and legend to the plot
-    fontsize = 20
-    ax.set_xlabel('Number Sampled Trajectories', fontsize=fontsize)
-    ax.set_ylabel('Success Rate', fontsize=fontsize)
-    ax.set_title(plot_name, fontsize=fontsize)
-    ax.tick_params(axis='both', which='major', labelsize=14)
+    ax.set_xlabel('Sampled Trajectories', fontsize=font_size)
+    ax.set_ylabel('Success Rate', fontsize=font_size)
+    ax.set_title(plot_name, fontsize=font_size)
+    ax.tick_params(axis='both', which='major', labelsize=font_size)
     if loc is None:
-        ax.legend(fontsize=14)
+        ax.legend(fontsize=legend_font_size)
     else:
-        ax.legend(loc = loc, fontsize=14)
+        ax.legend(loc = loc, fontsize=legend_font_size)
     if path is not None:
         # create directory if it doesn't exist
         os.makedirs(path, exist_ok=True)
@@ -142,7 +153,9 @@ def make_plot(
         find_closest = False, 
         loc=None,
         total_plot_points=1,
-        mark_every = None):
+        mark_every = None,
+        font_size = 14,
+        legend_font_size=14):
     abs_file_path_list = []
     
     for i in range(len(paths)):
@@ -162,10 +175,12 @@ def make_plot(
         mean=mean,
         loc=loc,
         total_plot_points=total_plot_points,
-        mark_every=mark_every
+        mark_every=mark_every,
+        font_size=font_size,
+        legend_font_size=legend_font_size
         )
     
-def plot_actions(paths, includes, excludes, experiment_num, time_step, save_path, legend_fontsize=12, label_fontsize=14, xlabel="Time Step", ylabel="Action"):
+def plot_actions(paths, includes, excludes, experiment_num, time_step, save_path, title, legend_fontsize=12, label_fontsize=14, xlabel="Time Step", ylabel="Action"):
     abs_file_path_list = []
 
     for i in range(len(paths)):
@@ -179,18 +194,33 @@ def plot_actions(paths, includes, excludes, experiment_num, time_step, save_path
     
     T, d_a = gen_actions.shape[1:]
     
-    fig, ax = plt.subplots(d_a, 1, sharex=True, figsize=(8, 6))
-    
-    for i in range(d_a):
-        ax[i].plot(range(T), gen_actions[time_step,:,i], label="Generated Actions")
-        ax[i].plot(range(T), opt_actions[time_step,:,i], label="Optimized Actions")
-        ax[i].set_ylabel(f"{ylabel} {i}", fontsize = label_fontsize)
-        ax[i].set_ylabel(f"{ylabel} {i}", rotation=90, labelpad=15)
-        ax[i].tick_params(axis="both", which="major", labelsize=label_fontsize)
-        ax[i].yaxis.set_label_coords(-0.1, 0.5)
-    ax[0].legend(fontsize=legend_fontsize)
-        
-    ax[-1].set_xlabel(xlabel, fontsize = label_fontsize)
-    
+    fig, ax = plt.subplots(2, 2, sharex=True)
+
+    for i in range(2):
+        for j in range(2):
+            index = i*2 + j
+            
+            gen_action = gen_actions[time_step, :, index]
+            opt_action = opt_actions[time_step, :, index]
+            
+            ax[i, j].plot(range(T), gen_action, label="Generated")
+            ax[i, j].plot(range(T), opt_action, label="Optimized")
+            ax[i, j].set_ylabel(f"{ylabel} {index}", fontsize=label_fontsize)
+            ax[i, j].tick_params(axis="both", which="major", labelsize=label_fontsize)
+            if j == 0:
+                ax[i, j].yaxis.set_label_coords(-0.35, 0.5)
+            else:
+                ax[i, j].yaxis.set_label_coords(-0.14, 0.5)
+            
+            if i == 1:
+                ax[i, j].set_xlabel(xlabel, fontsize=label_fontsize)
+
+    plt.suptitle(title, fontsize=label_fontsize, y=1)
+
+    fig.legend(["Generated", "Optimized"], loc="lower center", ncol=2, fontsize=legend_fontsize,
+            bbox_to_anchor=(0.5, -0.2))
+    plt.subplots_adjust(wspace=0.4, hspace=0.4)
+
     if save_path is not None:
-        plt.savefig(save_path)
+        os.makedirs(save_path, exist_ok=True)
+        plt.savefig(os.path.join(save_path, title), bbox_inches='tight')
