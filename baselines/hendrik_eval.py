@@ -655,7 +655,7 @@ if __name__ == '__main__':
     dense_list = [True]
     dense = True
     sparse = True
-    ms = 0
+    ms = 1
     th.manual_seed(ms)
     np.random.seed(ms)
     seq_len = 100
