@@ -287,18 +287,18 @@ def run_eval_stats_env(device, ms):
     demonstrations_list = [0]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 2
+    training_episodes = 1
     total_training_epsiodes = 3000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']
-    val_everys = [1000]
-    add_data_everys = [1000]
+    val_everys = [10]
+    add_data_everys = [100]
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = True
     seq_len = 100
-    max_epoch_steps = 30000
+    max_epoch_steps = 1500
     manual_seed = ms
     explore_until = 0
     th.manual_seed(manual_seed)
@@ -309,7 +309,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' min critic ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' double critic ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
@@ -325,7 +325,7 @@ def run_eval_stats_env(device, ms):
                                             add_data_every = add_data_everys[val_step],
                                             opt_mode=opt_mode,
                                             make_graphs = True,
-                                            fast=True,
+                                            fast=False,
                                             opt_steps=opt_steps,
                                             sparse=sparse,
                                             seq_len=seq_len,

@@ -416,10 +416,10 @@ class ActiveCriticPolicy(BaseModel):
         else:
             1/0
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
-        current_critic_result_1 = self.critics[self.current_active_critic].forward(inputs=critic_inpt)
-        current_critic_result_2 = self.critics[(self.current_active_critic + 1)%len(self.critics)].forward(inputs=critic_inpt)
-        critic_result = th.minimum(current_critic_result_1, current_critic_result_2)
-        critic_loss = self.critics[self.current_active_critic].loss_fct(result=critic_result, label=goal_label)
+        current_critic_result = self.critics[self.current_active_critic].forward(inputs=critic_inpt)
+        with th.no_grad():
+            unbiased_critic_result = self.critics[(self.current_active_critic + 1)%len(self.critics)].forward(inputs=critic_inpt)
+        critic_loss = self.critics[self.current_active_critic].loss_fct(result=current_critic_result, label=goal_label)
         if self.args_obj.use_diff_boundaries:
             diff_bound_loss = diff_boundaries(
                 actions=opt_actions[:, self.current_step:], 
@@ -431,13 +431,13 @@ class ActiveCriticPolicy(BaseModel):
         optimizer.step()
 
         debug_dict = {
-            'in optimisation expected success' : critic_result.mean().detach()
+            'in optimisation expected success' : current_critic_result.mean().detach()
         }
 
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=current_opt_step, optimize=True)
 
 
-        return opt_actions, critic_result, plans
+        return opt_actions, unbiased_critic_result, plans
     
     def get_critic_forward(self, critic_index, input):
         return self.critics[critic_index].forward(input)

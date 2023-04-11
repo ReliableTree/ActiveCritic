@@ -346,9 +346,11 @@ class ActiveCriticLearner(nn.Module):
     def train(self, epochs):
         next_val = 0
         next_add = 0
+        added_periods = 0
         for epoch in range(epochs):
-            if self.global_step >= next_val:
-                next_val = self.global_step + self.network_args.val_every
+            if added_periods >= next_val:
+                added_periods = 0
+                next_val = self.network_args.val_every
                 print(f'current run stats: {self.logname}')
                 if self.network_args.tboard:
                     print('_____________________________________________________________')
@@ -373,6 +375,7 @@ class ActiveCriticLearner(nn.Module):
 
 
             if (not self.network_args.imitation_phase) and (self.global_step >= next_add):
+                added_periods += 1
                 next_add = self.global_step + self.network_args.add_data_every
                 th.save(self.policy.actor.state_dict(),self.inter_path +  'actor_before')
                 th.save(self.policy.planner.state_dict(),self.inter_path +  'planner_before')
@@ -400,6 +403,7 @@ class ActiveCriticLearner(nn.Module):
                     print('______________________________init models___________________________________')
 
             elif (self.global_step >= next_add):
+                added_periods += 1
                 next_add = self.global_step + self.network_args.add_data_every
                 self.virtual_step += self.network_args.training_epsiodes
             if (self.network_args.imitation_phase) and (epoch >= next_add):
@@ -611,7 +615,10 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize)
 
         for i in range(min(opt_actions.shape[0], 4)):
-            self.createGraphs([gen_actions[i, 0], opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i) + fix)
+            gen_ac_at_t = gen_actions[i, 0]
+            for j in range(gen_actions.shape[1]):
+                gen_ac_at_t[j] = gen_actions[i, j, j]
+            self.createGraphs([gen_ac_at_t, opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i) + fix)
             labels = self.make_critic_score(rewards=rewards_run)
             self.createGraphs([labels[i].reshape([-1, 1]), self.policy.history.opt_scores[0][i].reshape([-1, 1]), self.policy.history.gen_scores[0][i].reshape([-1, 1])], 
                                 ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i) + fix)
