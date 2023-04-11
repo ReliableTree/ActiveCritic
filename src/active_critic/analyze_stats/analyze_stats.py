@@ -33,7 +33,10 @@ def parse_data(paths, find_closest):
 
     for dict in inter_dicts:
         for key in dict:
-            next_entrance = dict[key].reshape([1, -1])
+            if (key != 'gen_actions') and (key != 'opt_actions'):
+                next_entrance = dict[key].reshape([1, -1])
+            else:
+                next_entrance = dict[key]
             if key in result_dict:
                 result_dict[key] = np.append(result_dict[key], next_entrance, axis=0)
             else:
@@ -161,3 +164,33 @@ def make_plot(
         total_plot_points=total_plot_points,
         mark_every=mark_every
         )
+    
+def plot_actions(paths, includes, excludes, experiment_num, time_step, save_path, legend_fontsize=12, label_fontsize=14, xlabel="Time Step", ylabel="Action"):
+    abs_file_path_list = []
+
+    for i in range(len(paths)):
+        abs_file_path_list.append(file_crawler(path=paths[i], substrings=includes[i], exclude=excludes[i]))
+    dict_list = []
+
+    for result in abs_file_path_list:
+        dict_list.append(parse_data(paths=result, find_closest=False))
+    gen_actions = dict_list[experiment_num]["gen_actions"]
+    opt_actions = dict_list[experiment_num]["opt_actions"]
+    
+    T, d_a = gen_actions.shape[1:]
+    
+    fig, ax = plt.subplots(d_a, 1, sharex=True, figsize=(8, 6))
+    
+    for i in range(d_a):
+        ax[i].plot(range(T), gen_actions[time_step,:,i], label="Generated Actions")
+        ax[i].plot(range(T), opt_actions[time_step,:,i], label="Optimized Actions")
+        ax[i].set_ylabel(f"{ylabel} {i}", fontsize = label_fontsize)
+        ax[i].set_ylabel(f"{ylabel} {i}", rotation=90, labelpad=15)
+        ax[i].tick_params(axis="both", which="major", labelsize=label_fontsize)
+        ax[i].yaxis.set_label_coords(-0.1, 0.5)
+    ax[0].legend(fontsize=legend_fontsize)
+        
+    ax[-1].set_xlabel(xlabel, fontsize = label_fontsize)
+    
+    if save_path is not None:
+        plt.savefig(save_path)
