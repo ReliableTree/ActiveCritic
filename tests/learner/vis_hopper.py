@@ -7,7 +7,7 @@ from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE
 
 if __name__ == '__main__':
     pd = make_policy_dict()
-    asd = pd['reach']
+    asd = pd['push']
     expert, env_id = asd
     env = ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE[env_id]()
     env._freeze_rand_vec = False

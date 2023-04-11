@@ -178,11 +178,7 @@ class ActiveCriticPolicy(BaseModel):
             return result
 
         else:
-            if self.train_inference:
-                opt_count = int(math.ceil(actions.shape[0]/2))
-                print(f'also use actor vorschläge: opt count {opt_count}')
-            else:
-                opt_count = actions.shape[0]
+            opt_count = actions.shape[0]
             actions_opt, expected_success_opt = self.optimize_act_sequence(
                 actions=actions, 
                 observations=observation_seq, 
@@ -230,7 +226,6 @@ class ActiveCriticPolicy(BaseModel):
             optimizer = th.optim.AdamW(
                 [optimized_actions], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         elif self.args_obj.optimizer_mode == 'actor':
-            print('use actor opt mode')
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
@@ -245,7 +240,6 @@ class ActiveCriticPolicy(BaseModel):
                 self.actor.parameters(), lr=self.args_obj.inference_opt_lr, weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
                 )
         elif self.args_obj.optimizer_mode == 'actor+plan':
-            print('use actor+plan opt mode')
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
@@ -270,7 +264,6 @@ class ActiveCriticPolicy(BaseModel):
             )
 
         elif self.args_obj.optimizer_mode == 'plan':
-            print('use plan opt mode')
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
@@ -279,7 +272,6 @@ class ActiveCriticPolicy(BaseModel):
             optimizer = th.optim.AdamW(
                 [plans], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         elif self.args_obj.optimizer_mode == 'goal':
-            print('use goal opt mode')
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
@@ -334,11 +326,6 @@ class ActiveCriticPolicy(BaseModel):
         if self.args_obj.optimizer_mode == 'actor' or self.args_obj.optimizer_mode == 'actor+plan':
             self.actor.load_state_dict(init_actor)
             self.planner.load_state_dict(init_planner)
-            '''self.critic.load_state_dict(init_critic)
-            self.actor.optimizer.load_state_dict(init_actor_optimizer)
-            self.critic.optimizer.load_state_dict(init_critic_optimizer)
-            self.planner.optimizer.load_state_dict(init_planner_optimizer)'''
-            print('reloaded models and optimizer')
         return final_actions, final_exp_success
 
     def inference_opt_step(self, 

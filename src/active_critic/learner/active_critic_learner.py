@@ -234,9 +234,7 @@ class ActiveCriticLearner(nn.Module):
         success = rewards.squeeze().max(-1).values
         success = (success == 1).type(th.float).mean()
 
-        print(f'last rewards: {rewards.mean()}')
-        print(f'last success: {success}')
-        print(f'self.last_scores: {self.last_scores}')
+        print(f'success training: {success}')
         expert_trjs = th.zeros([episodes], dtype=th.bool, device=actions.device)
         self.add_data(
             actions=actions,
@@ -254,7 +252,7 @@ class ActiveCriticLearner(nn.Module):
             self.set_best_actor = False
             self.set_best_critic = False
 
-            print('reinit')
+            print('reinit because no positive data')
 
 
     def train_step(self, train_loader, actor_step, critic_step, loss_actor, loss_critic, train_critic):
@@ -304,7 +302,6 @@ class ActiveCriticLearner(nn.Module):
                     self.run_validation(optimize=True)
                     self.run_validation(optimize=False)
                     print(f'self.get_num_training_samples(): {self.get_num_training_samples()}')
-                    print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
                     self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'+self.logname), strict=False)
                     self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'+self.logname), strict=False)
                     self.scores.reset_min_score(self.scores.mean_actor)
@@ -324,7 +321,6 @@ class ActiveCriticLearner(nn.Module):
                     self.policy.planner.load_state_dict(th.load(self.inter_path + 'best_planner'+self.logname))
                 if self.set_best_critic:
                     self.policy.critic.load_state_dict(th.load(self.inter_path + 'best_critic'+self.logname))
-                    print('__________________lodaded best critic____________________')
 
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
                 self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'+self.logname), strict=False)
