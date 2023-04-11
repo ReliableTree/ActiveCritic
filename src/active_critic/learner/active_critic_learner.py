@@ -221,12 +221,13 @@ class ActiveCriticLearner(nn.Module):
         
         if self.network_args.explore_cautious_until > self.get_num_pos_samples():
             self.policy.actor.init_model()
-            self.policy.critic.init_model()
+            for critic in self.policy.critics:
+                critic.init_model()
             self.policy.planner.init_model()
             self.policy.args_obj.clip = False
             self.policy.args_obj.use_diff_boundaries = True
             print('__________________________________reinit model_________________________________')
-            self.policy.args_obj.inference_opt_lr = 1e-6
+            self.policy.args_obj.inference_opt_lr = 1e-5
 
         else:
             self.policy.args_obj.clip = True
@@ -266,27 +267,28 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict={'lr actor': th.tensor(self.policy.actor.scheduler.get_last_lr()).mean()}, train=True)
         return loss_actor
     
-    def critic_step(self, data, loss_critic, loss_prediction):
+    def critic_step(self, data, loss_critic, loss_prediction, critic_index):
 
         obsv, actions, reward, expert_trjs, prev_proposed_actions, steps, prev_observation, _ = data
 
-        if self.policy.critic.wsms.sparse:
+        if self.policy.critics[0].wsms.sparse:
             label = self.make_critic_score(reward)
         else:
             label = reward
 
 
         critic_input = self.policy.get_critic_input(obsvs=obsv, acts=actions)
-        critic_result = self.policy.critic.forward(critic_input)
+        critic_result = self.policy.get_critic_forward(critic_index=critic_index, input=critic_input)
+
         reward_loss, l2_dist = calcMSE(critic_result, label, return_tensor=True)
 
         if self.network_args.use_pred_loss:
             prediction_mask = steps > 0
             critic_predicted_input_prev = self.policy.get_critic_input(obsvs=prev_observation[prediction_mask], acts=prev_proposed_actions[prediction_mask])
-            critic_pred_result_prev = self.policy.critic.forward(critic_predicted_input_prev)
+            critic_pred_result_prev = self.policy.get_critic_forward(critic_index=critic_index, input=critic_predicted_input_prev)
 
             critic_predicted_input_current = self.policy.get_critic_input(obsvs=obsv[prediction_mask], acts=prev_proposed_actions[prediction_mask])
-            critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
+            critic_pred_result_current = self.policy.get_critic_forward(critic_index=critic_index, input=critic_predicted_input_current)
 
             pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
 
@@ -295,10 +297,9 @@ class ActiveCriticLearner(nn.Module):
             l2_pred = th.zeros_like(l2_dist)
             loss = reward_loss
 
-
-        self.policy.critic.optimizer.zero_grad()
+        self.policy.critics[critic_index].optimizer.zero_grad()
         loss.backward()
-        self.policy.critic.optimizer.step()
+        self.policy.critics[critic_index].optimizer.step()
         loss = loss.detach()
         if loss_critic is None:
             loss_critic = l2_dist.reshape([-1])
@@ -308,7 +309,7 @@ class ActiveCriticLearner(nn.Module):
                 (loss_critic, l2_dist.reshape([-1])), dim=0)
             loss_prediction = th.cat(
                 (loss_prediction, l2_pred.reshape([-1])), dim=0)
-        self.write_tboard_scalar(debug_dict={'lr actor': th.tensor(self.policy.critic.scheduler.get_last_lr()).mean()}, train=True)
+            
         return loss_critic, loss_prediction
 
 
@@ -321,12 +322,13 @@ class ActiveCriticLearner(nn.Module):
             for dat in data:
                 device_data.append(dat.to(self.network_args.device))
             local_step += dat.shape[0]
-            self.train_data.onyl_positiv = (self.policy.critic.wsms.sparse or (self.train_data.success.sum() > 0))
+            self.train_data.onyl_positiv = (self.policy.critics[0].wsms.sparse or (self.train_data.success.sum() > 0))
             self.train_data.onyl_positiv = True
             loss_actor = self.actor_step(device_data, loss_actor)
             self.train_data.onyl_positiv = False
             if train_critic:
-                loss_critic, loss_prediction = self.critic_step(device_data, loss_critic, loss_prediction)
+                for i in range(len(self.policy.critics)):
+                    loss_critic, loss_prediction = self.critic_step(device_data, loss_critic, loss_prediction, critic_index=i)
             if local_step > self.network_args.max_epoch_steps:
                 print('max steps in learning reached')
                 return loss_actor, loss_critic, loss_prediction
@@ -390,7 +392,8 @@ class ActiveCriticLearner(nn.Module):
                 if self.next_critic_init is None:
                     self.next_critic_init = self.get_num_training_samples() * 2
                 if (self.get_num_training_samples() > self.next_critic_init):
-                    self.policy.critic.init_model()
+                    for critic in self.policy.critics:
+                        critic.init_model()
                     self.policy.actor.init_model()
                     self.policy.planner.init_model()
                     self.next_critic_init = 2 * self.get_num_training_samples()
@@ -504,7 +507,7 @@ class ActiveCriticLearner(nn.Module):
         last_expected_reward = trj[3]
         critic_input = self.policy.get_critic_input(obsvs=last_obsv, acts=last_actions)
 
-        expected_reward = self.policy.critic.forward(critic_input).reshape([-1, 1, 1 ])
+        expected_reward = self.policy.critics[0].forward(critic_input).reshape([-1, 1, 1 ])
 
 
         label = self.make_critic_score(last_rewards)
@@ -516,22 +519,30 @@ class ActiveCriticLearner(nn.Module):
         labels = labels.type(th.float)
         return labels
     
-    def save_stat(self, success, rewards, expected_success, opt_exp, exp_dict):
+    def save_stat(self, success, rewards, expected_success, opt_exp, exp_dict, gen_actions, opt_actions):
         if exp_dict is None:
             exp_dict = {
             'success_rate':success.mean().cpu().numpy(),
             'expected_success' : expected_success.mean().cpu().numpy(),
             'rewards': rewards.unsqueeze(0).detach().cpu().numpy(),
+            'gen_actions': gen_actions.unsqueeze(0).detach().cpu().numpy(),
+            'opt_actions' : opt_actions.unsqueeze(0).detach().cpu().numpy(),
             'step':np.array(self.get_num_training_samples())
             }
             if opt_exp is not None:
                 exp_dict['optimized_expected'] =  opt_exp.mean().cpu().numpy()
+            print(f'save stats gen: {exp_dict["gen_actions"].shape}')
+            print(f'save stats opt_actions: {exp_dict["opt_actions"].shape}')
 
         else:
             exp_dict['success_rate'] = np.append(exp_dict['success_rate'], success.mean().cpu().numpy())
             exp_dict['expected_success'] = np.append(exp_dict['expected_success'], expected_success.mean().cpu().numpy())
             exp_dict['step'] = np.append(exp_dict['step'], np.array(self.get_num_training_samples()))
             exp_dict['rewards'] = np.append(exp_dict['rewards'], np.array(rewards.unsqueeze(0).detach().cpu().numpy()), axis=0)
+            exp_dict['gen_actions'] = np.append(exp_dict['gen_actions'], np.array(gen_actions.unsqueeze(0).detach().cpu().numpy()), axis=0)
+            exp_dict['opt_actions'] = np.append(exp_dict['opt_actions'], np.array(opt_actions.unsqueeze(0).detach().cpu().numpy()), axis=0)
+            print(f'save stats gen: {exp_dict["gen_actions"].shape}')
+            print(f'save stats opt_actions: {exp_dict["opt_actions"].shape}')
 
             if opt_exp is not None:
                 exp_dict['optimized_expected'] = np.append(exp_dict['optimized_expected'], opt_exp.mean().cpu().numpy())
@@ -641,7 +652,6 @@ class ActiveCriticLearner(nn.Module):
 
 
         print(f'Success Rate: {success.mean()}' + fix)
-        print(f'Reward: {sparse_reward.mean()}' + fix)
         try:
             print(
                 f'training samples: {int(len(self.train_data.obsv))}' + fix)
@@ -659,12 +669,21 @@ class ActiveCriticLearner(nn.Module):
             exp_after = None
             exp_dict = self.exp_dict
 
-        exp_dict = self.save_stat(success=success, rewards=rewards_cumm, expected_success=expected_rewards_before, opt_exp=exp_after, exp_dict=exp_dict)
+
+        gen_actions_at_time_t = gen_actions[0,0]
+        for i in range(gen_actions.shape[1]):
+            gen_actions_at_time_t[i] = gen_actions[0,i,i]
+        exp_dict = self.save_stat(
+            success=success, 
+            rewards=rewards_cumm, 
+            expected_success=expected_rewards_before, 
+            opt_exp=exp_after, 
+            exp_dict=exp_dict,
+            gen_actions=gen_actions_at_time_t,
+            opt_actions=opt_actions[0])
 
         if optimize:
             self.exp_dict_opt = exp_dict
-            #self.policy.args_obj.opt_steps = opt_steps_before
-            print(f'self.policy.args_obj.opt_steps after: {self.policy.args_obj.opt_steps}')
         else:
             self.exp_dict = exp_dict
 
@@ -728,7 +747,7 @@ class ActiveCriticLearner(nn.Module):
         th.save(self.state_dict(), path_to_file + "/policy_network")
         th.save(self.policy.actor.optimizer.state_dict(),
                 path_to_file + "/optimizer_actor")
-        th.save(self.policy.critic.optimizer.state_dict(),
+        th.save(self.policy.critics[0].optimizer.state_dict(),
                 path_to_file + "/optimizer_critic")
         th.save(th.tensor(self.global_step),
                 path_to_file + "/global_step")
@@ -752,7 +771,7 @@ class ActiveCriticLearner(nn.Module):
             path + "policy_network", map_location=device))
         self.policy.actor.optimizer.load_state_dict(
             th.load(path + "/optimizer_actor"))
-        self.policy.critic.optimizer.load_state_dict(
+        self.policy.critics[0].optimizer.load_state_dict(
             th.load(path + "/optimizer_critic"))
         self.global_step = int(th.load(path+'/global_step'))
         self.setDatasets(train_data=th.load(

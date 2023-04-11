@@ -70,7 +70,7 @@ class ActiveCriticPolicy(BaseModel):
         observation_space,
         action_space,
         actor: WholeSequenceModel,
-        critic: CriticSequenceModel,
+        critics: list([CriticSequenceModel]),
         acps: ActiveCriticPolicySetup = None,
         planner: WholeSequenceModel = None,
         write_tboard_scalar = None
@@ -79,7 +79,7 @@ class ActiveCriticPolicy(BaseModel):
         super().__init__(observation_space, action_space)
 
         self.actor = actor
-        self.critic = critic
+        self.critics = critics
         self.planner = planner
         self.args_obj = acps
         self.register_buffer('gl', th.ones(
@@ -89,6 +89,7 @@ class ActiveCriticPolicy(BaseModel):
         self.clip_max = th.tensor(self.action_space.high, device=acps.device)
         self.n_inferred = 0
         self.write_tboard_scalar = write_tboard_scalar
+        self.current_active_critic = 0
         self.reset()
 
         obsv_buffer_size = [self.args_obj.buffer_size, self.args_obj.epoch_len, self.args_obj.epoch_len, self.observation_space.shape[0]]
@@ -109,7 +110,10 @@ class ActiveCriticPolicy(BaseModel):
         self.history.reset()
 
     def reset_epoch(self, vec_obsv: th.Tensor):
+        self.current_active_critic = (self.current_active_critic + 1) % len(self.critics)
+        print(f'reset current critic: {self.current_active_critic}')
         self.n_inferred += 1
+
         self.current_step = 0
         self.last_goal = vec_obsv
         self.current_result = None
@@ -209,7 +213,7 @@ class ActiveCriticPolicy(BaseModel):
         self.history.add_value(self.history.gen_trj, actions.detach(), current_step=current_step)
         critic_input = self.get_critic_input(obsvs=observation_seq, acts=actions)
 
-        expected_success = self.critic.forward(
+        expected_success = self.critics[self.current_active_critic].forward(
             inputs=critic_input).max(dim=1)[0]  # batch_size, 1
         expected_success = expected_success.reshape([-1,1])
 
@@ -335,18 +339,18 @@ class ActiveCriticPolicy(BaseModel):
         expected_success = th.zeros(
             size=[actions.shape[0], 1], dtype=th.float, device=actions.device)
         final_exp_success = th.clone(expected_success)
-        if self.critic.wsms.sparse:
+        if self.critics[0].wsms.sparse:
             goal_label = self.gl[:actions.shape[0], 0]
-            if self.current_step == 0 and self.critic.wsms.sparse:
+            if self.current_step == 0 and self.critics[0].wsms.sparse:
                 print('use sparse critic')
         else:
             goal_label = self.gl[:actions.shape[0], :actions.shape[1]]
         step = 0
-        if self.critic.model is not None:
-            self.critic.model.eval()
+        if self.critics[0].model is not None:
+            for critic in self.critics:
+                critic.model.eval()
         num_opt_steps = self.args_obj.opt_steps
-        '''if self.current_step == 0:
-            num_opt_steps = num_opt_steps * 20'''
+        mean_scores = -float('inf')
         while (step <= num_opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
             mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success, plans = self.inference_opt_step(
@@ -366,13 +370,14 @@ class ActiveCriticPolicy(BaseModel):
                 }
                 self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=step, optimize=True)
             step += 1
-
-            if stop_opt:
-                final_actions[mask] = th.clone(optimized_actions[mask]).detach()
-                final_exp_success[mask] = th.clone(expected_success.max(dim=1)[0].reshape([-1,1])[mask]).detach()
-            else:
-                final_actions = optimized_actions
-                final_exp_success = expected_success
+            current_mean = expected_success.mean()
+            if current_mean > mean_scores:
+                mean_scores = current_mean
+                self.best_inter_actor = copy.deepcopy(self.actor.state_dict())
+                self.best_inter_planner = copy.deepcopy(self.planner.state_dict())
+            mask = mask & (final_exp_success < expected_success).reshape([-1])
+            final_actions[mask] = th.clone(optimized_actions[mask]).detach()
+            final_exp_success[mask] = th.clone(expected_success.max(dim=1)[0].reshape([-1,1])[mask]).detach()
 
         if self.args_obj.clip:
             with th.no_grad():
@@ -380,6 +385,10 @@ class ActiveCriticPolicy(BaseModel):
         if (self.args_obj.optimizer_mode == 'actor' or self.args_obj.optimizer_mode == 'actor+plan') and self.current_step == self.args_obj.epoch_len - 1:
             self.actor.load_state_dict(self.init_actor)
             self.planner.load_state_dict(self.init_planner)
+        elif (self.args_obj.optimizer_mode == 'actor+plan') and self.current_step < self.args_obj.epoch_len - 1:
+            self.actor.load_state_dict(self.best_inter_actor)
+            self.planner.load_state_dict(self.best_inter_planner)
+
         return final_actions, final_exp_success
 
     def inference_opt_step(self, 
@@ -407,8 +416,10 @@ class ActiveCriticPolicy(BaseModel):
         else:
             1/0
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
-        critic_result = self.critic.forward(inputs=critic_inpt)
-        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
+        current_critic_result_1 = self.critics[self.current_active_critic].forward(inputs=critic_inpt)
+        current_critic_result_2 = self.critics[(self.current_active_critic + 1)%len(self.critics)].forward(inputs=critic_inpt)
+        critic_result = th.minimum(current_critic_result_1, current_critic_result_2)
+        critic_loss = self.critics[self.current_active_critic].loss_fct(result=critic_result, label=goal_label)
         if self.args_obj.use_diff_boundaries:
             diff_bound_loss = diff_boundaries(
                 actions=opt_actions[:, self.current_step:], 
@@ -427,6 +438,9 @@ class ActiveCriticPolicy(BaseModel):
 
 
         return opt_actions, critic_result, plans
+    
+    def get_critic_forward(self, critic_index, input):
+        return self.critics[critic_index].forward(input)
     
     def get_planner_input(self, acts, obsvs):
         return th.cat((acts, obsvs), dim=-1)
@@ -456,6 +470,6 @@ class ActiveCriticPolicy(BaseModel):
 
         th.save(self.state_dict(), path_to_file + "/policy_network")
         th.save(self.actor.optimizer.state_dict(), path_to_file + "/optimizer_actor")
-        th.save(self.critic.optimizer.state_dict(), path_to_file + "/optimizer_critic")
+        th.save(self.critics[0].optimizer.state_dict(), path_to_file + "/optimizer_critic")
         with open(path_to_file + '/policy_args.pkl', 'wb') as f:
             pickle.dump(self.args_obj, f)

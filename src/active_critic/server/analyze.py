@@ -129,10 +129,11 @@ def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_epi
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device, opt_mode=opt_mode, opt_steps=opt_steps)
     acps.buffer_size = 2*training_episodes
     actor = WholeSequenceModel(wsm_actor_setup)
-    critic = CriticSequenceModel(wsm_critic_setup)
+    critic1 = CriticSequenceModel(wsm_critic_setup)
+    critic2 = CriticSequenceModel(wsm_critic_setup)
     planner = WholeSequenceModel(wsm_planner_setup)
     ac = ActiveCriticPolicy(observation_space=env.observation_space, action_space=env.action_space,
-                            actor=actor, critic=critic, planner=planner, acps=acps)
+                            actor=actor, critics=[critic1, critic2], planner=planner, acps=acps)
     return ac, acps, env, expert
 
 
@@ -286,7 +287,7 @@ def run_eval_stats_env(device, ms):
     demonstrations_list = [0]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 10
+    training_episodes = 2
     total_training_epsiodes = 3000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
@@ -308,7 +309,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' fast_reinit ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' min critic ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
@@ -324,7 +325,7 @@ def run_eval_stats_env(device, ms):
                                             add_data_every = add_data_everys[val_step],
                                             opt_mode=opt_mode,
                                             make_graphs = True,
-                                            fast=False,
+                                            fast=True,
                                             opt_steps=opt_steps,
                                             sparse=sparse,
                                             seq_len=seq_len,
