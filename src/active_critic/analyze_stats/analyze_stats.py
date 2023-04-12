@@ -30,7 +30,6 @@ def parse_data(paths, find_closest):
             inter_dicts.append(inter_dict)
     else:
         inter_dicts = dicts
-
     for dict in inter_dicts:
         for key in dict:
             if (key != 'gen_actions') and (key != 'opt_actions'):

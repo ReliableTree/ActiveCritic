@@ -610,16 +610,13 @@ class ActiveCriticLearner(nn.Module):
             exp_dict = self.exp_dict
 
 
-        gen_actions_at_time_t = gen_actions[0,0]
-        for i in range(gen_actions.shape[1]):
-            gen_actions_at_time_t[i] = gen_actions[0,i,i]
         exp_dict = self.save_stat(
             success=success, 
             rewards=rewards_cumm, 
             expected_success=expected_rewards_before, 
             opt_exp=exp_after, 
             exp_dict=exp_dict,
-            gen_actions=gen_actions_at_time_t,
+            gen_actions=gen_actions[0,0],
             opt_actions=opt_actions[0])
 
         if optimize:
