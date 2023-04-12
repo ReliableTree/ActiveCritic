@@ -179,7 +179,19 @@ def make_plot(
         legend_font_size=legend_font_size
         )
     
-def plot_actions(paths, includes, excludes, experiment_num, time_step, save_path, title, legend_fontsize=12, label_fontsize=14, xlabel="Time Step", ylabel="Action"):
+def plot_actions(
+        paths, 
+        includes, 
+        excludes, 
+        experiment_num, 
+        time_step, 
+        save_path, 
+        title, 
+        legend_fontsize=12, 
+        label_fontsize=14, 
+        xlabel="Time Step", 
+        ylabel="Action",
+        tick_size = 1):
     abs_file_path_list = []
 
     for i in range(len(paths)):
@@ -205,11 +217,11 @@ def plot_actions(paths, includes, excludes, experiment_num, time_step, save_path
             ax[i, j].plot(range(T), gen_action, label="Generated")
             ax[i, j].plot(range(T), opt_action, label="Optimized")
             ax[i, j].set_ylabel(f"{ylabel} {index}", fontsize=label_fontsize)
-            ax[i, j].tick_params(axis="both", which="major", labelsize=label_fontsize)
+            ax[i, j].tick_params(axis="both", which="major", labelsize=tick_size)
             if j == 0:
-                ax[i, j].yaxis.set_label_coords(-0.35, 0.5)
+                ax[i, j].yaxis.set_label_coords(-0.2, 0.5)
             else:
-                ax[i, j].yaxis.set_label_coords(-0.14, 0.5)
+                ax[i, j].yaxis.set_label_coords(-0.2, 0.5)
             
             if i == 1:
                 ax[i, j].set_xlabel(xlabel, fontsize=label_fontsize)
@@ -217,7 +229,7 @@ def plot_actions(paths, includes, excludes, experiment_num, time_step, save_path
     plt.suptitle(title, fontsize=label_fontsize, y=1)
 
     fig.legend(["Generated", "Optimized"], loc="lower center", ncol=2, fontsize=legend_fontsize,
-            bbox_to_anchor=(0.5, -0.2))
+            bbox_to_anchor=(0.5, -0.15))
     plt.subplots_adjust(wspace=0.4, hspace=0.4)
 
     if save_path is not None:
