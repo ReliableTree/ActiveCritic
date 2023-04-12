@@ -649,7 +649,7 @@ if __name__ == '__main__':
 
     list_demonstrations = [0]
     list_env_tags = ['windowopen']
-    n_samples = 5000
+    n_samples = 2000
     bc_epochs = 0
     ids = [i for i in range(3)]
     dense_list = [True]
