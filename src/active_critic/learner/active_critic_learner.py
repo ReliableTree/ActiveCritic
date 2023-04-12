@@ -386,6 +386,7 @@ class ActiveCriticLearner(nn.Module):
                 self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'), strict=False)
 
                 self.virtual_step += self.network_args.training_epsiodes
+                print(f'self.virtual_step: {self.virtual_step}')
 
                 if self.next_critic_init is None:
                     self.next_critic_init = self.get_num_training_samples() * 10
@@ -399,6 +400,8 @@ class ActiveCriticLearner(nn.Module):
             elif (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every
                 self.virtual_step += self.network_args.training_epsiodes
+                print(f'self.virtual_steps: {self.virtual_step}')
+
             if (self.network_args.imitation_phase) and (epoch >= next_add):
                 next_add += self.network_args.add_data_every
                 self.network_args.total_training_epsiodes -= self.network_args.training_epsiodes
