@@ -226,12 +226,12 @@ class ActiveCriticLearner(nn.Module):
             self.policy.args_obj.clip = False
             self.policy.args_obj.use_diff_boundaries = True
             print('__________________________________reinit model_________________________________')
-            self.policy.args_obj.inference_opt_lr = 1e-5
+            #self.policy.args_obj.inference_opt_lr = 1e-5
 
         else:
             self.policy.args_obj.clip = True
             self.policy.args_obj.use_diff_boundaries = False
-            self.policy.args_obj.inference_opt_lr = 1e-5
+            #self.policy.args_obj.inference_opt_lr = 1e-5
 
 
 
@@ -602,11 +602,12 @@ class ActiveCriticLearner(nn.Module):
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize)
 
+        ac_at_time_t = gen_actions[i, 0]
+        for j in range(gen_actions.shape[1]):
+            ac_at_time_t[j] = gen_actions[i, j, j]
+
         for i in range(min(opt_actions.shape[0], 4)):
-            self.createGraphs([gen_actions[i, 0], opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i) + fix)
-            labels = self.make_critic_score(rewards=rewards_run)
-            self.createGraphs([labels[i].reshape([-1, 1]), self.policy.history.opt_scores[0][i].reshape([-1, 1]), self.policy.history.gen_scores[0][i].reshape([-1, 1])], 
-                                ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i) + fix)
+            self.createGraphs([ac_at_time_t, opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i) + fix)
 
         last_sparse_reward, _ = rewards_run.max(dim=1)
         sparse_reward, _ = rewards_cumm.max(dim=1)
