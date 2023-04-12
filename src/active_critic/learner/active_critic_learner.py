@@ -226,12 +226,12 @@ class ActiveCriticLearner(nn.Module):
             self.policy.args_obj.clip = False
             self.policy.args_obj.use_diff_boundaries = True
             print('__________________________________reinit model_________________________________')
-            #self.policy.args_obj.inference_opt_lr = 1e-5
+            self.policy.args_obj.inference_opt_lr = self.network_args.explore_inf_lr
 
         else:
             self.policy.args_obj.clip = True
             self.policy.args_obj.use_diff_boundaries = False
-            #self.policy.args_obj.inference_opt_lr = 1e-5
+            self.policy.args_obj.inference_opt_lr = self.network_args.exploid_inf_lr
 
 
 

@@ -197,6 +197,8 @@ def make_acl(
 
     acla.use_pred_loss = True
     acla.explore_cautious_until = 3
+    acla.exploid_inf_lr = 1e-7
+    acla.explore_inf_lr = 1e-7
 
 
     epsiodes = 30
