@@ -257,8 +257,8 @@ def run_experiment(
     acl.train(epochs=100000)
 
 def run_eval_stats_env(device, weight_decay):
-    imitation_phases = [True]
-    demonstrations_list = [15]
+    imitation_phases = [False]
+    demonstrations_list = [1]
     manual_seed = 1
     th.manual_seed(manual_seed)
     np.random.seed(manual_seed)
@@ -268,10 +268,10 @@ def run_eval_stats_env(device, weight_decay):
     total_training_epsiodes = 400
     min_critic_threshold = 5e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
+    env_tags = ['reach']
     val_everys = [6000]
     add_data_everys = [6000]
-    opt_modes = ['actor+plan']
+    opt_modes = ['actions']
     start_training = 0
     for run_id in run_ids:
         for demonstrations in demonstrations_list:
@@ -294,7 +294,7 @@ def run_eval_stats_env(device, weight_decay):
                                         val_every=val_every,
                                         add_data_every = add_data_everys[val_step],
                                         opt_mode=opt_mode,
-                                        make_graphs = False,
+                                        make_graphs = True,
                                         start_training=start_training,
                                         fast=False)
 

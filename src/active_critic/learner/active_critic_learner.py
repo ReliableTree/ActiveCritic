@@ -459,21 +459,31 @@ class ActiveCriticLearner(nn.Module):
         labels = labels.type(th.float)
         return labels
     
-    def save_stat(self, success, expected_success, opt_exp, exp_dict):
-
+    def save_stat(self, success, rewards, expected_success, opt_exp, exp_dict, gen_actions, opt_actions):
         if exp_dict is None:
             exp_dict = {
             'success_rate':success.mean().cpu().numpy(),
             'expected_success' : expected_success.mean().cpu().numpy(),
+            'rewards': rewards.unsqueeze(0).detach().cpu().numpy(),
+            'gen_actions': gen_actions.unsqueeze(0).detach().cpu().numpy(),
+            'opt_actions' : opt_actions.unsqueeze(0).detach().cpu().numpy(),
             'step':np.array(self.get_num_training_samples())
             }
             if opt_exp is not None:
                 exp_dict['optimized_expected'] =  opt_exp.mean().cpu().numpy()
+            print(f'save stats gen: {exp_dict["gen_actions"].shape}')
+            print(f'save stats opt_actions: {exp_dict["opt_actions"].shape}')
 
         else:
             exp_dict['success_rate'] = np.append(exp_dict['success_rate'], success.mean().cpu().numpy())
             exp_dict['expected_success'] = np.append(exp_dict['expected_success'], expected_success.mean().cpu().numpy())
             exp_dict['step'] = np.append(exp_dict['step'], np.array(self.get_num_training_samples()))
+            exp_dict['rewards'] = np.append(exp_dict['rewards'], np.array(rewards.unsqueeze(0).detach().cpu().numpy()), axis=0)
+            exp_dict['gen_actions'] = np.append(exp_dict['gen_actions'], np.array(gen_actions.unsqueeze(0).detach().cpu().numpy()), axis=0)
+            exp_dict['opt_actions'] = np.append(exp_dict['opt_actions'], np.array(opt_actions.unsqueeze(0).detach().cpu().numpy()), axis=0)
+            print(f'save stats gen: {exp_dict["gen_actions"].shape}')
+            print(f'save stats opt_actions: {exp_dict["opt_actions"].shape}')
+
             if opt_exp is not None:
                 exp_dict['optimized_expected'] = np.append(exp_dict['optimized_expected'], opt_exp.mean().cpu().numpy())
 
@@ -490,7 +500,6 @@ class ActiveCriticLearner(nn.Module):
             pickle.dump(exp_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         return exp_dict
-
 
     def run_validation(self, optimize):
         self.policy.train_inference = False
@@ -600,7 +609,18 @@ class ActiveCriticLearner(nn.Module):
             exp_after = None
             exp_dict = self.exp_dict
 
-        exp_dict = self.save_stat(success=success, expected_success=expected_rewards_before, opt_exp=exp_after, exp_dict=exp_dict)
+
+        gen_actions_at_time_t = gen_actions[0,0]
+        for i in range(gen_actions.shape[1]):
+            gen_actions_at_time_t[i] = gen_actions[0,i,i]
+        exp_dict = self.save_stat(
+            success=success, 
+            rewards=rewards_cumm, 
+            expected_success=expected_rewards_before, 
+            opt_exp=exp_after, 
+            exp_dict=exp_dict,
+            gen_actions=gen_actions_at_time_t,
+            opt_actions=opt_actions[0])
 
         if optimize:
             self.exp_dict_opt = exp_dict
