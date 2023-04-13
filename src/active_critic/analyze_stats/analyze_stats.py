@@ -64,7 +64,9 @@ def plot_experiment_data(
         total_plot_points=1, 
         mark_every = None,
         font_size = 14,
-        legend_font_size=14):
+        legend_font_size=14,
+        first_different_color = False):
+    colors = ['orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray']
     # create figure and axis objects
     fig, ax = plt.subplots()
 
@@ -108,9 +110,12 @@ def plot_experiment_data(
 
             # plot the experiments at those timesteps
             use_steps = p_timesteps_steps % mark_every_calc == 0
-
-            ax.plot(p_timesteps[use_steps], mean_data[use_steps], label=names[i])
-            ax.fill_between(p_timesteps, np.maximum(mean_data-std_data, 0), np.minimum(mean_data+std_data, 1), alpha=0.3)
+            if first_different_color:
+                ax.plot(p_timesteps[use_steps], mean_data[use_steps], label=names[i], color=colors[i])
+                ax.fill_between(p_timesteps, np.maximum(mean_data-std_data, 0), np.minimum(mean_data+std_data, 1), alpha=0.3, color=colors[i])
+            else:
+                ax.plot(p_timesteps[use_steps], mean_data[use_steps], label=names[i])
+                ax.fill_between(p_timesteps, np.maximum(mean_data-std_data, 0), np.minimum(mean_data+std_data, 1), alpha=0.3)
         else:
             if mark_every is not None and total_plot_points is not None:
                 print(f'mark_every: {mark_every},  total_plot_points: {total_plot_points}')
@@ -122,9 +127,12 @@ def plot_experiment_data(
             timesteps_steps = np.arange(timesteps[i].shape[0])
 
             use_steps = timesteps_steps % mark_every_calc == 0
-
-            ax.plot(timesteps[i][use_steps], mean_data[use_steps], label=names[i], markevery=1)
-            ax.fill_between(timesteps[i],np.maximum(mean_data-std_data, 0), np.minimum(mean_data+std_data, 1), alpha=0.3)
+            if first_different_color:
+                ax.plot(timesteps[i][use_steps], mean_data[use_steps], label=names[i], markevery=1, color=colors[i])
+                ax.fill_between(timesteps[i],np.maximum(mean_data-std_data, 0), np.minimum(mean_data+std_data, 1), alpha=0.3, color=colors[i])
+            else:
+                ax.plot(timesteps[i][use_steps], mean_data[use_steps], label=names[i], markevery=1)
+                ax.fill_between(timesteps[i],np.maximum(mean_data-std_data, 0), np.minimum(mean_data+std_data, 1), alpha=0.3)
 
     # add labels, title, and legend to the plot
     ax.set_xlabel('Sampled Trajectories', fontsize=font_size)
@@ -154,7 +162,8 @@ def make_plot(
         total_plot_points=1,
         mark_every = None,
         font_size = 14,
-        legend_font_size=14):
+        legend_font_size=14,
+        first_different_color=False):
     abs_file_path_list = []
     
     for i in range(len(paths)):
@@ -176,7 +185,8 @@ def make_plot(
         total_plot_points=total_plot_points,
         mark_every=mark_every,
         font_size=font_size,
-        legend_font_size=legend_font_size
+        legend_font_size=legend_font_size,
+        first_different_color=first_different_color
         )
     
 def plot_actions(
