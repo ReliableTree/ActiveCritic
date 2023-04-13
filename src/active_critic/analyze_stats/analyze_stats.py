@@ -65,7 +65,8 @@ def plot_experiment_data(
         mark_every = None,
         font_size = 14,
         legend_font_size=14,
-        first_different_color = False):
+        first_different_color = False,
+        plot_legend=True):
     colors = ['orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray']
     # create figure and axis objects
     fig, ax = plt.subplots()
@@ -139,10 +140,11 @@ def plot_experiment_data(
     ax.set_ylabel('Success Rate', fontsize=font_size)
     ax.set_title(plot_name, fontsize=font_size)
     ax.tick_params(axis='both', which='major', labelsize=font_size)
-    if loc is None:
-        ax.legend(fontsize=legend_font_size)
-    else:
-        ax.legend(loc = loc, fontsize=legend_font_size)
+    if plot_legend:
+        if loc is None:
+            ax.legend(fontsize=legend_font_size)
+        else:
+            ax.legend(loc = loc, fontsize=legend_font_size)
     if path is not None:
         # create directory if it doesn't exist
         os.makedirs(path, exist_ok=True)
@@ -163,7 +165,8 @@ def make_plot(
         mark_every = None,
         font_size = 14,
         legend_font_size=14,
-        first_different_color=False):
+        first_different_color=False,
+        plot_legend=True):
     abs_file_path_list = []
     
     for i in range(len(paths)):
@@ -186,7 +189,8 @@ def make_plot(
         mark_every=mark_every,
         font_size=font_size,
         legend_font_size=legend_font_size,
-        first_different_color=first_different_color
+        first_different_color=first_different_color,
+        plot_legend=plot_legend
         )
     
 def plot_actions(
