@@ -111,7 +111,6 @@ class ActiveCriticPolicy(BaseModel):
 
     def reset_epoch(self, vec_obsv: th.Tensor):
         self.current_active_critic = (self.current_active_critic + 1) % len(self.critics)
-        print(f'reset current critic: {self.current_active_critic}')
         self.n_inferred += 1
 
         self.current_step = 0
@@ -313,7 +312,6 @@ class ActiveCriticPolicy(BaseModel):
             )
 
         elif self.args_obj.optimizer_mode == 'plan':
-            print('use plan opt mode')
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
@@ -322,7 +320,6 @@ class ActiveCriticPolicy(BaseModel):
             optimizer = th.optim.AdamW(
                 [plans], lr=self.args_obj.inference_opt_lr, weight_decay=0)
         elif self.args_obj.optimizer_mode == 'goal':
-            print('use goal opt mode')
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
@@ -341,8 +338,6 @@ class ActiveCriticPolicy(BaseModel):
         final_exp_success = th.clone(expected_success)
         if self.critics[0].wsms.sparse:
             goal_label = self.gl[:actions.shape[0], 0]
-            if self.current_step == 0 and self.critics[0].wsms.sparse:
-                print('use sparse critic')
         else:
             goal_label = self.gl[:actions.shape[0], :actions.shape[1]]
         step = 0

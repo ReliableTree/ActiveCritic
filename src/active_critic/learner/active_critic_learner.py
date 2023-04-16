@@ -111,6 +111,10 @@ class ActiveCriticLearner(nn.Module):
         if not os.path.exists(self.inter_path):
             os.makedirs(self.inter_path)
 
+        self.last_summed_lr_episode = 0
+        self.current_summed_lr_episode= 0
+        self.current_lr_episode_counter = 0
+
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
         if len(train_data) > 0:
@@ -130,8 +134,6 @@ class ActiveCriticLearner(nn.Module):
             steps=steps
             )
         
-        print(f'llen after add: {self.train_data.obsv.shape}')
-
         self.train_data.onyl_positiv = False
         self.train_loader = DataLoader(
             dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
@@ -144,7 +146,6 @@ class ActiveCriticLearner(nn.Module):
             self.policy.args_obj.optimize = (
                 self.policy.args_obj.optimize and 
                 self.network_args.start_critic)
-            print(f'policy oprimisation mode: {self.policy.args_obj.optimize}')
             iterations = math.ceil(episodes/self.env.num_envs)
             policy.training_mode = True
 
@@ -193,14 +194,31 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict=debug_dict, train=True)
         success = rewards.squeeze().max(-1).values
         success = (success == 1).type(th.float).mean()
-
-        sparse_reward, _ = rewards.max(dim=1)
+        self.current_summed_lr_episode += success
+        self.current_lr_episode_counter += 1
+        if self.current_lr_episode_counter == self.network_args.update_inf_lr_every:
+            print(f'self.last_summed_lr_episode: {self.last_summed_lr_episode}')
+            print(f'self.current_summed_lr_episode: {self.current_summed_lr_episode}')
+            if self.last_summed_lr_episode is not None:
+                if self.last_summed_lr_episode > self.current_summed_lr_episode:
+                    self.network_args.exploid_lr /= self.network_args.update_int_lr_factor
+                elif self.last_summed_lr_episode < self.current_summed_lr_episode:
+                    self.network_args.exploid_lr *= self.network_args.update_int_lr_factor
+            print(f'self.network_args.exploid_lr {self.network_args.exploid_lr}')
+            self.last_summed_lr_episode = self.current_summed_lr_episode
+            self.current_summed_lr_episode = 0
+            self.current_lr_episode_counter = 0
+            self.write_tboard_scalar(
+                {
+                'inf_lr':th.tensor(self.network_args.exploid_lr)
+                },
+                train=True,
+                step=self.get_num_training_samples()
+            )
 
         print(f'last rewards: {rewards.mean()}')
-        print(f'max last rewards: {sparse_reward.mean()}')
 
         print(f'last success: {success}')
-        print(f'self.last_scores: {self.last_scores}')
         expert_trjs = th.zeros([episodes], dtype=th.bool, device=actions.device)
         self.add_data(
             actions=actions,
@@ -227,12 +245,12 @@ class ActiveCriticLearner(nn.Module):
             self.policy.args_obj.clip = False
             self.policy.args_obj.use_diff_boundaries = True
             print('__________________________________reinit model_________________________________')
-            self.policy.args_obj.inference_opt_lr = 1e-5
+            self.policy.args_obj.inference_opt_lr = self.network_args.explore_lr
 
         else:
             self.policy.args_obj.clip = True
             self.policy.args_obj.use_diff_boundaries = False
-            self.policy.args_obj.inference_opt_lr = 1e-5
+            self.policy.args_obj.inference_opt_lr = self.network_args.exploid_lr
 
 
 
@@ -365,7 +383,6 @@ class ActiveCriticLearner(nn.Module):
                     self.run_validation(optimize=True)
                     self.run_validation(optimize=False)
                     print(f'self.get_num_training_samples(): {self.get_num_training_samples()}')
-                    print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
                     self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'), strict=False)
                     self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'), strict=False)
                     self.scores.reset_min_score(self.scores.mean_actor)
@@ -409,8 +426,6 @@ class ActiveCriticLearner(nn.Module):
             if (self.network_args.imitation_phase) and (epoch >= next_add):
                 next_add += self.network_args.add_data_every
                 self.network_args.total_training_epsiodes -= self.network_args.training_epsiodes
-                print(f'training now: {self.network_args.training_epsiodes}')
-                print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
 
             #if self.get_num_pos_samples() > self.network_args.explore_cautious_until:
             self.policy.train()
@@ -535,9 +550,6 @@ class ActiveCriticLearner(nn.Module):
             }
             if opt_exp is not None:
                 exp_dict['optimized_expected'] =  opt_exp.mean().cpu().numpy()
-            print(f'save stats gen: {exp_dict["gen_actions"].shape}')
-            print(f'save stats opt_actions: {exp_dict["opt_actions"].shape}')
-
         else:
             exp_dict['success_rate'] = np.append(exp_dict['success_rate'], success.mean().cpu().numpy())
             exp_dict['expected_success'] = np.append(exp_dict['expected_success'], expected_success.mean().cpu().numpy())
@@ -545,8 +557,6 @@ class ActiveCriticLearner(nn.Module):
             exp_dict['rewards'] = np.append(exp_dict['rewards'], np.array(rewards.unsqueeze(0).detach().cpu().numpy()), axis=0)
             exp_dict['gen_actions'] = np.append(exp_dict['gen_actions'], np.array(gen_actions.unsqueeze(0).detach().cpu().numpy()), axis=0)
             exp_dict['opt_actions'] = np.append(exp_dict['opt_actions'], np.array(opt_actions.unsqueeze(0).detach().cpu().numpy()), axis=0)
-            print(f'save stats gen: {exp_dict["gen_actions"].shape}')
-            print(f'save stats opt_actions: {exp_dict["opt_actions"].shape}')
 
             if opt_exp is not None:
                 exp_dict['optimized_expected'] = np.append(exp_dict['optimized_expected'], opt_exp.mean().cpu().numpy())
@@ -578,7 +588,6 @@ class ActiveCriticLearner(nn.Module):
                 self.policy.args_obj.opt_steps = min(opt_steps_before, 10 * self.train_data.success.sum())
             else:
                 self.policy.args_obj.opt_steps = 0'''
-            print(f'self.policy.args_obj.opt_steps: {self.policy.args_obj.opt_steps}')
         else:
             fix = ''
             
@@ -660,8 +669,6 @@ class ActiveCriticLearner(nn.Module):
 
         print(f'Success Rate: {success.mean()}' + fix)
         try:
-            print(
-                f'training samples: {int(len(self.train_data.obsv))}' + fix)
             print(f'positive training samples: {int(self.train_data.success.sum()/self.policy.args_obj.epoch_len)}' + fix)
         except:
             pass

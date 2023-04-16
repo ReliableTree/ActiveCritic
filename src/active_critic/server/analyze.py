@@ -199,6 +199,11 @@ def make_acl(
     acla.use_pred_loss = True
     acla.explore_cautious_until = 3
 
+    acla.exploid_lr = 1e-7
+    acla.explore_lr = 1e-6
+    acla.update_inf_lr_every = 10
+    acla.update_int_lr_factor = 2
+
 
     epsiodes = 30
     ac, acps, env, expert = setup_ac(
@@ -284,17 +289,17 @@ def run_experiment(
 def run_eval_stats_env(device, ms):
     weight_decay = 1e-2
     imitation_phases = [False]
-    demonstrations_list = [0]
+    demonstrations_list = [4]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
     total_training_epsiodes = 15000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['reach']
+    env_tags = ['pickplace']
     val_everys = [1]
     add_data_everys = [1000]
-    opt_modes = ['actions']
+    opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = True
     seq_len = 100

@@ -332,7 +332,6 @@ def sample_new_episode(policy:ActiveCriticPolicy,
             policy.reset()
             seq_len = policy.args_obj.epoch_len
             policy.start_training = start_training
-            print(f'policy train mode: {policy.start_training}')
         else:
             seq_len = seq_len
             
