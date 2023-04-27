@@ -204,16 +204,16 @@ class ActiveCriticLearner(nn.Module):
             print(f'self.current_summed_lr_episode: {self.current_summed_lr_episode}')
             if self.last_summed_lr_episode is not None:
                 if self.last_summed_lr_episode > self.current_summed_lr_episode:
-                    self.network_args.exploid_lr /= self.network_args.update_int_lr_factor
+                    self.network_args.exploid_inf_lr /= self.network_args.update_int_lr_factor
                 elif self.last_summed_lr_episode < self.current_summed_lr_episode:
-                    self.network_args.exploid_lr *= self.network_args.update_int_lr_factor
-            print(f'self.network_args.exploid_lr {self.network_args.exploid_lr}')
+                    self.network_args.exploid_inf_lr *= self.network_args.update_int_lr_factor
+            print(f'self.network_args.exploid_inf_lr {self.network_args.exploid_inf_lr}')
             self.last_summed_lr_episode = self.current_summed_lr_episode
             self.current_summed_lr_episode = 0
             self.current_lr_episode_counter = 0
             self.write_tboard_scalar(
                 {
-                'inf_lr':th.tensor(self.network_args.exploid_lr)
+                'inf_lr':th.tensor(self.network_args.exploid_inf_lr)
                 },
                 train=True,
                 step=self.get_num_training_samples()
