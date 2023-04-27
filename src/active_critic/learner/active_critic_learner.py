@@ -410,12 +410,12 @@ class ActiveCriticLearner(nn.Module):
                 print(f'self.virtual_step: {self.virtual_step}')
 
                 if self.next_critic_init is None:
-                    self.next_critic_init = self.get_num_training_samples() * 2
+                    self.next_critic_init = self.get_num_training_samples() * 10
                 if (self.get_num_training_samples() > self.next_critic_init):
                     self.policy.critic.init_model()
                     self.policy.actor.init_model()
                     self.policy.planner.init_model()
-                    self.next_critic_init = 2 * self.get_num_training_samples()
+                    self.next_critic_init = 10 * self.get_num_training_samples()
                     print('______________________________init models___________________________________')
 
             elif (self.global_step >= next_add):
