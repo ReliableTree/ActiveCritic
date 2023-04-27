@@ -110,6 +110,10 @@ class ActiveCriticLearner(nn.Module):
         self.inter_path = os.path.join(self.network_args.data_path, self.logname, 'inter_models/')
         if not os.path.exists(self.inter_path):
             os.makedirs(self.inter_path)
+        
+        self.last_summed_lr_episode = 0
+        self.current_summed_lr_episode= 0
+        self.current_lr_episode_counter = 0
 
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
