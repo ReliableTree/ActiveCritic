@@ -19,6 +19,8 @@ import os
 from active_critic.utils.dataset import DatasetAC
 from torch.utils.data.dataloader import DataLoader
 
+import time
+
 class PositionalEncoding(nn.Module):
 
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
@@ -125,7 +127,6 @@ def make_dummy_vec_env(name, seq_len, sparse):
         policy=policy_dict[env_tag][0], env=dv1)
     return dv1, vec_expert
 
-
 class ResetCounterWrapper(gym.Wrapper):
     def __init__(self, env: Env) -> None:
         super().__init__(env)
@@ -135,7 +136,7 @@ class ResetCounterWrapper(gym.Wrapper):
         return super().reset()
 
     def step(self, action):
-        
+        h = time.perf_counter()
         obsv, rew, done, info = super().step(action)
         if done:
             self.reset_count += 1
