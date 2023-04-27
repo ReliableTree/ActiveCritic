@@ -199,6 +199,8 @@ def make_acl(
     acla.explore_cautious_until = 3
     acla.exploid_inf_lr = 1e-5
     acla.explore_inf_lr = 1e-6
+    acla.update_inf_lr_every = 10
+    acla.update_int_lr_factor = 2
 
 
     epsiodes = 30
