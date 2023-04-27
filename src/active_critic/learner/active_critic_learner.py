@@ -193,14 +193,31 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict=debug_dict, train=True)
         success = rewards.squeeze().max(-1).values
         success = (success == 1).type(th.float).mean()
-
-        sparse_reward, _ = rewards.max(dim=1)
+        self.current_summed_lr_episode += success
+        self.current_lr_episode_counter += 1
+        if self.current_lr_episode_counter == self.network_args.update_inf_lr_every:
+            print(f'self.last_summed_lr_episode: {self.last_summed_lr_episode}')
+            print(f'self.current_summed_lr_episode: {self.current_summed_lr_episode}')
+            if self.last_summed_lr_episode is not None:
+                if self.last_summed_lr_episode > self.current_summed_lr_episode:
+                    self.network_args.exploid_lr /= self.network_args.update_int_lr_factor
+                elif self.last_summed_lr_episode < self.current_summed_lr_episode:
+                    self.network_args.exploid_lr *= self.network_args.update_int_lr_factor
+            print(f'self.network_args.exploid_lr {self.network_args.exploid_lr}')
+            self.last_summed_lr_episode = self.current_summed_lr_episode
+            self.current_summed_lr_episode = 0
+            self.current_lr_episode_counter = 0
+            self.write_tboard_scalar(
+                {
+                'inf_lr':th.tensor(self.network_args.exploid_lr)
+                },
+                train=True,
+                step=self.get_num_training_samples()
+            )
 
         print(f'last rewards: {rewards.mean()}')
-        print(f'max last rewards: {sparse_reward.mean()}')
 
         print(f'last success: {success}')
-        print(f'self.last_scores: {self.last_scores}')
         expert_trjs = th.zeros([episodes], dtype=th.bool, device=actions.device)
         self.add_data(
             actions=actions,
