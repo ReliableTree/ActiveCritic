@@ -36,6 +36,9 @@ class ActiveCriticPolicySetup:
         self.buffer_size:int = None
         self.use_diff_boundaries = None
 
+        self.opt_at_beginning = None
+
+
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
         self.reset()
@@ -345,8 +348,8 @@ class ActiveCriticPolicy(BaseModel):
         if self.critic.model is not None:
             self.critic.model.eval()
         num_opt_steps = self.args_obj.opt_steps
-        '''if self.current_step == 0:
-            num_opt_steps = num_opt_steps * 20'''
+        if (self.args_obj.opt_at_beginning) and (self.current_step == 0):
+            num_opt_steps = num_opt_steps * 20
         while (step <= num_opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
             mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success, plans = self.inference_opt_step(

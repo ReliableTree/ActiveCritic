@@ -109,6 +109,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
     acps.use_diff_boundaries = True
 
     acps.optimizer_mode = opt_mode
+    acps.opt_at_beginning = True
     return acps
 
 
