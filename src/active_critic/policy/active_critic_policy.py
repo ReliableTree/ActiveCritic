@@ -58,11 +58,14 @@ class ActiveCriticPolicyHistory:
 
 
     def add_value(self, history:list([th.Tensor]), value:th.Tensor, current_step:int):
-        history[0][-value.shape[0]:, current_step] = value
+        half_step = int(current_step/2)
+        history[0][-value.shape[0]:, half_step] = value
 
     def add_buffer_value(self, history:list([th.Tensor]), value:th.Tensor, current_step:int, index:int, training_mode:bool):
+        half_step = int(current_step/2)
+
         if training_mode:
-            history[0][index:index+value.shape[0], current_step] = value
+            history[0][index:index+value.shape[0], half_step] = value
 
 class ActiveCriticPolicy(BaseModel):
     def __init__(
@@ -105,6 +108,7 @@ class ActiveCriticPolicy(BaseModel):
 
     def reset(self):
         self.last_goal = None
+        self.last_actions = None
         self.current_step = 0
         self.history.reset()
 
@@ -140,6 +144,7 @@ class ActiveCriticPolicy(BaseModel):
         episode_start: Optional[np.ndarray] = None,
         deterministic: bool = False
     ) -> th.Tensor:
+
         vec_obsv = self.args_obj.extractor.forward(
             observation).to(self.args_obj.device).unsqueeze(1)
             
@@ -153,45 +158,48 @@ class ActiveCriticPolicy(BaseModel):
             self.current_step += 1
             if self.start_training:
                 action_seq = self.current_result.gen_trj
+        
+        if self.current_step % 2 == 0:
+            if self.start_training:
+                self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
+                self.history.add_buffer_value(
+                    self.history.obsv_buffer, 
+                    value=th.clone(self.obs_seq.detach()), 
+                    current_step=self.current_step, 
+                    index=self.buffer_index,
+                    training_mode=self.training_mode)
 
-        if self.start_training:
-            self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
-            self.history.add_buffer_value(
-                self.history.obsv_buffer, 
-                value=th.clone(self.obs_seq.detach()), 
-                current_step=self.current_step, 
-                index=self.buffer_index,
-                training_mode=self.training_mode)
 
-
-            #self.obs_seq = vec_obsv.repeat([1, self.obs_seq.shape[1], 1]).type(th.float)
-            #if action_seq is None:
-            self.current_result = self.forward(
-                observation_seq=self.obs_seq, action_seq=action_seq, 
-                optimize=self.args_obj.optimize, 
-                current_step=self.current_step,
-                stop_opt=self.args_obj.stop_opt
-                )
-            self.history.add_buffer_value(
-                self.history.act_buffer, 
-                value=th.clone(self.current_result.gen_trj.detach()), 
-                current_step=self.current_step, 
-                index=self.buffer_index,
-                training_mode=self.training_mode)
-            
-            self.action_history[:, self.current_step] = th.clone(self.current_result.gen_trj.detach())
-
-            if self.current_step == 0:
-                if self.args_obj.optimize:
-                    self.history.add_value(
-                        history=self.history.opt_scores, 
-                        value=self.current_result.expected_succes_after[:, 0].detach(), 
-                        current_step=self.current_step
+                #self.obs_seq = vec_obsv.repeat([1, self.obs_seq.shape[1], 1]).type(th.float)
+                #if action_seq is None:
+                self.current_result = self.forward(
+                    observation_seq=self.obs_seq, action_seq=action_seq, 
+                    optimize=self.args_obj.optimize, 
+                    current_step=self.current_step,
+                    stop_opt=self.args_obj.stop_opt
                     )
-                self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
-            return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
-        else:
-            return np.random.rand(vec_obsv.shape[0], self.action_space.shape[0]) * 2 - 1
+                self.history.add_buffer_value(
+                    self.history.act_buffer, 
+                    value=th.clone(self.current_result.gen_trj.detach()), 
+                    current_step=self.current_step, 
+                    index=self.buffer_index,
+                    training_mode=self.training_mode)
+                
+                self.action_history[:, int(self.current_step/2)] = th.clone(self.current_result.gen_trj.detach())
+
+                if self.current_step == 0:
+                    if self.args_obj.optimize:
+                        self.history.add_value(
+                            history=self.history.opt_scores, 
+                            value=self.current_result.expected_succes_after[:, 0].detach(), 
+                            current_step=self.current_step
+                        )
+                    self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
+                actions = self.current_result.gen_trj[:, int(self.current_step/2)].detach().cpu().numpy()
+            else:
+                actions = np.random.rand(vec_obsv.shape[0], self.action_space.shape[0]) * 2 - 1
+            self.last_actions = actions
+        return self.last_actions
 
     def forward(self, 
             observation_seq: th.Tensor, 

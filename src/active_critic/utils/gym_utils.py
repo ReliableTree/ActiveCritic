@@ -102,12 +102,26 @@ class ImitationLearningWrapper:
         self.observation_space = env.observation_space
         self.action_space = env.action_space
         self.policy = policy
+        self.current_step = 0
+        self.last_goal = None
+        self.last_action = None
 
     def predict(self, obsv, deterministic=None):
-        actions = []
-        for obs in obsv:
-            actions.append(self.policy.get_action(obs))
-        return actions
+        if self.last_goal is None:
+            self.last_goal = obsv
+        else:
+            if not np.all(obsv[:, -3:] == self.last_goal[:, -3:]):
+                self.last_goal = obsv
+                self.current_step = 0
+            else:
+                self.current_step += 1
+        print(f'current step of exp policy: {self.current_step}')
+        if self.current_step % 2 == 0:
+            actions = []
+            for obs in obsv:
+                actions.append(self.policy.get_action(obs))
+            self.last_action = actions
+        return self.last_action
 
 def make_dummy_vec_env(name, seq_len, sparse):
     policy_dict = make_policy_dict()
@@ -173,6 +187,7 @@ class StrictSeqLenWrapper(gym.Wrapper):
         
 def make_vec_env(env_id, num_cpu, seq_len, sparse):
     policy_dict = make_policy_dict()
+    seq_len = 2*seq_len
 
     def make_env(env_id, rank, seed=0):
         def _init():
@@ -264,7 +279,6 @@ def parse_sampled_transitions(transitions, extractor, seq_len, device='cuda', de
         epch_rewards.append([transitions[i]['infos']['unscaled_reward']/10])
         if transitions[i]['infos']['success'] == 1:
             current_success = True
-
         if transitions[i]['dones']:
             if dense:
                 rewards.append(epch_rewards)
@@ -338,14 +352,15 @@ def sample_new_episode(policy:ActiveCriticPolicy,
             
         transitions = sample_expert_transitions(
             policy.predict, env, episodes, set_deterministic=False)
-
+        
         datas = parse_sampled_transitions(
             transitions=transitions, seq_len=seq_len, extractor=extractor, device=device, dense=dense)
+        
         device_data = []
         for data in datas:
             device_data.append(data[:episodes].to(device))
         actions, observations, rewards = device_data
-
+        rewards[:, -2:] = rewards[:, -1:].repeat([1, 2,1])
         if isinstance(policy, ActiveCriticPolicy):
             expected_rewards_before = policy.history.gen_scores[0]
             expected_rewards_after = policy.history.opt_scores[0]
@@ -358,11 +373,10 @@ def sample_new_episode(policy:ActiveCriticPolicy,
         else:
             action_history = None
 
-
         if return_gen_trj:
-            return actions, policy.history.gen_trj[0][:episodes], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes], action_history
+            return actions[:, 0::2], policy.history.gen_trj[0][:episodes][:, 0::2], observations[:, 0::2], rewards[:, 0::2], expected_rewards_before[:episodes][:, 0::2], expected_rewards_after[:episodes][:, 0::2], action_history
         else:
-            return actions[:episodes], observations[:episodes], rewards[:episodes], expected_rewards_before, expected_rewards_after, action_history
+            return actions[:episodes][:, 0::2], observations[:episodes][:, 0::2], rewards[:episodes][:, 0::2], expected_rewards_before[:, 0::2], expected_rewards_after[:, 0::2], action_history
         
 class POMDP_Wrapper(gym.Wrapper):
     def __init__(self, env, lookup_freq, pe_dim, seq_len) -> None:
