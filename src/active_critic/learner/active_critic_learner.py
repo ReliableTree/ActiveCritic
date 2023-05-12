@@ -389,7 +389,11 @@ class ActiveCriticLearner(nn.Module):
 
                 if self.next_critic_init is None:
                     self.next_critic_init = self.get_num_training_samples() * 10
-                if (self.get_num_training_samples() > self.next_critic_init):
+                reward = self.train_data.reward
+                b, _ = th.max(reward, dim=1)
+                successfull_trj = (b == 1)
+                positive_examples = th.tensor(int(successfull_trj.sum()/self.policy.args_obj.epoch_len))                
+                if (self.get_num_training_samples() > self.next_critic_init) and (positive_examples < 200):
                     self.policy.critic.init_model()
                     self.policy.actor.init_model()
                     self.policy.planner.init_model()
