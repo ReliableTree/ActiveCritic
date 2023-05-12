@@ -290,7 +290,7 @@ def run_eval_stats_env(device, ms):
     total_training_epsiodes = 5000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
+    env_tags = ['reach']
     val_everys = [1000]
     add_data_everys = [1000]
     opt_modes = ['actor+plan']
@@ -308,7 +308,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' fast_reinit ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
