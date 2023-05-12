@@ -193,6 +193,7 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict=debug_dict, train=True)
         success = rewards.squeeze().max(-1).values
         success = (success == 1).type(th.float).mean()
+        print(f'rewards: {rewards}')
 
         sparse_reward, _ = rewards.max(dim=1)
 

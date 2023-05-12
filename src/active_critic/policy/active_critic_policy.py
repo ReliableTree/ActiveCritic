@@ -341,6 +341,9 @@ class ActiveCriticPolicy(BaseModel):
                 print('use sparse critic')
         else:
             goal_label = self.gl[:actions.shape[0], :actions.shape[1]]
+            if self.current_step == 0:
+                print('use dense critic')
+
         step = 0
         if self.critic.model is not None:
             self.critic.model.eval()

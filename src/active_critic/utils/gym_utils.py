@@ -160,16 +160,11 @@ class StrictSeqLenWrapper(gym.Wrapper):
         
         done = self.current_step == self.seq_len
         if info['success'] == 1:
-            self.success = float(10)
-        if self.sparse and not done:
-            info['unscaled_reward'] = float(0)
-            return obsv, float(0), done, info
-        elif done:
-            info['unscaled_reward'] = self.success
-
-            return obsv, self.success, done, info
+            rew = float(10)
         else:
-            return obsv, rew, done, info
+            rew = float(0)
+        info['unscaled_reward'] = rew
+        return obsv, rew, done, info
         
 def make_vec_env(env_id, num_cpu, seq_len, sparse):
     policy_dict = make_policy_dict()
