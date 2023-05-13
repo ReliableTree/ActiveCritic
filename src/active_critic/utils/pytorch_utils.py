@@ -130,3 +130,14 @@ def diff_boundaries(actions, low, high):
     else:
         com = th.zeros([1], device=actions.device, requires_grad=True)
     return com
+
+def max_mask_after_ind(x, ind):
+    x = x.reshape([x.shape[0], x.shape[1]])
+    max_values, _ = x[:, ind:].max(dim=1)
+
+    # create mask
+    mask = x[:, ind:] == max_values.unsqueeze(1)
+
+    # pad with zeros for indices before start index
+    mask = th.cat([th.zeros((x.size(0), ind), dtype=th.bool, device=x.device), mask], dim=1)
+    return mask.unsqueeze(-1)

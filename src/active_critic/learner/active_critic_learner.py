@@ -167,7 +167,6 @@ class ActiveCriticLearner(nn.Module):
             for res in result:
                 result_array.append(res)
             add_results.append(result_array)
-        
         for element in add_results[1:]:
             for i, part in enumerate(element):
                 add_results[0][i] = th.cat((add_results[0][i], part), dim=0)
@@ -193,7 +192,6 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict=debug_dict, train=True)
         success = rewards.squeeze().max(-1).values
         success = (success == 1).type(th.float).mean()
-        print(f'rewards: {rewards}')
 
         sparse_reward, _ = rewards.max(dim=1)
 

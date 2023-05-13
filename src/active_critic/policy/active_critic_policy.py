@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel, CriticSequenceModel
-from active_critic.utils.pytorch_utils import diff_boundaries
+from active_critic.utils.pytorch_utils import diff_boundaries, max_mask_after_ind
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -205,6 +205,9 @@ class ActiveCriticPolicy(BaseModel):
 
         plans = th.zeros([observation_seq.shape[0], observation_seq.shape[1], self.planner.wsms.model_setup.d_output], device=self.args_obj.device, dtype=th.float32)
         actions = self.make_action(action_seq=action_seq, observation_seq=observation_seq, plans=plans, current_step=current_step)
+        with th.no_grad():
+            plans = self.make_plans(acts=actions, obsvs=observation_seq)
+        actions = self.make_action(action_seq=action_seq, observation_seq=observation_seq, plans=plans, current_step=current_step)
 
         self.history.add_value(self.history.gen_trj, actions.detach(), current_step=current_step)
         critic_input = self.get_critic_input(obsvs=observation_seq, acts=actions)
@@ -365,7 +368,7 @@ class ActiveCriticPolicy(BaseModel):
                 )
             if self.write_tboard_scalar is not None:
                 debug_dict = {
-                    f'optimized expected success' : expected_success.detach().mean().cpu()
+                    f'optimized expected success' : expected_success.max(dim=1).values.detach().mean().cpu()
                 }
                 self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=step, optimize=True)
             step += 1
@@ -411,7 +414,9 @@ class ActiveCriticPolicy(BaseModel):
             1/0
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
-        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
+        max_mask = max_mask_after_ind(x=critic_result, ind=self.current_step)
+
+        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label, mask=max_mask)
         if self.args_obj.use_diff_boundaries:
             diff_bound_loss = diff_boundaries(
                 actions=opt_actions[:, self.current_step:], 
