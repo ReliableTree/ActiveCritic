@@ -155,7 +155,7 @@ class ActiveCriticPolicy(BaseModel):
                 action_seq = self.current_result.gen_trj
 
         if self.start_training:
-            self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
+            self.obs_seq[:, :1, :] = vec_obsv
             self.history.add_buffer_value(
                 self.history.obsv_buffer, 
                 value=th.clone(self.obs_seq.detach()), 
@@ -189,7 +189,7 @@ class ActiveCriticPolicy(BaseModel):
                         current_step=self.current_step
                     )
                 self.history.add_value(self.history.gen_scores, value=self.current_result.expected_succes_before[:, 0].detach(), current_step=self.current_step)
-            return self.current_result.gen_trj[:, self.current_step].detach().cpu().numpy()
+            return self.current_result.gen_trj[:, 0].detach().cpu().numpy()
         else:
             return np.random.rand(vec_obsv.shape[0], self.action_space.shape[0]) * 2 - 1
 

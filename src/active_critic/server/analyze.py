@@ -283,10 +283,10 @@ def run_experiment(
 def run_eval_stats_env(device, ms):
     weight_decay = 1e-2
     imitation_phases = [False]
-    demonstrations_list = [0]
+    demonstrations_list = [1]
     run_ids = [i for i in range(3)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 10
+    training_episodes = 1
     total_training_epsiodes = 5000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
@@ -324,7 +324,7 @@ def run_eval_stats_env(device, ms):
                                             add_data_every = add_data_everys[val_step],
                                             opt_mode=opt_mode,
                                             make_graphs = False,
-                                            fast=False,
+                                            fast=True,
                                             opt_steps=opt_steps,
                                             sparse=sparse,
                                             seq_len=seq_len,

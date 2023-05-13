@@ -11,7 +11,7 @@ from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 from active_critic.utils.dataset import DatasetAC
 from active_critic.utils.gym_utils import sample_new_episode
-from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask, make_part_obs_data, count_parameters
+from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask, make_part_obs_data, count_parameters, make_autoregressive_obs_data
 from active_critic.utils.tboard_graphs import TBoardGraphs
 from gym.envs.mujoco import MujocoEnv
 from torch.utils.data.dataloader import DataLoader
@@ -118,7 +118,7 @@ class ActiveCriticLearner(nn.Module):
                 dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
 
     def add_data(self, actions: th.Tensor, observations: th.Tensor, rewards: th.Tensor, expert_trjs:th.Tensor, action_history:th.Tensor):
-        acts, obsv, rews, steps, exp_trjs = make_part_obs_data(
+        acts, obsv, rews, steps, exp_trjs = make_autoregressive_obs_data(
             actions=actions, observations=observations, rewards=rewards, expert_trjs=expert_trjs)
 
         self.train_data.add_data(
@@ -211,13 +211,6 @@ class ActiveCriticLearner(nn.Module):
         )
         if opt_before is not None:
             self.policy.args_obj.optimize = opt_before
-
-        '''if self.get_num_training_samples() < self.network_args.explore_until:
-            self.policy.actor.init_model()
-            self.policy.critic.init_model()
-            self.policy.planner.init_model()
-            self.policy.args_obj.inference_opt_lr = 1e-6
-            print('__________________________________reinit model_________________________________')'''
         
         if self.network_args.explore_cautious_until > self.get_num_pos_samples():
             self.policy.actor.init_model()
@@ -250,7 +243,10 @@ class ActiveCriticLearner(nn.Module):
 
         actor_input = self.policy.get_actor_input(plans=plans, obsvs=obsv, rewards=reward)
         actor_result = self.policy.actor.forward(actor_input)
-        loss = calcMSE(actor_result, actions)
+
+        mask = reward != -3
+        mask = mask.squeeze()
+        loss = calcMSE(actor_result[mask], actions[mask])
         self.policy.actor.optimizer.zero_grad()
         self.policy.planner.optimizer.zero_grad()
         loss.backward()
@@ -275,10 +271,19 @@ class ActiveCriticLearner(nn.Module):
         else:
             label = reward
 
+        mask = reward != -3
+        mask = mask.squeeze()
+        print(f'reward critic: {reward}')
+        print(f'mask critic: {mask}')
+
 
         critic_input = self.policy.get_critic_input(obsvs=obsv, acts=actions)
         critic_result = self.policy.critic.forward(critic_input)
-        reward_loss, l2_dist = calcMSE(critic_result, label, return_tensor=True)
+        print(damn)
+        print(f'actor result at mask critic; {critic_result[mask].shape}')
+        print(f'actor result at mask critic; {critic_result[mask]}')
+        1/0
+        reward_loss, l2_dist = calcMSE(critic_result[mask], label[mask], return_tensor=True)
 
         if self.network_args.use_pred_loss:
             prediction_mask = steps > 0
@@ -288,7 +293,7 @@ class ActiveCriticLearner(nn.Module):
             critic_predicted_input_current = self.policy.get_critic_input(obsvs=obsv[prediction_mask], acts=prev_proposed_actions[prediction_mask])
             critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
 
-            pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
+            pred_loss, l2_pred = calcMSE(critic_pred_result_current[mask], critic_pred_result_prev[mask], return_tensor=True)
 
             loss = reward_loss + pred_loss
         else:
