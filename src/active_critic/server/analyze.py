@@ -283,7 +283,7 @@ def run_experiment(
 def run_eval_stats_env(device, ms):
     weight_decay = 1e-2
     imitation_phases = [False]
-    demonstrations_list = [1]
+    demonstrations_list = [0]
     run_ids = [i for i in range(3)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
