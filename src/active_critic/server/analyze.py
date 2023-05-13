@@ -283,11 +283,11 @@ def run_experiment(
 def run_eval_stats_env(device, ms):
     weight_decay = 1e-2
     imitation_phases = [False]
-    demonstrations_list = [1]
+    demonstrations_list = [0]
     run_ids = [i for i in range(3)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 1000
+    total_training_epsiodes = 5000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['reach']
@@ -308,7 +308,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' high lr ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' nl reinit ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
@@ -323,7 +323,7 @@ def run_eval_stats_env(device, ms):
                                             val_every=val_every,
                                             add_data_every = add_data_everys[val_step],
                                             opt_mode=opt_mode,
-                                            make_graphs = True,
+                                            make_graphs = False,
                                             fast=False,
                                             opt_steps=opt_steps,
                                             sparse=sparse,
