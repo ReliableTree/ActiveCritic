@@ -151,8 +151,7 @@ class ActiveCriticPolicy(BaseModel):
                 self.action_history = th.zeros([vec_obsv.shape[0], self.args_obj.epoch_len, self.args_obj.epoch_len, self.action_space.shape[0]], device=self.args_obj.device, dtype=th.float)
         else:
             self.current_step += 1
-            if self.start_training:
-                action_seq = self.current_result.gen_trj
+            action_seq = self.current_result.gen_trj
 
         if self.start_training or True:
             self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
