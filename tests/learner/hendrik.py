@@ -17,6 +17,8 @@ if __name__ == '__main__':
                     help='weight decay')
     parser.add_argument('-ms', type=int,
                 help='manual seed')
+    parser.add_argument('-tag', type=str,
+                help='tag')
     args = parser.parse_args()
-    run_eval_stats_env(device=args.device, ms=args.ms)
+    run_eval_stats_env(device=args.device, ms=args.ms, demonstrations=args.demos, tag=args.tag)
     
