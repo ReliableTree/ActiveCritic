@@ -154,7 +154,7 @@ class ActiveCriticPolicy(BaseModel):
             if self.start_training:
                 action_seq = self.current_result.gen_trj
 
-        if self.start_training:
+        if self.start_training or True:
             self.obs_seq[:, self.current_step:self.current_step+1, :] = vec_obsv
             self.history.add_buffer_value(
                 self.history.obsv_buffer, 
