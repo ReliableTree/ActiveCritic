@@ -202,7 +202,7 @@ def make_acl(
     epsiodes = 30
     ac, acps, env, expert = setup_ac(
         seq_len=seq_len, 
-        num_cpu=min(1, acla.training_epsiodes), 
+        num_cpu=min(acla.num_cpu, acla.training_epsiodes), 
         device=device, 
         opt_mode=opt_mode, 
         tag=tag, 
@@ -272,11 +272,10 @@ def run_experiment(
             episodes=demos,
             seq_len=seq_len)
     
-    
-        exp_trjs = th.zeros([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
+        #exp_trjs = th.zeros([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
         actions_history = actions.unsqueeze(1).repeat([1, actions.shape[1], 1, 1])
-        print(rewards)
-        acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos], action_history=actions_history[:demos])
+        #print(rewards)
+        #acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos], action_history=actions_history[:demos])
         exp_trjs = th.ones([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
         acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos], action_history=actions_history[:demos])
 
@@ -286,20 +285,20 @@ def run_experiment(
 def run_eval_stats_env(device, ms):
     weight_decay = 1e-2
     imitation_phases = [False]
-    demonstrations_list = [5]
-    run_ids = [i for i in range(3)]
+    demonstrations_list = [1]
+    run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
     total_training_epsiodes = 1000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['pickplace']
+    env_tags = ['windowopen']
     val_everys = [1000]
     add_data_everys = [1000]
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = False
-    seq_len = 200
+    seq_len = 100
     max_epoch_steps = 15000
     manual_seed = ms
     explore_until = 0
@@ -311,7 +310,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' rebuild plans ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' opt steps 1 ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,

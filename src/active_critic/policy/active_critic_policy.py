@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel, CriticSequenceModel
-from active_critic.utils.pytorch_utils import diff_boundaries, max_mask_after_ind
+from active_critic.utils.pytorch_utils import diff_boundaries, max_mask_before_ind
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -121,7 +121,7 @@ class ActiveCriticPolicy(BaseModel):
         trj_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.args_obj.epoch_len, self.action_space.shape[0]]
         self.history.new_epoch(self.history.gen_trj, size=trj_size, device=self.args_obj.device)
         
-        self.obs_seq = th.zeros(
+        self.obs_seq = -2*th.ones(
             size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
         
         if self.training_mode:
@@ -261,7 +261,7 @@ class ActiveCriticPolicy(BaseModel):
 
         if action_seq is not None:
             actions = self.proj_actions(
-                action_seq, actions, current_step)
+                action_seq, actions, current_step= 0)
         return actions
     
     def make_plans(self, acts, obsvs):
@@ -414,10 +414,10 @@ class ActiveCriticPolicy(BaseModel):
             1/0
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
-        max_mask = max_mask_after_ind(x=critic_result, ind=self.current_step)
+        max_mask = max_mask_before_ind(x=critic_result, ind=self.args_obj.epoch_len - self.current_step)
 
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label, mask=max_mask)
-        if self.args_obj.use_diff_boundaries:
+        if self.args_obj.use_diff_boundaries or True:
             diff_bound_loss = diff_boundaries(
                 actions=opt_actions[:, self.current_step:], 
                 low=th.tensor(self.action_space.low, device=opt_actions.device), 
@@ -452,7 +452,7 @@ class ActiveCriticPolicy(BaseModel):
     def proj_actions(self, org_actions: th.Tensor, new_actions: th.Tensor, current_step: int):
         with th.no_grad():
             new_actions[:, :current_step] = org_actions[:, :current_step]
-            if self.args_obj.clip:
+            if self.args_obj.clip and False:
                 th.clamp(new_actions, min=self.clip_min, max=self.clip_max, out=new_actions)
         return new_actions
 
