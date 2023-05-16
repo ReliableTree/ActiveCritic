@@ -362,7 +362,7 @@ def sample_new_episode(policy:ActiveCriticPolicy,
         if return_gen_trj:
             return actions, policy.history.gen_trj[0][:episodes], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes], action_history
         else:
-            return actions[:episodes], observations[:episodes], rewards[:episodes], expected_rewards_before[:episodes], expected_rewards_after[:episodes], action_history[:episodes]
+            return actions[:episodes], observations[:episodes], rewards[:episodes], expected_rewards_before[:episodes], expected_rewards_after[:episodes], action_history
         
 class POMDP_Wrapper(gym.Wrapper):
     def __init__(self, env, lookup_freq, pe_dim, seq_len) -> None:

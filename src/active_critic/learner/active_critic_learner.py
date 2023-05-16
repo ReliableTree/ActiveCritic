@@ -387,7 +387,7 @@ class ActiveCriticLearner(nn.Module):
 
                 if self.next_critic_init is None:
                     self.next_critic_init = self.get_num_training_samples() * 4
-                if (self.get_num_training_samples() > self.next_critic_init):
+                if (self.get_num_training_samples() > self.next_critic_init) and (self.get_num_training_samples() < 100):
                     self.policy.critic.init_model()
                     self.policy.actor.init_model()
                     self.policy.planner.init_model()
