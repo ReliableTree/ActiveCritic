@@ -403,7 +403,7 @@ class ActiveCriticLearner(nn.Module):
                 print(f'training now: {self.network_args.training_epsiodes}')
                 print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
 
-            if self.get_num_pos_samples() > self.network_args.explore_cautious_until:
+            if self.get_num_pos_samples() > self.network_args.explore_cautious_until or True:
                 self.policy.train()
 
                 max_actor = float('inf')
