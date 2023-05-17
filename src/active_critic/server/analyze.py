@@ -120,7 +120,7 @@ def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_epi
     wsm_critic_setup = make_wsm_setup(
         seq_len=seq_len, d_output=1, device=device, weight_decay=weight_decay)
     
-    wsm_critic_setup.sparse = True
+    wsm_critic_setup.sparse = False
 
     wsm_planner_setup = make_wsm_setup_tiny(
         seq_len=seq_len, d_output=d_plan, weight_decay=weight_decay, device=device)
