@@ -407,13 +407,14 @@ class ActiveCriticPolicy(BaseModel):
             1/0
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
-        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label)
+        mask = get_seq_end_mask(critic_result, self.current_step)
+        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label, mask=mask)
         optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()
 
         debug_dict = {
-            'in optimisation expected success' : critic_result.mean().detach()
+            'in optimisation expected success' : critic_result[mask].mean().detach()
         }
 
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=current_opt_step, optimize=True)
