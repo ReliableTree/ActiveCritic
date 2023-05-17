@@ -109,6 +109,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
     acps.clip = True
 
     acps.optimizer_mode = opt_mode
+    acps.ent_coeff = 1e-2
     return acps
 
 

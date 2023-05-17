@@ -34,6 +34,7 @@ class ActiveCriticPolicySetup:
         self.optimizer_mode : str = None
         self.clip:bool = True
         self.buffer_size:int = None
+        self.ent_coeff = None
 
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
@@ -376,7 +377,7 @@ class ActiveCriticPolicy(BaseModel):
         if self.args_obj.clip:
             with th.no_grad():
                 th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
-                
+
         self.opt_actor = copy.deepcopy(self.actor.state_dict())
         self.opt_planner = copy.deepcopy(self.planner.state_dict())    
 
