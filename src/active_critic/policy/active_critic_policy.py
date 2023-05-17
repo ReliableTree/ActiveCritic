@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel, CriticSequenceModel
-from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq
+from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq, max_mask_after_ind
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -205,6 +205,10 @@ class ActiveCriticPolicy(BaseModel):
         plans = th.zeros([observation_seq.shape[0], observation_seq.shape[1], self.planner.wsms.model_setup.d_output], device=self.args_obj.device, dtype=th.float32)
         actions = self.make_action(action_seq=action_seq, observation_seq=observation_seq, plans=plans, current_step=current_step)
 
+        with th.no_grad():
+            plans = self.make_plans(acts=actions, obsvs=observation_seq)
+        actions = self.make_action(action_seq=action_seq, observation_seq=observation_seq, plans=plans, current_step=current_step)
+
         self.history.add_value(self.history.gen_trj, actions.detach(), current_step=current_step)
         critic_input = self.get_critic_input(obsvs=observation_seq, acts=actions)
 
@@ -219,15 +223,7 @@ class ActiveCriticPolicy(BaseModel):
                 expected_succes_after=expected_success.detach())
             return result
         else:
-            #opt_count = int(actions.shape[0]/2)
             batch_size = actions.shape[0]
-            '''if (self.buffer_filled_to > 0) and (self.training_mode):
-                buffer_actions = self.history.act_buffer[0][:self.buffer_filled_to, self.current_step]
-                buffer_obsvs = self.history.obsv_buffer[0][:self.buffer_filled_to, self.current_step]
-                actions = th.cat((actions, buffer_actions), dim=0)
-                observation_seq = th.cat((observation_seq, buffer_obsvs), dim=0)
-                plans = th.zeros([observation_seq.shape[0], observation_seq.shape[1], self.planner.wsms.model_setup.d_output], device=self.args_obj.device, dtype=th.float32)
-            '''
             actions_opt, expected_success_opt = self.optimize_act_sequence(
                 actions=actions, 
                 observations=observation_seq, 
@@ -235,8 +231,6 @@ class ActiveCriticPolicy(BaseModel):
                 plans=plans,
                 stop_opt=stop_opt
                 )
-            #actions[:opt_count + 1] = actions_opt[:opt_count + 1]
-            #expected_success_opt[opt_count + 1:] = expected_success[opt_count + 1:]
             actions=actions_opt
 
 
@@ -300,6 +294,12 @@ class ActiveCriticPolicy(BaseModel):
                 self.init_actor = copy.deepcopy(self.actor.state_dict())
                 self.init_planner = copy.deepcopy(self.planner.state_dict())
 
+                self.opt_actor = copy.deepcopy(self.actor.state_dict())
+                self.opt_planner = copy.deepcopy(self.planner.state_dict())
+
+            self.actor.load_state_dict(self.opt_actor)
+            self.planner.load_state_dict(self.opt_planner)
+
             lr = self.args_obj.inference_opt_lr
             optimizer = th.optim.AdamW(
                 [{'params': self.actor.parameters()}, {'params': self.planner.parameters()}],
@@ -344,8 +344,8 @@ class ActiveCriticPolicy(BaseModel):
         if self.critic.model is not None:
             self.critic.model.eval()
         num_opt_steps = self.args_obj.opt_steps
-        '''if self.current_step == 0:
-            num_opt_steps = num_opt_steps * 20'''
+        if self.current_step == 0:
+            num_opt_steps = num_opt_steps * 20
         while (step <= num_opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
             mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success, plans = self.inference_opt_step(
@@ -376,9 +376,12 @@ class ActiveCriticPolicy(BaseModel):
         if self.args_obj.clip:
             with th.no_grad():
                 th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
-        if (self.args_obj.optimizer_mode == 'actor' or self.args_obj.optimizer_mode == 'actor+plan') and self.current_step == self.args_obj.epoch_len - 1:
-            self.actor.load_state_dict(self.init_actor)
-            self.planner.load_state_dict(self.init_planner)
+                
+        self.opt_actor = copy.deepcopy(self.actor.state_dict())
+        self.opt_planner = copy.deepcopy(self.planner.state_dict())    
+
+        self.actor.load_state_dict(self.init_actor)
+        self.planner.load_state_dict(self.init_planner)
         return final_actions, final_exp_success
 
     def inference_opt_step(self, 
@@ -407,14 +410,14 @@ class ActiveCriticPolicy(BaseModel):
             1/0
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
-        mask = get_seq_end_mask(critic_result, self.current_step)
+        mask = max_mask_after_ind(x=critic_result, ind=self.current_step)
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label, mask=mask)
         optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()
 
         debug_dict = {
-            'in optimisation expected success' : critic_result[mask].mean().detach()
+            'in optimisation expected success' : critic_result[mask].mean().detach(),
         }
 
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=current_opt_step, optimize=True)

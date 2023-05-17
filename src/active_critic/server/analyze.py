@@ -98,8 +98,9 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
         acps.inference_opt_lr = 1e-3
         acps.opt_steps = 5
     elif opt_mode == 'actor+plan':
-        acps.inference_opt_lr = 1e-6
         acps.opt_steps = opt_steps
+        acps.inference_opt_lr = 1e-6
+
     else:
         1/0
 
@@ -196,6 +197,8 @@ def make_acl(
 
     acla.use_pred_loss = True
     acla.explore_cautious_until = 3
+    acla.explore_lr = 1e-5
+    acla.exploid_lr = 1e-5
 
     epsiodes = 30
     ac, acps, env, expert = setup_ac(

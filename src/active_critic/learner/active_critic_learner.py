@@ -217,12 +217,11 @@ class ActiveCriticLearner(nn.Module):
             self.policy.actor.init_model()
             self.policy.critic.init_model()
             self.policy.planner.init_model()
-            self.policy.args_obj.inference_opt_lr = 1e-6
+            self.policy.args_obj.inference_opt_lr = self.network_args.explore_lr
             print('__________________________________reinit model_________________________________')
         
         if self.network_args.explore_cautious_until < self.get_num_pos_samples():
-            self.policy.args_obj.inference_opt_lr = 1e-5
-            print('higher lr in optimizer')
+            self.policy.args_obj.inference_opt_lr = self.network_args.exploid_lr
         else:
             self.policy.actor.init_model()
             self.policy.critic.init_model()
@@ -272,7 +271,6 @@ class ActiveCriticLearner(nn.Module):
             label = self.make_critic_score(reward)
         else:
             label = reward
-
 
         critic_input = self.policy.get_critic_input(obsvs=obsv, acts=actions)
         critic_result = self.policy.critic.forward(critic_input)
@@ -496,6 +494,7 @@ class ActiveCriticLearner(nn.Module):
                         self.tboard.addValidationScalar(para, value, step)
 
     def compare_expecations(self, trj, post_fix):
+        return
         last_obsv = trj[0]
         last_actions = trj[1]
         last_rewards = trj[2]
@@ -597,11 +596,16 @@ class ActiveCriticLearner(nn.Module):
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize)
 
+
         for i in range(min(opt_actions.shape[0], 4)):
-            self.createGraphs([gen_actions[i, 0], opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i) + fix)
-            labels = self.make_critic_score(rewards=rewards_run)
-            self.createGraphs([labels[i].reshape([-1, 1]), self.policy.history.opt_scores[0][i].reshape([-1, 1]), self.policy.history.gen_scores[0][i].reshape([-1, 1])], 
-                                ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i) + fix)
+            actor_actions = th.clone(gen_actions[i, 0])
+            for j in range(gen_actions.shape[1]):
+                actor_actions[j] = gen_actions[i,j, j]
+
+            self.createGraphs([actor_actions, opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i) + fix)
+            #labels = self.make_critic_score(rewards=rewards_run)
+            #self.createGraphs([labels[i].reshape([-1, 1]), self.policy.history.opt_scores[0][i].reshape([-1, 1]), self.policy.history.gen_scores[0][i].reshape([-1, 1])], 
+            #                    ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i) + fix)
 
         last_sparse_reward, _ = rewards_run.max(dim=1)
         sparse_reward, _ = rewards_cumm.max(dim=1)

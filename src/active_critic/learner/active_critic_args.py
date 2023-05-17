@@ -31,3 +31,5 @@ class ActiveCriticLearnerArgs:
         self.explore_until = None
         self.use_pred_loss = None
         self.explore_cautious_until = None
+        self.explore_lr = None
+        self.exploid_lr = None
