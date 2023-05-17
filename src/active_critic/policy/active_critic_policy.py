@@ -291,7 +291,7 @@ class ActiveCriticPolicy(BaseModel):
             optimized_actions = self.make_action(action_seq=actions, observation_seq=observations, plans=plans, current_step=current_step).detach()
             actions = actions.detach()
             observations = observations.detach()
-            plans = self.make_plans(acts=actions, obsvs=observations)
+            plans = self.make_plans(acts=actions, obsvs=observations) 
 
             if current_step == 0:
                 self.init_actor = copy.deepcopy(self.actor.state_dict())
