@@ -285,6 +285,8 @@ class ActiveCriticLearner(nn.Module):
             critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
 
             pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
+            pred_loss = pred_loss * self.policy.args_obj.epoch_len
+            l2_pred = l2_pred * self.policy.args_obj.epoch_len
 
             loss = reward_loss + pred_loss
         else:
