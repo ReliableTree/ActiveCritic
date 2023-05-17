@@ -33,3 +33,4 @@ class ActiveCriticLearnerArgs:
         self.explore_cautious_until = None
         self.explore_lr = None
         self.exploid_lr = None
+        self.rolling_success_rate_window = None

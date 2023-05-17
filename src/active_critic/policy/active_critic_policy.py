@@ -28,6 +28,8 @@ class ActiveCriticPolicySetup:
         self.opt_steps: int = None
         self.device: str = None
         self.inference_opt_lr: float = None
+        self.inf_noise_lr = None
+        self.current_inf_noise_lr = None
         self.optimize: bool = None
         self.batch_size: int = None
         self.stop_opt: bool = None
@@ -35,6 +37,7 @@ class ActiveCriticPolicySetup:
         self.clip:bool = True
         self.buffer_size:int = None
         self.ent_coeff = None
+        self.current_ent_coeff = None
         self.use_diff_boundaries = None
 
 
@@ -293,12 +296,16 @@ class ActiveCriticPolicy(BaseModel):
             observations = observations.detach()
             plans = self.make_plans(acts=actions, obsvs=observations) 
 
+
             if current_step == 0:
                 self.init_actor = copy.deepcopy(self.actor.state_dict())
                 self.init_planner = copy.deepcopy(self.planner.state_dict())
 
                 self.opt_actor = copy.deepcopy(self.actor.state_dict())
                 self.opt_planner = copy.deepcopy(self.planner.state_dict())
+            action_noise = sample_gauss(mean=th.zeros_like(actions), variance=self.args_obj.current_ent_coeff * th.ones_like(actions))
+            action_noise.requires_grad = True
+
 
             self.actor.load_state_dict(self.opt_actor)
             self.planner.load_state_dict(self.opt_planner)
@@ -309,6 +316,12 @@ class ActiveCriticPolicy(BaseModel):
                 lr=lr,
                 weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
             )
+            noise_optimizer = th.optim.AdamW(
+                [{'params': action_noise}],
+                lr=self.args_obj.current_inf_noise_lr,
+                weight_decay=0
+            )
+
 
         elif self.args_obj.optimizer_mode == 'plan':
             print('use plan opt mode')
@@ -356,11 +369,13 @@ class ActiveCriticPolicy(BaseModel):
                 opt_actions=optimized_actions,
                 obs_seq=observations,
                 optimizer=optimizer,
+                noise_optimizer = noise_optimizer,
                 goal_label=goal_label,
                 current_step=current_step,
                 plans=plans,
                 goals=goals,
-                current_opt_step=step + current_step * self.args_obj.epoch_len
+                current_opt_step=step + current_step * self.args_obj.epoch_len,
+                action_noise=action_noise
                 )
             if self.write_tboard_scalar is not None:
                 debug_dict = {
@@ -392,11 +407,13 @@ class ActiveCriticPolicy(BaseModel):
             opt_actions: th.Tensor, 
             obs_seq: th.Tensor, 
             optimizer: th.optim.Optimizer, 
+            noise_optimizer,
             goal_label: th.Tensor, 
             plans:th.Tensor,
             current_step: int,
             goals:th.Tensor,
-            current_opt_step
+            current_opt_step,
+            action_noise
             ):
         if (self.args_obj.optimizer_mode == 'goal'):
             current_obs_seq = th.cat((obs_seq[:, :, :-3], goals), dim=-1)
@@ -412,6 +429,7 @@ class ActiveCriticPolicy(BaseModel):
             pass
         else:
             1/0
+        opt_actions = opt_actions + action_noise
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
         mask = max_mask_after_ind(x=critic_result, ind=self.current_step)
@@ -433,8 +451,10 @@ class ActiveCriticPolicy(BaseModel):
             critic_loss = critic_loss - entropy'''
 
         optimizer.zero_grad()
+        noise_optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()
+        noise_optimizer.step()
 
 
 

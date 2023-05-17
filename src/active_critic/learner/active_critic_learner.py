@@ -111,6 +111,9 @@ class ActiveCriticLearner(nn.Module):
         if not os.path.exists(self.inter_path):
             os.makedirs(self.inter_path)
 
+        self.rolling_success_rate = th.zeros([self.network_args.rolling_success_rate_window])
+        self.rolling_success_rate_pointer = 0
+
     def setDatasets(self, train_data: DatasetAC):
         self.train_data = train_data
         if len(train_data) > 0:
@@ -194,6 +197,13 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict=debug_dict, train=True)
         success = rewards.squeeze().max(-1).values
         success = (success == 1).type(th.float).mean()
+        self.rolling_success_rate[self.rolling_success_rate_pointer] = success.cpu()
+        self.rolling_success_rate_pointer = (self.rolling_success_rate_pointer + 1)%self.network_args.rolling_success_rate_window
+        self.policy.args_obj.current_ent_coeff = self.policy.args_obj.ent_coeff * (1-self.rolling_success_rate.mean())
+        self.policy.args_obj.current_inf_noise_lr = self.policy.args_obj.inf_noise_lr * (1-self.rolling_success_rate.mean())
+        print(f'self.rolling_success_rate.mean(): {self.rolling_success_rate.mean()}')
+        print(f'self.policy.args_obj.current_ent_coeff: {self.policy.args_obj.current_ent_coeff}')
+        print(f'self.policy.args_obj.current_inf_noise_lr: {self.policy.args_obj.current_inf_noise_lr}')
 
         sparse_reward, _ = rewards.max(dim=1)
 
@@ -213,23 +223,10 @@ class ActiveCriticLearner(nn.Module):
         if opt_before is not None:
             self.policy.args_obj.optimize = opt_before
 
-        if self.get_num_training_samples() < self.network_args.explore_until:
-            '''self.policy.actor.init_model()
-            self.policy.critic.init_model()
-            self.policy.planner.init_model()'''
-            self.policy.args_obj.inference_opt_lr = self.network_args.explore_lr
-            #print('__________________________________reinit model_________________________________')
-        
-        '''if self.network_args.explore_cautious_until < self.get_num_pos_samples():
+        if self.get_num_pos_samples() < self.network_args.explore_until:
             self.policy.args_obj.inference_opt_lr = self.network_args.exploid_lr
         else:
-            self.policy.actor.init_model()
-            self.policy.critic.init_model()
-            self.policy.planner.init_model()
-            self.policy.args_obj.inference_opt_lr = 1e-6
-            print('__________________________________reinit model_________________________________')'''
-
-
+            self.policy.args_obj.inference_opt_lr = self.network_args.explore_lr
 
 
     def actor_step(self, data, loss_actor):

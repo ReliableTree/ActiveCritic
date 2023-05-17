@@ -110,7 +110,8 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
     acps.use_diff_boundaries = True
 
     acps.optimizer_mode = opt_mode
-    acps.ent_coeff = 1e-2
+    acps.ent_coeff = 1e-3
+    acps.inf_noise_lr = 1e-4
     return acps
 
 
@@ -201,6 +202,7 @@ def make_acl(
     acla.explore_cautious_until = 3
     acla.explore_lr = 1e-5
     acla.exploid_lr = 1e-5
+    acla.rolling_success_rate_window = 10
 
     epsiodes = 30
     ac, acps, env, expert = setup_ac(
@@ -312,7 +314,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' rand vec ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' new noise ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
