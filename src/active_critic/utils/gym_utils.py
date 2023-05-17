@@ -106,7 +106,9 @@ class ImitationLearningWrapper:
     def predict(self, obsv, deterministic=None):
         actions = []
         for obs in obsv:
-            actions.append(self.policy.get_action(obs))
+            action = self.policy.get_action(obs)
+            action = np.clip(action, -1, 1)
+            actions.append(action)
         return actions
 
 def make_dummy_vec_env(name, seq_len, sparse):
@@ -562,3 +564,4 @@ def make_ppo_rec_data_loader(env, vec_expert, n_demonstrations, seq_len, device,
 
     dataloader = DataLoader(dataset=train_data, batch_size=batch_size, shuffle=True)
     return dataloader
+

@@ -129,3 +129,45 @@ def max_mask_after_ind(x, ind):
     # pad with zeros for indices before start index
     mask = th.cat([th.zeros((x.size(0), ind), dtype=th.bool, device=x.device), mask], dim=1)
     return mask.unsqueeze(-1)
+
+def diff_boundaries(actions, low, high):
+    high_mask = actions > high
+    low_mask = actions < low
+    high_bound = th.square(th.where(high_mask, actions - high, th.zeros_like(actions))).sum()
+    low_bound = th.square(th.where(low_mask, actions - low, th.zeros_like(actions))).sum()
+    normalizing = th.sum(high_mask) + th.sum(low_mask)
+    if normalizing > 0:
+        com = (high_bound + low_bound) / normalizing
+    else:
+        com = th.zeros([1], device=actions.device, requires_grad=True)
+    return com
+
+def calc_entropy(mean, vector, variance=None):
+    mean = mean.reshape([-1])
+    vector = vector.reshape([-1])
+    if variance is None:
+        variance = th.ones_like(mean)
+    else:
+        variance = variance.reshape([-1])
+
+    # Create a multivariate Gaussian distribution with diagonal covariance
+    gaussian = th.distributions.MultivariateNormal(mean, th.diag(variance))
+    
+    # Evaluate the log-probability of the vector under the Gaussian distribution
+    log_prob = gaussian.log_prob(vector)
+    
+    # Calculate the entropy as the negative mean of the log-probabilities
+    entropy = -th.mean(log_prob)
+    
+    return entropy
+
+def sample_gauss(mean, variance=None):
+    shape = mean.shape
+    mean = mean.reshape([-1])
+    if variance is None:
+        variance = th.ones_like(mean)
+    else:
+        variance = variance.reshape([-1])
+    gaussian = th.distributions.MultivariateNormal(mean, th.diag(variance))
+    sampled_vector = gaussian.sample()
+    return sampled_vector.reshape([*shape])

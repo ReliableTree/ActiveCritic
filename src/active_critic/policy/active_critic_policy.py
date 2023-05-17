@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel, CriticSequenceModel
-from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq, max_mask_after_ind, diff_boundaries
+from active_critic.utils.pytorch_utils import get_rew_mask, get_seq_end_mask, make_partially_observed_seq, max_mask_after_ind, diff_boundaries, calc_entropy, sample_gauss
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -35,6 +35,8 @@ class ActiveCriticPolicySetup:
         self.clip:bool = True
         self.buffer_size:int = None
         self.ent_coeff = None
+        self.use_diff_boundaries = None
+
 
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
@@ -346,7 +348,7 @@ class ActiveCriticPolicy(BaseModel):
             self.critic.model.eval()
         num_opt_steps = self.args_obj.opt_steps
         if self.current_step == 0:
-            num_opt_steps = num_opt_steps * 20
+            num_opt_steps = num_opt_steps * 30
         while (step <= num_opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
             mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success, plans = self.inference_opt_step(
@@ -403,6 +405,7 @@ class ActiveCriticPolicy(BaseModel):
             assert goals is None, 'Kinda the wrong mode or smth.'
 
         if (self.args_obj.optimizer_mode in ['plan', 'goal', 'actor+plan']):
+            #rand_actions = sample_gauss(mean=opt_actions)
             opt_plan = self.make_plans(opt_actions.detach(), obsvs=obs_seq.detach())
             opt_actions = self.make_action(action_seq=org_actions, observation_seq=current_obs_seq, plans=opt_plan, current_step=current_step)
         elif (self.args_obj.optimizer_mode in ['actions']):
@@ -413,14 +416,28 @@ class ActiveCriticPolicy(BaseModel):
         critic_result = self.critic.forward(inputs=critic_inpt)
         mask = max_mask_after_ind(x=critic_result, ind=self.current_step)
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label, mask=mask)
-        bound_loss = diff_boundaries(opt_actions, low=self.)
+        debug_dict = {
+            'in optimisation expected success' : critic_result[mask].mean().detach(),
+        }
+        if self.args_obj.use_diff_boundaries:
+            diff_bound_loss = diff_boundaries(
+                actions=opt_actions[:, self.current_step:], 
+                low=th.tensor(self.action_space.low, device=opt_actions.device), 
+                high = th.tensor(self.action_space.high, device=opt_actions.device))
+            critic_loss = critic_loss + diff_bound_loss        
+            debug_dict['diff bound loss'] = diff_bound_loss.detach().mean()
+        
+        '''if self.current_step == 0:
+            entropy = calc_entropy(mean=org_actions.detach(), vector=opt_actions)
+            debug_dict['entropy'] = entropy.detach()
+            critic_loss = critic_loss - entropy'''
+
         optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()
 
-        debug_dict = {
-            'in optimisation expected success' : critic_result[mask].mean().detach(),
-        }
+
+
 
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=current_opt_step, optimize=True)
 

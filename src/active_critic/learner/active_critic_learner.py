@@ -214,20 +214,20 @@ class ActiveCriticLearner(nn.Module):
             self.policy.args_obj.optimize = opt_before
 
         if self.get_num_training_samples() < self.network_args.explore_until:
-            self.policy.actor.init_model()
+            '''self.policy.actor.init_model()
             self.policy.critic.init_model()
-            self.policy.planner.init_model()
+            self.policy.planner.init_model()'''
             self.policy.args_obj.inference_opt_lr = self.network_args.explore_lr
-            print('__________________________________reinit model_________________________________')
+            #print('__________________________________reinit model_________________________________')
         
-        if self.network_args.explore_cautious_until < self.get_num_pos_samples():
+        '''if self.network_args.explore_cautious_until < self.get_num_pos_samples():
             self.policy.args_obj.inference_opt_lr = self.network_args.exploid_lr
         else:
             self.policy.actor.init_model()
             self.policy.critic.init_model()
             self.policy.planner.init_model()
             self.policy.args_obj.inference_opt_lr = 1e-6
-            print('__________________________________reinit model_________________________________')
+            print('__________________________________reinit model_________________________________')'''
 
 
 
@@ -375,10 +375,10 @@ class ActiveCriticLearner(nn.Module):
                 if self.set_best_actor:
                     self.policy.actor.load_state_dict(th.load(self.inter_path + 'best_actor'))
                     self.policy.planner.load_state_dict(th.load(self.inter_path + 'best_planner'))
-                if (self.train_data.success is not None) and (self.train_data.success.sum() == 0):
+                '''if (self.train_data.success is not None) and (self.train_data.success.sum() == 0):
                     self.policy.actor.init_model()
                     self.policy.planner.init_model()
-                    print(f'_________________________reinit actor__________________________________________')
+                    print(f'_________________________reinit actor__________________________________________')'''
                 self.add_training_data(episodes=self.network_args.training_epsiodes)
                 self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'), strict=False)
                 self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'), strict=False)
@@ -387,12 +387,12 @@ class ActiveCriticLearner(nn.Module):
 
                 if self.next_critic_init is None:
                     self.next_critic_init = self.get_num_training_samples() * 4
-                if (self.get_num_training_samples() > self.next_critic_init) and (self.get_num_training_samples() < 100):
+                '''if (self.get_num_training_samples() > self.next_critic_init) and (self.get_num_training_samples() < 100):
                     self.policy.critic.init_model()
                     self.policy.actor.init_model()
                     self.policy.planner.init_model()
                     self.next_critic_init = 4 * self.get_num_training_samples()
-                    print('______________________________init models___________________________________')
+                    print('______________________________init models___________________________________')'''
 
             elif (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every
