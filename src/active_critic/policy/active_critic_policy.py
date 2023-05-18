@@ -361,7 +361,7 @@ class ActiveCriticPolicy(BaseModel):
             self.critic.model.eval()
         num_opt_steps = self.args_obj.opt_steps
         if self.current_step == 0:
-            num_opt_steps = num_opt_steps * 30
+            num_opt_steps = num_opt_steps * 100
         while (step <= num_opt_steps):# and (not th.all(final_exp_success.max(dim=1)[0] >= self.args_obj.optimisation_threshold)):
             mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success, plans = self.inference_opt_step(
@@ -429,7 +429,7 @@ class ActiveCriticPolicy(BaseModel):
             pass
         else:
             1/0
-        opt_actions = opt_actions + action_noise
+        #opt_actions = opt_actions + action_noise
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
         mask = max_mask_after_ind(x=critic_result, ind=self.current_step)

@@ -200,8 +200,8 @@ def make_acl(
 
     acla.use_pred_loss = True
     acla.explore_cautious_until = 3
-    acla.explore_lr = 1e-5
-    acla.exploid_lr = 1e-5
+    acla.explore_lr = 1e-6
+    acla.exploid_lr = 1e-6
     acla.rolling_success_rate_window = 10
 
     epsiodes = 30
@@ -300,9 +300,9 @@ def run_eval_stats_env(device, ms):
     val_everys = [1000]
     add_data_everys = [1000]
     opt_modes = ['actor+plan']
-    opt_steps_list = [3]
+    opt_steps_list = [1]
     sparse = True
-    seq_len = 100
+    seq_len = 200
     max_epoch_steps = 30000
     manual_seed = ms
     explore_until = 0
