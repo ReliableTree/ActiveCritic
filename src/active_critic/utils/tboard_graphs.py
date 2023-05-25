@@ -66,7 +66,7 @@ class TBoardGraphs():
             ls = []
 
             for trj_num in range(len(trjs)):
-                l, = ax[idx, idy].plot(range(trjs[trj_num].shape[0]), trjs[trj_num][:,sp], color=trj_colors[trj_num], label=trj_names[trj_num])
+                l, = ax[idx, idy].plot(range(trjs[trj_num].shape[0]), trjs[trj_num][:,sp],  label=trj_names[trj_num])
                 ls.append(l)
 
         if self.legend is not None:

@@ -180,7 +180,7 @@ class TestPolicy(unittest.TestCase):
                 self.assertTrue(
                     ac.current_step == ac.args_obj.epoch_len - 1, 'Steps are counted wrong')
                 ata = th.tensor(all_taken_actions).transpose(0, 1)
-                self.assertTrue(th.equal(ata.to('cuda'), ac.current_result.gen_trj),
+                self.assertTrue(th.equal(ata.to('cuda'), ac.current_result.opt_trj),
                                 'Actual action sequence differs from saved action sequence. Maybe problem with backprop?')
                 aob = th.tensor(all_observations).transpose(0, 1)[:, :50]
                 self.assertTrue(th.equal(aob.to('cuda'), ac.obs_seq),
@@ -238,7 +238,7 @@ class TestPolicy(unittest.TestCase):
         for i in range(epsiodes):
             for j in range(all_scores_after_th.shape[1]):
                 self.assertTrue(th.equal(
-                    all_actions_th[i, j], ac.history.gen_trj[0][i, j]), 'Trajectory history of ac is corrupted.')
+                    all_actions_th[i, j], ac.history.gen_trj_hist[0][i, j]), 'Trajectory history of ac is corrupted.')
                 
 
         for i in range(epsiodes*ac.args_obj.epoch_len):
@@ -255,7 +255,7 @@ class TestPolicy(unittest.TestCase):
         self.assertTrue(
             ac.history.opt_scores[0].shape[0] == 2*epsiodes, 'Scores after are not properly appended.')
         self.assertTrue(
-            ac.history.gen_scores[0].shape[0] == 2*epsiodes, 'Scores before are not properly appended.')
+            ac.history.gen_scores_hist[0].shape[0] == 2*epsiodes, 'Scores before are not properly appended.')
 
         all_taken_actions = []
         all_observations = [obsv]
@@ -275,7 +275,7 @@ class TestPolicy(unittest.TestCase):
         self.assertTrue(
             ac.history.opt_scores[0].shape[0] == 2, 'Epochs reset did not work.')
         self.assertTrue(
-            ac.history.gen_scores[0].shape[0] == 2, 'Epochs reset did not work.')
+            ac.history.gen_scores_hist[0].shape[0] == 2, 'Epochs reset did not work.')
 
     def test_early_stopping(self):
         th.manual_seed(1)

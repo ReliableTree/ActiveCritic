@@ -26,7 +26,9 @@ class WholeSequenceModel(nn.Module):
         self.model = None
         self.optimizer = None
 
-    def forward(self, inputs: th.Tensor, mask:th.Tensor = None) -> th.Tensor:
+    def forward(self, inputs: th.Tensor) -> th.Tensor:
+        mask = generate_square_subsequent_mask(inputs.shape[-2]).to(inputs.device)
+
         if (self.model is None):
             self.wsms.model_setup.ntoken = inputs.size(-1)
             self.model = TransformerModel(
@@ -69,24 +71,13 @@ class WholeSequenceModel(nn.Module):
 class CriticSequenceModel(WholeSequenceModel):
     def __init__(self, wsms: WholeSequenceModelSetup) -> None:
         super().__init__(wsms)
-
-    def forward(self, inputs: th.Tensor) -> th.Tensor:
-        mask = generate_square_subsequent_mask(inputs.shape[-2]).to(inputs.device)
-        result = super().forward(inputs=inputs, mask=mask)
-        return result
-
-
-class CriticSequenceModel(WholeSequenceModel):
-    def __init__(self, wsms: WholeSequenceModelSetup) -> None:
-        super().__init__(wsms)
         self.result_decoder = None
         self.sm = th.nn.Sigmoid()
 
     def forward(self, inputs: th.Tensor) -> th.Tensor:
-        mask = generate_square_subsequent_mask(inputs.shape[-2]).to(inputs.device)
         reinit = (self.model is None)
 
-        trans_result = super().forward(inputs=inputs, mask=mask)
+        trans_result = super().forward(inputs=inputs)
 
         if self.wsms.sparse:
             trans_result = trans_result.reshape([inputs.shape[0], -1])

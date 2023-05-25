@@ -11,7 +11,7 @@ from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 from active_critic.utils.dataset import DatasetAC
 from active_critic.utils.gym_utils import sample_new_episode
-from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask, make_part_obs_data, count_parameters, make_autoregressive_obs_data
+from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask, make_part_obs_data, count_parameters, make_autoregressive_obs_data, linear_interpolation
 from active_critic.utils.tboard_graphs import TBoardGraphs
 from gym.envs.mujoco import MujocoEnv
 from torch.utils.data.dataloader import DataLoader
@@ -79,7 +79,6 @@ class ActiveCriticLearner(nn.Module):
         self.last_scores = None
 
         self.last_trj = None
-        self.last_trj_training = None
         self.best_success = -1
         self.train_critic = self.network_args.start_critic
         self.virtual_step = 0
@@ -170,22 +169,11 @@ class ActiveCriticLearner(nn.Module):
         for element in add_results[1:]:
             for i, part in enumerate(element):
                 add_results[0][i] = th.cat((add_results[0][i], part), dim=0)
-        actions, observations, rewards, _, expected_rewards, action_history = add_results[0]
+        actions, observations, rewards, actions_history = add_results[0]
         assert actions.shape[0] >= episodes, 'ASDSAD'
         actions = actions[:episodes]
         observations = observations[:episodes]
         rewards = rewards[:episodes]
-        expected_rewards = expected_rewards[:episodes]
-        action_history = action_history[:episodes]
-        if self.last_trj_training is not None:
-            self.compare_expecations(self.last_trj_training, 'Training')
-        self.last_trj_training = [
-            observations[:1],
-            actions[:1],
-            rewards[:1],
-            expected_rewards[:1]
-        ]
-
         debug_dict = {
             'Training epoch time': th.tensor(time.perf_counter() - h)
         }
@@ -193,30 +181,18 @@ class ActiveCriticLearner(nn.Module):
         success = rewards.squeeze().max(-1).values
         success = (success == 1).type(th.float).mean()
 
-        sparse_reward, _ = rewards.max(dim=1)
-
         print(f'last rewards: {rewards.mean()}')
-        print(f'max last rewards: {sparse_reward.mean()}')
-
         print(f'last success: {success}')
-        print(f'self.last_scores: {self.last_scores}')
         expert_trjs = th.zeros([episodes], dtype=th.bool, device=actions.device)
         self.add_data(
             actions=actions,
             observations=observations,
             rewards=rewards,
             expert_trjs=expert_trjs,
-            action_history=action_history
+            action_history=actions_history
         )
         if opt_before is not None:
             self.policy.args_obj.optimize = opt_before
-
-        '''if self.get_num_training_samples() < self.network_args.explore_until:
-            self.policy.actor.init_model()
-            self.policy.critic.init_model()
-            self.policy.planner.init_model()
-            self.policy.args_obj.inference_opt_lr = 1e-6
-            print('__________________________________reinit model_________________________________')'''
         
         if self.network_args.explore_cautious_until > self.get_num_pos_samples():
             self.policy.actor.init_model()
@@ -245,7 +221,10 @@ class ActiveCriticLearner(nn.Module):
             expert_trjs = expert_trjs[success]
 
         plans = self.policy.make_plans(acts=actions, obsvs=obsv)
-        plans[expert_trjs] = 0
+        label_plans = th.clone(plans.detach())
+        label_plans[expert_trjs] = 0
+
+        plans_loss = calcMSE(label_plans, plans)
 
         actor_input = self.policy.get_actor_input(plans=plans, obsvs=obsv, rewards=reward)
         actor_result = self.policy.actor.forward(actor_input)
@@ -253,6 +232,7 @@ class ActiveCriticLearner(nn.Module):
         mask = reward != -3
         mask = mask.reshape(mask.shape[0], mask.shape[1])
         loss = calcMSE(actor_result[mask], actions[mask])
+        loss = loss + plans_loss
         self.policy.actor.optimizer.zero_grad()
         self.policy.planner.optimizer.zero_grad()
         loss.backward()
@@ -278,25 +258,25 @@ class ActiveCriticLearner(nn.Module):
             label = reward
 
         mask = reward != -3
-        mask = mask.squeeze()
+        mask = mask.reshape([mask.shape[0], -1])
 
 
         critic_input = self.policy.get_critic_input(obsvs=obsv, acts=actions)
+
         critic_result = self.policy.critic.forward(critic_input)
         reward_loss, l2_dist = calcMSE(critic_result[mask], label[mask], return_tensor=True)
+        prediction_mask = steps > 0
 
-        if self.network_args.use_pred_loss:
-            prediction_mask = steps > 0
-            mask = mask[prediction_mask]
-
+        if self.network_args.use_pred_loss and (prediction_mask.sum() > 0):
             critic_predicted_input_prev = self.policy.get_critic_input(obsvs=prev_observation[prediction_mask], acts=prev_proposed_actions[prediction_mask])
-            critic_pred_result_prev = self.policy.critic.forward(critic_predicted_input_prev)
+            critic_pred_result_prev = self.policy.critic.forward(critic_predicted_input_prev)[:, 1:]
 
-            critic_predicted_input_current = self.policy.get_critic_input(obsvs=obsv[prediction_mask], acts=prev_proposed_actions[prediction_mask])
+            critic_predicted_input_current = self.policy.get_critic_input(obsvs=obsv[prediction_mask][:, :-1], acts=prev_proposed_actions[prediction_mask][:, 1:])
+            
             critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
-
-            pred_loss, l2_pred = calcMSE(critic_pred_result_current[mask], critic_pred_result_prev[mask], return_tensor=True)
-
+            pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
+            pred_loss = 100* pred_loss
+            l2_pred = 100* l2_pred
             loss = reward_loss + pred_loss
         else:
             l2_pred = th.zeros_like(l2_dist)
@@ -568,11 +548,6 @@ class ActiveCriticLearner(nn.Module):
             fix = ' optimize'
             if self.last_trj is not None:
                 self.compare_expecations(self.last_trj, 'Validation')
-            '''opt_steps_before = self.policy.args_obj.opt_steps
-            if self.train_data.success is not None:
-                self.policy.args_obj.opt_steps = min(opt_steps_before, 10 * self.train_data.success.sum())
-            else:
-                self.policy.args_obj.opt_steps = 0'''
             print(f'self.policy.args_obj.opt_steps: {self.policy.args_obj.opt_steps}')
         else:
             fix = ''
@@ -584,36 +559,42 @@ class ActiveCriticLearner(nn.Module):
         rewards_cumm = None
 
         for i in range(self.network_args.validation_rep):
-            opt_actions, gen_actions, observations, rewards_run, expected_rewards_before, expected_rewards_after, _ = sample_new_episode(
+            opt_actions, observations, rewards_run, _ = sample_new_episode(
                 policy=self.policy,
                 env=self.eval_env,
                 dense=self.network_args.dense,
                 extractor=self.network_args.extractor,
                 device=self.network_args.device,
                 episodes=self.network_args.validation_episodes,
-                return_gen_trj=True,
+                return_gen_trj=False,
                 start_training=self.get_num_training_samples()> self.network_args.explore_until)
             if rewards_cumm is None:
                 rewards_cumm = rewards_run
             else:
                 rewards_cumm = th.cat((rewards_cumm, rewards_run))
-        if optimize:
-            self.last_trj = [
-                observations[:1],
-                opt_actions[:1],
-                rewards_run[:1],
-                expected_rewards_after[:1]
-            ]
+
         debug_dict = {
             'Validation epoch time '+fix : th.tensor(time.perf_counter() - h)
         }
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize)
+        if optimize:
+            for i in range(min(opt_actions.shape[0], 4)):
 
-        for i in range(min(opt_actions.shape[0], 4)):
-            self.createGraphs([gen_actions[i, 0], opt_actions[i]], ['Generated Actions', 'Opimized Actions'+str(i)], plot_name='Trajectories ' + str(i) + fix)
-            labels = self.make_critic_score(rewards=rewards_run)
-            self.createGraphs([labels[i].reshape([-1, 1]), self.policy.history.opt_scores[0][i].reshape([-1, 1]), self.policy.history.gen_scores[0][i].reshape([-1, 1])], 
-                                ['GT Reward ' + str(i), 'Expected Optimized Reward', 'Expected Generated Reward'], plot_name='Rewards '+str(i) + fix)
+                self.make_time_series(
+                    time_series=self.policy.history.opt_trj_hist[0][i],
+                    name=f'actions',
+                    title=f'Run {i}',
+                    max_steps=4,
+                    generated=self.policy.history.gen_trj_hist[0][i, -1]
+                )
+                self.make_time_series(
+                    time_series=self.policy.history.opt_scores_hist[0][i],
+                    name=f'rewards',
+                    title=f'Run rewards {i}',
+                    max_steps=4,
+                    generated=self.policy.history.gen_scores_hist[0][i, -1],
+                    gt = rewards_run[i]
+                )
 
         last_sparse_reward, _ = rewards_run.max(dim=1)
         sparse_reward, _ = rewards_cumm.max(dim=1)
@@ -622,14 +603,14 @@ class ActiveCriticLearner(nn.Module):
             self.scores.mean_reward, sparse_reward.mean())
             
 
-        last_expected_rewards_before, _ = expected_rewards_before.max(dim=1)
+        '''last_expected_rewards_before, _ = expected_rewards_before.max(dim=1)
         last_expected_reward_after, _ = expected_rewards_after.max(dim=1)
             
 
         self.analyze_critic_scores(
             last_sparse_reward, last_expected_rewards_before,  fix)
         self.analyze_critic_scores(
-            last_sparse_reward, last_expected_reward_after, ' optimized'+ fix)
+            last_sparse_reward, last_expected_reward_after, ' optimized'+ fix)'''
         success = (sparse_reward == 1)
         success = success.type(th.float)
 
@@ -662,7 +643,7 @@ class ActiveCriticLearner(nn.Module):
 
         self.policy.args_obj.optimize = pre_opt
 
-        if optimize:
+        '''if optimize:
             exp_after = expected_rewards_after
             exp_dict = self.exp_dict_opt
         else:
@@ -676,7 +657,7 @@ class ActiveCriticLearner(nn.Module):
             #self.policy.args_obj.opt_steps = opt_steps_before
             print(f'self.policy.args_obj.opt_steps after: {self.policy.args_obj.opt_steps}')
         else:
-            self.exp_dict = exp_dict
+            self.exp_dict = exp_dict'''
 
 
 
@@ -726,6 +707,24 @@ class ActiveCriticLearner(nn.Module):
                 np_trjs.append(trj.detach().cpu().numpy())
             self.tboard.plot_graph(trjs=np_trjs, trj_names=trj_names, trj_colors=trj_colors, plot_name=plot_name, step=self.global_step)
 
+    def make_time_series(self, time_series, name, title, max_steps, generated = None, gt = None):
+        trjs = []
+        names = []
+        for i in range(min(time_series.shape[0], max_steps)):
+            time_step = linear_interpolation(total_steps=min(time_series.shape[0], max_steps), current_step=i+1, start=0, end=time_series.shape[0]-1)
+            names.append(name + f' time  step {time_step}')
+            trjs.append(time_series[time_step])
+        if generated is not None:
+            trjs.append(generated)
+            names.append(name + ' generated')
+        if gt is not None:
+            trjs.append(gt)
+            names.append(name + 'gt')
+        self.createGraphs(
+            trjs=trjs,
+            trj_names=names,
+            plot_name=title
+        )
 
     def saveNetworkToFile(self, add, data_path):
 

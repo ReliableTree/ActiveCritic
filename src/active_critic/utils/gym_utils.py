@@ -328,8 +328,6 @@ def sample_new_episode(policy:ActiveCriticPolicy,
             seq_len = policy.args_obj.epoch_len
             policy.start_training = start_training
             print(f'policy train mode: {policy.start_training}')
-        else:
-            seq_len = seq_len
             
         transitions = sample_expert_transitions(
             policy.predict, env, episodes, set_deterministic=False)
@@ -341,23 +339,21 @@ def sample_new_episode(policy:ActiveCriticPolicy,
             device_data.append(data[:episodes].to(device))
         actions, observations, rewards = device_data
 
-        if isinstance(policy, ActiveCriticPolicy):
-            expected_rewards_before = policy.history.gen_scores[0]
-            expected_rewards_after = policy.history.opt_scores[0]
-        else:
-            expected_rewards_before = th.clone(rewards)
-            expected_rewards_after = th.clone(rewards)
-
         if type(policy) is ActiveCriticPolicy:
-            action_history = policy.action_history
-        else:
-            action_history = None
-
+            actions_history = policy.history.opt_trj_hist[0]
 
         if return_gen_trj:
-            return actions, policy.history.gen_trj[0][:episodes], observations, rewards, expected_rewards_before[:episodes], expected_rewards_after[:episodes], action_history
+            if type(policy) is ActiveCriticPolicy:
+                return actions[:episodes], policy.history.gen_trj_hist[0][:episodes, -1], observations[:episodes], rewards[:episodes], actions_history[:episodes]
+            else:
+                return actions[:episodes], policy.history.gen_trj_hist[0][:episodes, -1], observations[:episodes], rewards[:episodes], None
+
         else:
-            return actions[:episodes], observations[:episodes], rewards[:episodes], expected_rewards_before, expected_rewards_after, action_history
+            if type(policy) is ActiveCriticPolicy:
+                return actions[:episodes], observations[:episodes], rewards[:episodes], actions_history[:episodes]
+            else:
+                return actions[:episodes], observations[:episodes], rewards[:episodes], None
+
         
 class POMDP_Wrapper(gym.Wrapper):
     def __init__(self, env, lookup_freq, pe_dim, seq_len) -> None:

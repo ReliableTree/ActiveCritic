@@ -176,3 +176,17 @@ def max_mask_before_ind(x, ind):
     # pad with zeros for indices before start index
     mask = th.cat([mask, th.zeros((x.size(0), x.size(1) - ind), dtype=th.bool, device=x.device)], dim=1)
     return mask.unsqueeze(-1)
+
+def generate_square_subsequent_mask(sz: int):
+    """Generates an upper-triangular matrix of -inf, with zeros on diag."""
+    return th.triu(th.ones(sz, sz) * float('-inf'), diagonal=1)
+
+def linear_interpolation(total_steps, current_step, start, end):
+    if current_step <= 0:
+        return start
+    elif current_step >= total_steps:
+        return end
+
+    step_size = (end - start) / total_steps
+    interpolated_value = start + (current_step * step_size)
+    return int(interpolated_value)

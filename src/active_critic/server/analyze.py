@@ -263,7 +263,7 @@ def run_experiment(
     acl.network_args.num_expert_demos = demos
     if demos > 0:
         
-        actions, observations, rewards, _, expected_rewards, _ = sample_new_episode(
+        actions, observations, rewards, _ = sample_new_episode(
             policy=expert,
             env=acl.env,
             dense=True,
@@ -271,11 +271,10 @@ def run_experiment(
             device=acl.network_args.device,
             episodes=demos,
             seq_len=seq_len)
+        
+        actions = th.clip(actions, -1, 1)
     
-        #exp_trjs = th.zeros([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
         actions_history = actions.unsqueeze(1).repeat([1, actions.shape[1], 1, 1])
-        #print(rewards)
-        #acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos], action_history=actions_history[:demos])
         exp_trjs = th.ones([actions.shape[0]], device=acl.network_args.device, dtype=th.bool)
         acl.add_data(actions=actions[:demos], observations=observations[:demos], rewards=rewards[:demos], expert_trjs=exp_trjs[:demos], action_history=actions_history[:demos])
 
@@ -285,7 +284,7 @@ def run_experiment(
 def run_eval_stats_env(device, ms):
     weight_decay = 1e-2
     imitation_phases = [False]
-    demonstrations_list = [1]
+    demonstrations_list = [0]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10

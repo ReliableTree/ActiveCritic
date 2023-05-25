@@ -166,7 +166,7 @@ class TestLerner(unittest.TestCase):
                         predicted_actions.append(action)
                     th_action = th.tensor(np.array(predicted_actions))
                     actions_L2_b.append(calcMSE(th_action, dact[epoch].to('cpu')))
-                    rew_L2_b.append(calcMSE(acl.policy.history.gen_scores[0], drews[epoch]))
+                    rew_L2_b.append(calcMSE(acl.policy.history.gen_scores_hist[0], drews[epoch]))
 
         L2_actions_mean_b = th.tensor([*actions_L2_b]).mean()
         L2_critic_mean_b = th.tensor([*rew_L2_b]).mean()
@@ -190,7 +190,7 @@ class TestLerner(unittest.TestCase):
                         predicted_actions.append(action)
                     th_action = th.tensor(np.array(predicted_actions))
                     actions_L2.append(calcMSE(th_action, dact[epoch].to('cpu')))
-                    rew_L2.append(calcMSE(acl.policy.history.gen_scores[0], drews[epoch]))
+                    rew_L2.append(calcMSE(acl.policy.history.gen_scores_hist[0], drews[epoch]))
 
         L2_actions_mean = th.tensor([*actions_L2]).mean()
         L2_critic_mean = th.tensor([*rew_L2]).mean()
