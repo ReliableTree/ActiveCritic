@@ -172,13 +172,13 @@ def make_acl(
         acla.val_every = val_every
         acla.add_data_every = add_data_every
 
-        acla.validation_episodes = 20 
+        acla.validation_episodes = 10 
         acla.validation_rep = 1
         acla.training_epsiodes = training_episodes
         acla.actor_threshold = 1e-2
         acla.critic_threshold = 1e-2
         acla.min_critic_threshold = min_critic_threshold
-        acla.num_cpu = 20
+        acla.num_cpu = 10
 
     acla.data_path = data_path
     acla.device = device
@@ -284,20 +284,20 @@ def run_experiment(
 def run_eval_stats_env(device, ms):
     weight_decay = 1e-2
     imitation_phases = [False]
-    demonstrations_list = [0]
+    demonstrations_list = [5]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
     total_training_epsiodes = 1000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
+    env_tags = ['pickplace']
     val_everys = [1000]
     add_data_everys = [1000]
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = False
-    seq_len = 100
+    seq_len = 200
     max_epoch_steps = 15000
     manual_seed = ms
     explore_until = 0
