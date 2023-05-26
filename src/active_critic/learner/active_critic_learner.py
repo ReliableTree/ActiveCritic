@@ -230,6 +230,7 @@ class ActiveCriticLearner(nn.Module):
         mask = reward != -3
         mask = mask.reshape(mask.shape[0], mask.shape[1])
         loss = calcMSE(actor_result[mask], actions[mask])
+        
         loss = loss + plans_loss
         self.policy.actor.optimizer.zero_grad()
         self.policy.planner.optimizer.zero_grad()

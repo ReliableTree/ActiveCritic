@@ -179,15 +179,16 @@ class ActiveCriticPolicy(BaseModel):
             ):
         
         
-        if self.current_step == 0:
-            plans = th.zeros([observation_seq.shape[0], observation_seq.shape[1], self.planner.wsms.model_setup.d_output], device=self.args_obj.device, dtype=th.float32)
-            actions = self.make_action(observation_seq=observation_seq, plans=plans)
-            with th.no_grad():
-                plans = self.make_plans(acts=actions, obsvs=observation_seq)
+        #if self.current_step == 0:
+        plans = th.zeros([observation_seq.shape[0], observation_seq.shape[1], self.planner.wsms.model_setup.d_output], device=self.args_obj.device, dtype=th.float32)
+        actions = self.make_action(observation_seq=observation_seq, plans=plans)
+        with th.no_grad():
+            plans = self.make_plans(acts=actions, obsvs=observation_seq)
+        '''
         else:
             app_actions = (self.current_result.opt_trj[:, 1:])
             with th.no_grad():
-                plans = self.make_plans(acts=app_actions, obsvs=observation_seq)
+                plans = self.make_plans(acts=app_actions, obsvs=observation_seq)'''
 
         actions = self.make_action(observation_seq=observation_seq, plans=plans)
 
