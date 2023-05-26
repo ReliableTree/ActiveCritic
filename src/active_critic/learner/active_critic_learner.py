@@ -145,8 +145,6 @@ class ActiveCriticLearner(nn.Module):
                 self.network_args.start_critic)
             print(f'policy oprimisation mode: {self.policy.args_obj.optimize}')
             iterations = math.ceil(episodes/self.env.num_envs)
-            policy.training_mode = True
-
         else:
             opt_before = None
 
@@ -275,8 +273,11 @@ class ActiveCriticLearner(nn.Module):
             
             critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
             pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
-            pred_loss = 100* pred_loss
-            l2_pred = 100* l2_pred
+
+            critic_pred_loss_max, l2_loss_max = calcMSE(critic_pred_result_prev.max(dim=1)[0], label[prediction_mask].max(dim=1)[0], return_tensor=True)
+
+            pred_loss = 100* pred_loss + critic_pred_loss_max
+            l2_pred = th.cat((100* l2_pred, l2_loss_max), dim=0)
             loss = reward_loss + pred_loss
         else:
             l2_pred = th.zeros_like(l2_dist)

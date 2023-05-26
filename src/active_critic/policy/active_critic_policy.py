@@ -65,7 +65,7 @@ class ActiveCriticPolicyHistory:
         if current_step == 0:
             history[0][:, current_step] = value
         else:
-            complete_history = th.cat((history[0][:, current_step-1, :current_step], value[:, current_step:]), dim=1)
+            complete_history = th.cat((history[0][:, current_step-1, :current_step], value), dim=1)
             history[0][:, current_step] = complete_history
 
 
@@ -95,8 +95,6 @@ class ActiveCriticPolicy(BaseModel):
         self.n_inferred = 0
         self.write_tboard_scalar = write_tboard_scalar
         self.reset()
-
-        self.training_mode = False
 
     def reset(self):
         self.last_goal = None
@@ -167,6 +165,9 @@ class ActiveCriticPolicy(BaseModel):
                 value=th.clone(self.current_result.expected_succes_after.detach()),
                 current_step=self.current_step
             )
+
+        self.obs_seq = self.obs_seq[:, :-1]
+
         return self.current_result.opt_trj[:, 0].detach().cpu().numpy()
 
     def forward(self, 
@@ -184,7 +185,7 @@ class ActiveCriticPolicy(BaseModel):
             with th.no_grad():
                 plans = self.make_plans(acts=actions, obsvs=observation_seq)
         else:
-            app_actions = th.cat((self.current_result.opt_trj[:, 1:], th.zeros_like(self.current_result.opt_trj[:, :1])), dim=1)
+            app_actions = (self.current_result.opt_trj[:, 1:])
             with th.no_grad():
                 plans = self.make_plans(acts=app_actions, obsvs=observation_seq)
 
@@ -279,10 +280,10 @@ class ActiveCriticPolicy(BaseModel):
         if self.critic.model is not None:
             self.critic.model.eval()
         num_opt_steps = self.args_obj.opt_steps
-        '''if self.current_step == 0:
-            num_opt_steps = num_opt_steps * 20'''
+        if self.current_step == 0:
+            num_opt_steps = num_opt_steps * 20
         while (step <= num_opt_steps):
-            mask = (final_exp_success[:, :(self.args_obj.epoch_len - self.current_step)].max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
+            mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success, plans = self.inference_opt_step(
                 opt_actions=optimized_actions,
                 obs_seq=observations,
@@ -295,7 +296,7 @@ class ActiveCriticPolicy(BaseModel):
                 )
             if self.write_tboard_scalar is not None:
                 debug_dict = {
-                    f'optimized expected success' : expected_success[:, :(self.args_obj.epoch_len - self.current_step)].max(dim=1).values.detach().mean().cpu()
+                    f'optimized expected success' : expected_success.max(dim=1).values.detach().mean().cpu()
                 }
                 self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=step, optimize=True)
             step += 1
@@ -337,12 +338,10 @@ class ActiveCriticPolicy(BaseModel):
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
 
-        max_mask = max_mask_before_ind(x=critic_result, ind=self.args_obj.epoch_len - self.current_step)
-
-        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label, mask=max_mask)
+        critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label[:, :critic_result.shape[1]])
         if self.args_obj.use_diff_boundaries or True:
             diff_bound_loss = diff_boundaries(
-                actions=opt_actions[:, self.current_step:], 
+                actions=opt_actions, 
                 low=th.tensor(self.action_space.low, device=opt_actions.device), 
                 high = th.tensor(self.action_space.high, device=opt_actions.device))
             critic_loss = critic_loss + diff_bound_loss

@@ -196,7 +196,7 @@ def make_acl(
     acla.max_epoch_steps = max_epoch_steps
 
     acla.use_pred_loss = True
-    acla.explore_cautious_until = 3
+    acla.explore_cautious_until = 0
 
 
     epsiodes = 30
@@ -292,13 +292,13 @@ def run_eval_stats_env(device, ms):
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['pickplace']
-    val_everys = [1000]
-    add_data_everys = [1000]
+    val_everys = [10000]
+    add_data_everys = [10000]
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = False
-    seq_len = 200
-    max_epoch_steps = 15000
+    seq_len = 100
+    max_epoch_steps = 30000
     manual_seed = ms
     explore_until = 0
     th.manual_seed(manual_seed)
@@ -309,7 +309,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' opt steps 1 ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' no long opt 20 ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
