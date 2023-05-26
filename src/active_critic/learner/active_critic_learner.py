@@ -11,7 +11,7 @@ from active_critic.learner.active_critic_args import ActiveCriticLearnerArgs
 from active_critic.policy.active_critic_policy import ActiveCriticPolicy
 from active_critic.utils.dataset import DatasetAC
 from active_critic.utils.gym_utils import sample_new_episode
-from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask, make_part_obs_data, count_parameters, make_autoregressive_obs_data, linear_interpolation
+from active_critic.utils.pytorch_utils import calcMSE, get_rew_mask, make_part_obs_data, count_parameters, make_autoregressive_obs_data, linear_interpolation, diff_boundaries
 from active_critic.utils.tboard_graphs import TBoardGraphs
 from gym.envs.mujoco import MujocoEnv
 from torch.utils.data.dataloader import DataLoader
@@ -208,15 +208,14 @@ class ActiveCriticLearner(nn.Module):
 
 
 
-    def actor_step(self, data, loss_actor):
+    def actor_step(self, data, loss_actor_critic, loss_imitation):
         obsv, actions, reward, expert_trjs, _, _, _, success = data
-        if self.train_data.onyl_positiv:
-            if success.sum() == 0:
-                return loss_actor
-            obsv = obsv[success]
-            actions = actions[success]
-            reward = reward[success]
-            expert_trjs = expert_trjs[success]
+
+        mask = reward != -3
+        mask[0,0] = 1
+        success[0] = 1
+        mask = mask.reshape(mask.shape[0], mask.shape[1])
+        mask_success = mask & success.unsqueeze(-1)
 
         plans = self.policy.make_plans(acts=actions, obsvs=obsv)
         label_plans = th.clone(plans.detach())
@@ -226,12 +225,29 @@ class ActiveCriticLearner(nn.Module):
 
         actor_input = self.policy.get_actor_input(plans=plans, obsvs=obsv, rewards=reward)
         actor_result = self.policy.actor.forward(actor_input)
+        loss = plans_loss
 
-        mask = reward != -3
-        mask = mask.reshape(mask.shape[0], mask.shape[1])
-        loss = calcMSE(actor_result[mask], actions[mask])
-        
-        loss = loss + plans_loss
+        if (~success).sum() > 0:
+            
+            critic_input = self.policy.get_critic_input(obsvs=obsv, acts=actor_result)
+            critic_result = self.policy.critic.forward(inputs=critic_input)
+            critic_mean = critic_result[~success].mean()
+            diff_bound_loss = diff_boundaries(
+                actions=actor_result[~success], 
+                low=th.tensor(self.policy.action_space.low, device=actor_result.device), 
+                high = th.tensor(self.policy.action_space.high, device=actor_result.device))
+            ac_loss = calcMSE(critic_mean, th.ones_like(critic_mean)) + diff_bound_loss
+            ac_loss = ac_loss * 1e-2
+            loss = loss + ac_loss
+        else:
+            ac_loss = None
+
+        if mask_success.sum() > 0:
+            imitation_loss = calcMSE(actor_result[mask_success], actions[mask_success])
+            loss = loss + imitation_loss
+        else:
+            imitation_loss = None
+
         self.policy.actor.optimizer.zero_grad()
         self.policy.planner.optimizer.zero_grad()
         loss.backward()
@@ -239,14 +255,22 @@ class ActiveCriticLearner(nn.Module):
         self.policy.planner.optimizer.step()
         loss = loss.detach()
 
-        if loss_actor is None:
-            loss_actor = loss.unsqueeze(0)
-        else:
-            loss_actor = th.cat(
-                (loss_actor, loss.unsqueeze(0)), dim=0)
+        loss_actor_critic = self.append_value(loss_actor_critic, ac_loss)
+        loss_imitation = self.append_value(loss_imitation, imitation_loss)
+
         self.write_tboard_scalar(debug_dict={'lr actor': th.tensor(self.policy.actor.scheduler.get_last_lr()).mean()}, train=True)
-        return loss_actor
+        return loss_actor_critic, loss_imitation
     
+    def append_value(self, series, value):
+        if series is None and value is None:
+            return None
+        elif series is None:
+            return value.reshape([1,1])
+        elif value is None:
+            return series
+        else:
+            return th.cat((series, value.reshape([1,1])), dim=0)
+
     def critic_step(self, data, loss_critic, loss_prediction):
 
         obsv, actions, reward, expert_trjs, prev_proposed_actions, steps, prev_observation, _ = data
@@ -300,7 +324,7 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict={'lr actor': th.tensor(self.policy.critic.scheduler.get_last_lr()).mean()}, train=True)
         return loss_critic, loss_prediction
 
-    def train_step(self, train_loader, loss_actor, loss_critic, train_critic, loss_prediction):
+    def train_step(self, train_loader, loss_actor_critic, loss_imitation, loss_critic, train_critic, loss_prediction):
 
         self.train_data.onyl_positiv = False
         local_step = 0
@@ -311,15 +335,15 @@ class ActiveCriticLearner(nn.Module):
             local_step += dat.shape[0]
             self.train_data.onyl_positiv = (self.policy.critic.wsms.sparse or (self.train_data.success.sum() > 0))
             self.train_data.onyl_positiv = True
-            loss_actor = self.actor_step(device_data, loss_actor)
+            loss_actor_critic, loss_imitation = self.actor_step(device_data, loss_imitation=loss_imitation, loss_actor_critic=loss_actor_critic)
             self.train_data.onyl_positiv = False
             if train_critic:
                 loss_critic, loss_prediction = self.critic_step(device_data, loss_critic, loss_prediction)
             if local_step > self.network_args.max_epoch_steps:
                 print('max steps in learning reached')
-                return loss_actor, loss_critic, loss_prediction
+                return loss_actor_critic, loss_imitation, loss_critic, loss_prediction
 
-        return loss_actor, loss_critic, loss_prediction
+        return loss_actor_critic, loss_imitation, loss_critic, loss_prediction
 
     def get_num_training_samples(self):
         return self.virtual_step
@@ -400,27 +424,34 @@ class ActiveCriticLearner(nn.Module):
             #if self.get_num_pos_samples() > self.network_args.explore_cautious_until:
             self.policy.train()
 
-            max_actor = float('inf')
+            mean_actor_imitation = float('inf')
             mean_critic = float('inf')
 
-            loss_actor = None
+            loss_actor_critic = None
+            loss_imitation = None
             loss_critic = None
             loss_prediction = None
 
-            loss_actor, loss_critic, loss_prediction = self.train_step(
+            loss_actor_critic, loss_imitation, loss_critic, loss_prediction = self.train_step(
                 train_loader=self.train_loader,
-                loss_actor=loss_actor,
+                loss_actor_critic=loss_actor_critic,
+                loss_imitation=loss_imitation,
                 loss_critic=loss_critic,
                 train_critic=self.train_critic,
                 loss_prediction=loss_prediction
             )
 
             new_min = self.scores.update_min_score(
-                self.scores.mean_actor, max_actor)
-            if loss_actor is not None:
-                max_actor = th.max(loss_actor)
+                self.scores.mean_actor, mean_actor_imitation)
+            if loss_imitation is not None:
+                mean_actor_imitation = th.mean(loss_imitation)
             else:
-                max_actor = None
+                mean_actor_imitation = None
+            
+            if loss_actor_critic is not None:
+                mean_actor_critic = th.mean(loss_actor_critic)
+            else:
+                mean_actor_critic = None
 
             
             if loss_critic is not None:
@@ -433,7 +464,6 @@ class ActiveCriticLearner(nn.Module):
                 mean_critic = None
 
             
-
             if new_min:
                 th.save(self.policy.actor.state_dict(),self.inter_path +  'best_actor')
                 th.save(self.policy.planner.state_dict(),self.inter_path +  'best_planner')
@@ -454,10 +484,15 @@ class ActiveCriticLearner(nn.Module):
             else:
                 mean_critic = 0
 
-            if max_actor is not None:
-                debug_dict['Loss Actor'] = max_actor
+            if mean_actor_imitation is not None:
+                debug_dict['Loss Actor Imitation'] = mean_actor_imitation
             else:
-                max_actor = 0
+                mean_actor_imitation = 0
+
+            if mean_actor_critic is not None:
+                debug_dict['Loss Actor Critic'] = mean_actor_critic
+            else:
+                mean_actor_critic = 0
 
             self.write_tboard_scalar(debug_dict=debug_dict, train=True, step=self.global_step)
             self.train_data.onyl_positiv = False

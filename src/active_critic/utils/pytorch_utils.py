@@ -81,14 +81,14 @@ def apply_triu(inpt:th.Tensor, diagonal:th.Tensor):
     exp_out = exp_out + mask[None, :, :, None]'''
     return exp_out
 
-def pad_observations(obs: th.Tensor) -> th.Tensor:
+def pad_observations(obs: th.Tensor, unseen_token) -> th.Tensor:
     batch_size, seq_len, dim = obs.size()
     padded_obs = th.full((batch_size * seq_len, seq_len, dim), -2, device=obs.device, dtype=obs.dtype)
     for i in range(batch_size):
         for j in range(seq_len):
             padded_obs[i*seq_len + j, 0] = obs[i, j]
             for k in range(j):
-                padded_obs[i*seq_len + j, -(k+1)] = -3
+                padded_obs[i*seq_len + j, -(k+1)] = unseen_token
     return padded_obs
 
 def pad_actions(acts: th.Tensor) -> th.Tensor:
@@ -101,7 +101,7 @@ def pad_actions(acts: th.Tensor) -> th.Tensor:
 
 def make_autoregressive_obs_data(actions:th.Tensor, observations:th.Tensor, rewards:th.Tensor, expert_trjs:th.Tensor):
     padded_act = pad_actions(actions)
-    padded_obsv = pad_observations(observations)
+    padded_obsv = pad_observations(observations, unseen_token=-2)
     padded_rews = pad_actions(rewards)
     exp_trjs = expert_trjs.unsqueeze(1).repeat([1, actions.shape[1]]).reshape([-1])
     steps = get_steps_from_actions(actions=actions)

@@ -187,7 +187,7 @@ def make_acl(
     tag = env_tag
     acla.logname = tag + logname
     acla.tboard = True
-    acla.batch_size = 32
+    acla.batch_size = 16
     acla.make_graphs = make_graphs
     acla.explore_until = explore_until
     acla.total_training_epsiodes = total_training_epsiodes
@@ -292,13 +292,13 @@ def run_eval_stats_env(device, ms):
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
     env_tags = ['pickplace']
-    val_everys = [20000]
-    add_data_everys = [20000]
+    val_everys = [10000]
+    add_data_everys = [10000]
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = False
     seq_len = 100
-    max_epoch_steps = 60000
+    max_epoch_steps = 30000
     manual_seed = ms
     explore_until = 0
     th.manual_seed(manual_seed)
@@ -309,7 +309,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' double batch size ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' actor training reinit ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
