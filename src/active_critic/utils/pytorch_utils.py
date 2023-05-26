@@ -192,6 +192,9 @@ def linear_interpolation(total_steps, current_step, start, end):
     return int(interpolated_value)
 
 def sample_gauss(mean, variance):
-    gaussian = th.distributions.MultivariateNormal(mean, th.diag(variance))
+    mean_vec = mean.reshape([-1])
+    variance_vec = variance.reshape([-1])
+    gaussian = th.distributions.MultivariateNormal(mean_vec, th.diag(variance_vec))
     sampled_vector = gaussian.sample()
-    return sampled_vector
+    
+    return sampled_vector.reshape([*mean.shape])

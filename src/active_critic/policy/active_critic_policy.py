@@ -120,11 +120,14 @@ class ActiveCriticPolicy(BaseModel):
         self.obs_seq = -2*th.ones(
             size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
         
+        mean_size = [vec_obsv.shape[0], self.args_obj.epoch_len, self.action_space.shape[0]]
+
+        noise_zero_mean =th.zeros(mean_size, device=vec_obsv.device, dtype=th.float)
+
         self.noise = sample_gauss(
-            mean=th.zeros(trj_size, device=vec_obsv.device, dtype=float)
+            noise_zero_mean,
+            variance=self.args_obj.variance * th.ones_like(noise_zero_mean)
         )
-        print(f'self.noise: {self.noise}')
-        print(f'self.noise shape: {self.noise.shape}')
 
     def predict(
         self,
@@ -326,9 +329,7 @@ class ActiveCriticPolicy(BaseModel):
                 final_actions = optimized_actions
                 final_exp_success = expected_success
 
-        if self.args_obj.clip:
-            with th.no_grad():
-                th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
+
 
         self.opt_actor = copy.deepcopy(self.actor.state_dict())
         self.opt_planner = copy.deepcopy(self.planner.state_dict())
@@ -336,6 +337,13 @@ class ActiveCriticPolicy(BaseModel):
         self.actor.load_state_dict(self.init_actor)
         self.planner.load_state_dict(self.init_planner)
 
+        self.noise = self.noise.detach()
+
+        final_actions = final_actions + self.noise
+        self.noise = self.noise[:, 1:]
+        if self.args_obj.clip:
+            with th.no_grad():
+                th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
         return final_actions, final_exp_success
 
     def inference_opt_step(self, 
@@ -364,14 +372,20 @@ class ActiveCriticPolicy(BaseModel):
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label[:, :critic_result.shape[1]])
         critic_loss_noise = self.critic.loss_fct(result=critic_result_noise, label=goal_label[:, :critic_result.shape[1]])
 
-        critic_loss = critic_loss + critic_inpt_noise
+        critic_loss = critic_loss + critic_loss_noise
 
         if self.args_obj.use_diff_boundaries or True:
-            diff_bound_loss = diff_boundaries(
+            diff_bound_loss_gene = diff_boundaries(
                 actions=opt_actions, 
                 low=th.tensor(self.action_space.low, device=opt_actions.device), 
                 high = th.tensor(self.action_space.high, device=opt_actions.device))
-            critic_loss = critic_loss + diff_bound_loss
+            
+            diff_bound_loss_noise = diff_boundaries(
+                actions=result_actions, 
+                low=th.tensor(self.action_space.low, device=opt_actions.device), 
+                high = th.tensor(self.action_space.high, device=opt_actions.device))
+            
+            critic_loss = critic_loss + diff_bound_loss_gene + diff_bound_loss_noise
         optimizer.zero_grad()
         noise_optimizer.zero_grad()
         critic_loss.backward()
@@ -379,13 +393,14 @@ class ActiveCriticPolicy(BaseModel):
         noise_optimizer.step()
 
         debug_dict = {
-            'in optimisation expected success' : critic_result[:, :self.args_obj.epoch_len - self.current_step].max(dim=1).values.mean().detach()
+            'in optimisation expected success' : critic_result[:, :self.args_obj.epoch_len - self.current_step].max(dim=1).values.mean().detach(),
+            'in optimisation mean noise' : self.noise.detach().mean()
         }
 
         self.write_tboard_scalar(debug_dict=debug_dict, train=False, step=current_opt_step, optimize=True)
 
 
-        return opt_actions, critic_result, plans
+        return opt_actions, critic_result_noise, plans
     
     def get_planner_input(self, acts, obsvs):
         return th.cat((acts, obsvs), dim=-1)

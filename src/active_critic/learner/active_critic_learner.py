@@ -276,8 +276,8 @@ class ActiveCriticLearner(nn.Module):
 
             critic_pred_loss_max, l2_loss_max = calcMSE(critic_pred_result_prev.max(dim=1)[0], label[prediction_mask].max(dim=1)[0], return_tensor=True)
 
-            pred_loss = 100* pred_loss + critic_pred_loss_max
-            l2_pred = th.cat((100* l2_pred, l2_loss_max), dim=0)
+            pred_loss = 1000* pred_loss + critic_pred_loss_max
+            l2_pred = th.cat((1000* l2_pred, l2_loss_max), dim=0)
             loss = reward_loss + pred_loss
         else:
             l2_pred = th.zeros_like(l2_dist)

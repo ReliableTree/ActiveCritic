@@ -105,10 +105,11 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
 
     acps.optimize = True
     acps.stop_opt = True
-    acps.clip = False
+    acps.clip = True
     acps.use_diff_boundaries = True
-
     acps.optimizer_mode = opt_mode
+    acps.variance = 1e-2
+    acps.var_lr = 1e-3
     return acps
 
 
@@ -291,9 +292,9 @@ def run_eval_stats_env(device, ms):
     total_training_epsiodes = 5000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
-    val_everys = [10000]
-    add_data_everys = [10000]
+    env_tags = ['pickplace']
+    val_everys = [20000]
+    add_data_everys = [20000]
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = False
