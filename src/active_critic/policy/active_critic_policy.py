@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel, CriticSequenceModel
-from active_critic.utils.pytorch_utils import diff_boundaries, max_mask_before_ind
+from active_critic.utils.pytorch_utils import diff_boundaries, sample_gauss
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -35,6 +35,8 @@ class ActiveCriticPolicySetup:
         self.clip:bool = True
         self.buffer_size:int = None
         self.use_diff_boundaries = None
+        self.variance = None
+        self.var_lr = None
 
 class ActiveCriticPolicyHistory:
     def __init__(self) -> None:
@@ -117,6 +119,13 @@ class ActiveCriticPolicy(BaseModel):
         
         self.obs_seq = -2*th.ones(
             size=[vec_obsv.shape[0], self.args_obj.epoch_len, vec_obsv.shape[-1]], device=self.args_obj.device)
+        
+        self.noise = sample_gauss(
+            mean=th.zeros(trj_size, device=vec_obsv.device, dtype=float)
+        )
+        print(f'self.noise: {self.noise}')
+        print(f'self.noise shape: {self.noise.shape}')
+
     def predict(
         self,
         observation: Union[th.Tensor, Dict[str, th.Tensor]],
@@ -191,6 +200,8 @@ class ActiveCriticPolicy(BaseModel):
 
         actions = self.make_action(observation_seq=observation_seq, plans=plans)
 
+
+
         critic_input = self.get_critic_input(obsvs=observation_seq, acts=actions)
 
         expected_success = self.critic.forward(
@@ -261,6 +272,12 @@ class ActiveCriticPolicy(BaseModel):
             lr=lr,
             weight_decay=self.actor.wsms.optimizer_kwargs['weight_decay']
         )
+        self.noise.requires_grad = True
+        noise_optimizer = th.optim.AdamW(
+            [{'params': self.noise}],
+            lr=self.args_obj.var_lr,
+            weight_decay=0
+        )
         final_actions = th.clone(org_actions)
 
         expected_success = th.zeros(
@@ -288,6 +305,7 @@ class ActiveCriticPolicy(BaseModel):
                 opt_actions=optimized_actions,
                 obs_seq=observations,
                 optimizer=optimizer,
+                noise_optimizer = noise_optimizer,
                 goal_label=goal_label,
                 current_step=current_step,
                 plans=plans,
@@ -324,6 +342,7 @@ class ActiveCriticPolicy(BaseModel):
             opt_actions: th.Tensor, 
             obs_seq: th.Tensor, 
             optimizer: th.optim.Optimizer, 
+            noise_optimizer: th.optim.Optimizer,
             goal_label: th.Tensor, 
             plans:th.Tensor,
             current_step: int,
@@ -338,7 +357,15 @@ class ActiveCriticPolicy(BaseModel):
         critic_inpt = self.get_critic_input(acts=opt_actions, obsvs=obs_seq)
         critic_result = self.critic.forward(inputs=critic_inpt)
 
+        result_actions = opt_actions.detach() + self.noise
+        critic_inpt_noise = self.get_critic_input(acts=result_actions, obsvs=obs_seq)
+        critic_result_noise = self.critic.forward(inputs=critic_inpt_noise)
+
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label[:, :critic_result.shape[1]])
+        critic_loss_noise = self.critic.loss_fct(result=critic_result_noise, label=goal_label[:, :critic_result.shape[1]])
+
+        critic_loss = critic_loss + critic_inpt_noise
+
         if self.args_obj.use_diff_boundaries or True:
             diff_bound_loss = diff_boundaries(
                 actions=opt_actions, 
@@ -346,8 +373,10 @@ class ActiveCriticPolicy(BaseModel):
                 high = th.tensor(self.action_space.high, device=opt_actions.device))
             critic_loss = critic_loss + diff_bound_loss
         optimizer.zero_grad()
+        noise_optimizer.zero_grad()
         critic_loss.backward()
         optimizer.step()
+        noise_optimizer.step()
 
         debug_dict = {
             'in optimisation expected success' : critic_result[:, :self.args_obj.epoch_len - self.current_step].max(dim=1).values.mean().detach()

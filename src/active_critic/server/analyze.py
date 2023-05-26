@@ -291,7 +291,7 @@ def run_eval_stats_env(device, ms):
     total_training_epsiodes = 5000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['pickplace']
+    env_tags = ['windowopen']
     val_everys = [10000]
     add_data_everys = [10000]
     opt_modes = ['actor+plan']

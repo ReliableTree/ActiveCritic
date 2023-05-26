@@ -190,3 +190,8 @@ def linear_interpolation(total_steps, current_step, start, end):
     step_size = (end - start) / total_steps
     interpolated_value = start + (current_step * step_size)
     return int(interpolated_value)
+
+def sample_gauss(mean, variance):
+    gaussian = th.distributions.MultivariateNormal(mean, th.diag(variance))
+    sampled_vector = gaussian.sample()
+    return sampled_vector
