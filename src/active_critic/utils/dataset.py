@@ -113,22 +113,6 @@ class DatasetAC(torch.utils.data.Dataset):
                 self.virt_steps[index],
                 self.virt_obsv[max(index-1, 0)],
                 self.virt_success[index])
-    
-        '''if self.onyl_positiv:
-            return (self.virt_obsv[self.virt_success][index], 
-                    self.virt_actions[self.virt_success][index], 
-                    self.virt_reward[self.virt_success][index], 
-                    self.virt_expert_trjs[self.virt_success][index], 
-                    self.virt_prev_proposed_acts[self.virt_success][index],
-                    self.virt_steps[self.virt_success][index],
-                    self.virt_obsv[self.virt_success][max(index-1, 0)])
-        else:
-            return (self.virt_obsv[index], 
-                    self.virt_actions[index], 
-                    self.virt_reward[index], 
-                    self.virt_expert_trjs[index],
-                    self.virt_prev_proposed_acts[index],
-                    self.virt_steps[index],
-                    self.virt_obsv[max(index-1, 0)])'''
+
 
         
