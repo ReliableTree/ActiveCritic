@@ -122,7 +122,7 @@ def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_epi
     
     wsm_critic_setup.sparse = True
 
-    wsm_planner_setup = make_wsm_setup_tiny(
+    wsm_planner_setup = make_wsm_setup(
         seq_len=seq_len, d_output=d_plan, weight_decay=weight_decay, device=device)
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device, opt_mode=opt_mode, opt_steps=opt_steps)
@@ -281,16 +281,16 @@ def run_experiment(
 def run_eval_stats_env(device, ms):
     weight_decay = 1e-2
     imitation_phases = [False]
-    demonstrations_list = [1]
-    run_ids = [i for i in range(3)]
+    demonstrations_list = [5]
+    run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
     total_training_epsiodes = 4000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
-    val_everys = [1000]
-    add_data_everys = [1000]
+    env_tags = ['pickplace']
+    val_everys = [10000]
+    add_data_everys = [10000]
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = True
