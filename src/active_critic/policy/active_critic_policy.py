@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel, CriticSequenceModel
-from active_critic.utils.pytorch_utils import diff_boundaries, sample_gauss
+from active_critic.utils.pytorch_utils import diff_boundaries, sample_gauss, print_progress
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -210,6 +210,7 @@ class ActiveCriticPolicy(BaseModel):
 
         expected_success = self.critic.forward(
             inputs=critic_input)
+        print_progress(current_step=self.current_step, total_steps=self.args_obj.epoch_len)
 
         if not optimize:
             result = ACPOptResult(
@@ -301,8 +302,8 @@ class ActiveCriticPolicy(BaseModel):
         if self.critic.model is not None:
             self.critic.model.eval()
         num_opt_steps = self.args_obj.opt_steps
-        if self.current_step == 0:
-            num_opt_steps = num_opt_steps * 20
+        '''if self.current_step == 0:
+            num_opt_steps = num_opt_steps * 20'''
         while (step <= num_opt_steps):
             mask = (final_exp_success.max(dim=1)[0] < self.args_obj.optimisation_threshold).reshape(-1)
             optimized_actions, expected_success, plans = self.inference_opt_step(

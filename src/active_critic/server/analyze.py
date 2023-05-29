@@ -157,6 +157,7 @@ def make_acl(
         max_epoch_steps,
         explore_until,
         var_gamma,
+        opt_steps_mult,
         fast=False):
     device = device
     acla = ActiveCriticLearnerArgs()
@@ -200,6 +201,7 @@ def make_acl(
 
     acla.use_pred_loss = True
     acla.explore_cautious_until = 0
+    acla.opt_steps_mult = opt_steps_mult
 
 
     epsiodes = 30
@@ -237,6 +239,7 @@ def run_experiment(
         max_epoch_steps,
         explore_until,
         var_gamma,
+        opt_steps_mult,
         weight_decay=1e-2, 
         demos=14, 
         make_graphs=False,
@@ -265,7 +268,8 @@ def run_experiment(
                             sparse=sparse,
                             explore_until=explore_until,
                             max_epoch_steps=max_epoch_steps,
-                            var_gamma=var_gamma)    
+                            var_gamma=var_gamma,
+                            opt_steps_mult=opt_steps_mult)    
     acl.network_args.num_expert_demos = demos
     if demos > 0:
         
@@ -301,13 +305,14 @@ def run_eval_stats_env(device, ms):
     val_everys = [20000]
     add_data_everys = [20000]
     opt_modes = ['actor+plan']
-    opt_steps_list = [3]
+    opt_steps_list = [4]
     sparse = False
     seq_len = 100
     max_epoch_steps = 30000
     manual_seed = ms
     explore_until = 0
-    var_gamma = 0.9
+    var_gamma = 0.98
+    opt_steps_mult = 1.006
     th.manual_seed(manual_seed)
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
@@ -338,5 +343,6 @@ def run_eval_stats_env(device, ms):
                                             seq_len=seq_len,
                                             max_epoch_steps=max_epoch_steps,
                                             explore_until=explore_until,
-                                            var_gamma=var_gamma)
+                                            var_gamma=var_gamma,
+                                            opt_steps_mult=opt_steps_mult)
 

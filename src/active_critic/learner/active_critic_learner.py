@@ -174,7 +174,8 @@ class ActiveCriticLearner(nn.Module):
         self.write_tboard_scalar(debug_dict=debug_dict, train=True)
         success = rewards.squeeze().max(-1).values
         success = (success == 1).type(th.float).mean()
-
+        print('_________________________________________________')
+        print(self.logname)
         print(f'last rewards: {rewards.mean()}')
         print(f'last success: {success}')
         expert_trjs = th.zeros([episodes], dtype=th.bool, device=actions.device)
@@ -193,6 +194,9 @@ class ActiveCriticLearner(nn.Module):
             print('__________________________________reinit model_________________________________')
         self.policy.args_obj.variance *= self.policy.args_obj.variance_gamma
         print(f'policy variance: {self.policy.args_obj.variance}')
+        self.policy.args_obj.opt_steps *= self.network_args.opt_steps_mult
+        print(f'policy opt_steps: {int(self.policy.args_obj.opt_steps)}')
+
         self.run_validation(actions=actions, rewards=rewards)
 
 
@@ -259,14 +263,23 @@ class ActiveCriticLearner(nn.Module):
 
             critic_predicted_input_current = self.policy.get_critic_input(obsvs=obsv[prediction_mask][:, :-1], acts=prev_proposed_actions[prediction_mask][:, 1:])
             
+            mask_pred = reward[:, :-1][prediction_mask] != -3
+
+
+
             critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
-            pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
+            pred_loss, l2_pred = calcMSE(critic_pred_result_current[mask_pred], critic_pred_result_prev[mask_pred], return_tensor=True)
 
             #critic_pred_loss_max, l2_loss_max = calcMSE(critic_pred_result_prev.max(dim=1)[0], label[prediction_mask].max(dim=1)[0], return_tensor=True)
 
             pred_loss = 1000* pred_loss# + critic_pred_loss_max
+            l2_pred = 1000 * l2_pred
+
             #l2_pred = th.cat((1000* l2_pred, l2_loss_max), dim=0)
             loss = reward_loss + pred_loss
+            if loss_critic is None:
+                print(f'critic_pred_result_current: {critic_pred_result_current[0]}')
+                print(f'critic_pred_result_current: {critic_pred_result_prev[0]}')
         else:
             l2_pred = th.zeros_like(l2_dist)
             loss = reward_loss

@@ -198,3 +198,15 @@ def sample_gauss(mean, variance):
     sampled_vector = gaussian.sample()
     
     return sampled_vector.reshape([*mean.shape])
+
+
+def print_progress(current_step, total_steps):
+    progress = current_step / total_steps
+    progress_bar_length = 20  # Adjust the length of the progress bar
+    
+    filled_length = int(progress * progress_bar_length)
+    remaining_length = progress_bar_length - filled_length
+    
+    bar = '█' * filled_length + '-' * remaining_length
+    percent = int(progress * 100)
+    print (f'\rProgress: [{bar}] {percent}%', end="\r")
