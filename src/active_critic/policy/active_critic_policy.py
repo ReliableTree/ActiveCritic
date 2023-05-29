@@ -36,6 +36,7 @@ class ActiveCriticPolicySetup:
         self.buffer_size:int = None
         self.use_diff_boundaries = None
         self.variance = None
+        self.variance_gamma = None
         self.var_lr = None
 
 class ActiveCriticPolicyHistory:

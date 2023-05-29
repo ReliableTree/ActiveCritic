@@ -97,7 +97,7 @@ class TestVec(unittest.TestCase):
     def test_vec_env(self):
         acl, env, expert, seq_len, device = make_acl()
         self.assertTrue(len(acl.train_data) == 0)
-        acl.add_training_data()
+        acl.add_training_data_and_validate()
         self.assertTrue(len(acl.train_data) == acl.network_args.training_epsiodes * seq_len)
         opt_actions, gen_actions, observations, rewards, expected_rewards_before, expected_rewards_after = \
             sample_new_episode(acl.policy, env, episodes=acl.network_args.validation_episodes, return_gen_trj=True)

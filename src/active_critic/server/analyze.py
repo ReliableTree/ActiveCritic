@@ -78,7 +78,7 @@ def make_wsm_setup_tiny(seq_len, d_output, weight_decay, device='cuda'):
 
 
 
-def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
+def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps, var_gamma):
     acps = ActiveCriticPolicySetup()
     acps.device = device
     acps.epoch_len = seq_len
@@ -109,11 +109,12 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps):
     acps.use_diff_boundaries = True
     acps.optimizer_mode = opt_mode
     acps.variance = 1e-2
+    acps.variance_gamma = var_gamma
     acps.var_lr = 1e-3
     return acps
 
 
-def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_episodes, opt_steps, sparse):
+def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_episodes, opt_steps, sparse, var_gamma):
     env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len, sparse=sparse)
     d_output = env.action_space.shape[0]
     d_plan = 1
@@ -127,7 +128,7 @@ def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_epi
     wsm_planner_setup = make_wsm_setup_tiny(
         seq_len=seq_len, d_output=d_plan, weight_decay=weight_decay, device=device)
     acps = make_acps(
-        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device, opt_mode=opt_mode, opt_steps=opt_steps)
+        seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device, opt_mode=opt_mode, opt_steps=opt_steps, var_gamma=var_gamma)
     acps.buffer_size = 2*training_episodes
     actor = WholeSequenceModel(wsm_actor_setup)
     critic = CriticSequenceModel(wsm_critic_setup)
@@ -155,6 +156,7 @@ def make_acl(
         sparse,
         max_epoch_steps,
         explore_until,
+        var_gamma,
         fast=False):
     device = device
     acla = ActiveCriticLearnerArgs()
@@ -210,7 +212,8 @@ def make_acl(
         weight_decay=weight_decay, 
         training_episodes=acla.training_epsiodes,
         opt_steps=opt_steps,
-        sparse=sparse
+        sparse=sparse,
+        var_gamma = var_gamma
         )
     
     eval_env, expert = make_vec_env(tag, num_cpu=acla.num_cpu, seq_len=seq_len, sparse=sparse)
@@ -233,6 +236,7 @@ def run_experiment(
         seq_len,
         max_epoch_steps,
         explore_until,
+        var_gamma,
         weight_decay=1e-2, 
         demos=14, 
         make_graphs=False,
@@ -260,7 +264,8 @@ def run_experiment(
                             fast=fast,
                             sparse=sparse,
                             explore_until=explore_until,
-                            max_epoch_steps=max_epoch_steps)    
+                            max_epoch_steps=max_epoch_steps,
+                            var_gamma=var_gamma)    
     acl.network_args.num_expert_demos = demos
     if demos > 0:
         
@@ -285,14 +290,14 @@ def run_experiment(
 def run_eval_stats_env(device, ms):
     weight_decay = 1e-2
     imitation_phases = [False]
-    demonstrations_list = [5]
+    demonstrations_list = [1]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
     training_episodes = 10
-    total_training_epsiodes = 5000
+    total_training_epsiodes = 4000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['pickplace']
+    env_tags = ['windowopen']
     val_everys = [20000]
     add_data_everys = [20000]
     opt_modes = ['actor+plan']
@@ -302,6 +307,7 @@ def run_eval_stats_env(device, ms):
     max_epoch_steps = 30000
     manual_seed = ms
     explore_until = 0
+    var_gamma = 0.98
     th.manual_seed(manual_seed)
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
@@ -310,7 +316,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' no long opt 20 ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' vg {var_gamma} ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
@@ -331,5 +337,6 @@ def run_eval_stats_env(device, ms):
                                             sparse=sparse,
                                             seq_len=seq_len,
                                             max_epoch_steps=max_epoch_steps,
-                                            explore_until=explore_until)
+                                            explore_until=explore_until,
+                                            var_gamma=var_gamma)
 

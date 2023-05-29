@@ -135,15 +135,10 @@ class ActiveCriticLearner(nn.Module):
         self.train_loader = DataLoader(
             dataset=self.train_data, batch_size=self.network_args.batch_size, shuffle=True)
     
-    def add_training_data(self, policy=None, episodes = 1, seq_len = None):
+    def add_training_data_and_validate(self, policy=None, episodes = 1, seq_len = None):
         if policy is None:
             policy = self.policy
             policy.eval()
-            opt_before = self.policy.args_obj.optimize
-            self.policy.args_obj.optimize = (
-                self.policy.args_obj.optimize and 
-                self.network_args.start_critic)
-            print(f'policy oprimisation mode: {self.policy.args_obj.optimize}')
             iterations = math.ceil(episodes/self.env.num_envs)
         else:
             opt_before = None
@@ -172,6 +167,7 @@ class ActiveCriticLearner(nn.Module):
         actions = actions[:episodes]
         observations = observations[:episodes]
         rewards = rewards[:episodes]
+        actions_history = actions_history[:episodes]
         debug_dict = {
             'Training epoch time': th.tensor(time.perf_counter() - h)
         }
@@ -189,23 +185,15 @@ class ActiveCriticLearner(nn.Module):
             expert_trjs=expert_trjs,
             action_history=actions_history
         )
-        if opt_before is not None:
-            self.policy.args_obj.optimize = opt_before
         
         if self.network_args.explore_cautious_until > self.get_num_pos_samples():
             self.policy.actor.init_model()
             self.policy.critic.init_model()
             self.policy.planner.init_model()
-            self.policy.args_obj.clip = False
-            self.policy.args_obj.use_diff_boundaries = True
             print('__________________________________reinit model_________________________________')
-            self.policy.args_obj.inference_opt_lr = 1e-6
-
-        else:
-            self.policy.args_obj.clip = False
-            self.policy.args_obj.use_diff_boundaries = True
-            self.policy.args_obj.inference_opt_lr = 1e-6
-
+        self.policy.args_obj.variance *= self.policy.args_obj.variance_gamma
+        print(f'policy variance: {self.policy.args_obj.variance}')
+        self.run_validation(actions=actions, rewards=rewards)
 
 
     def actor_step(self, data, loss_actor):
@@ -274,10 +262,10 @@ class ActiveCriticLearner(nn.Module):
             critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
             pred_loss, l2_pred = calcMSE(critic_pred_result_current, critic_pred_result_prev, return_tensor=True)
 
-            critic_pred_loss_max, l2_loss_max = calcMSE(critic_pred_result_prev.max(dim=1)[0], label[prediction_mask].max(dim=1)[0], return_tensor=True)
+            #critic_pred_loss_max, l2_loss_max = calcMSE(critic_pred_result_prev.max(dim=1)[0], label[prediction_mask].max(dim=1)[0], return_tensor=True)
 
-            pred_loss = 1000* pred_loss + critic_pred_loss_max
-            l2_pred = th.cat((1000* l2_pred, l2_loss_max), dim=0)
+            pred_loss = 1000* pred_loss# + critic_pred_loss_max
+            #l2_pred = th.cat((1000* l2_pred, l2_loss_max), dim=0)
             loss = reward_loss + pred_loss
         else:
             l2_pred = th.zeros_like(l2_dist)
@@ -332,45 +320,20 @@ class ActiveCriticLearner(nn.Module):
         next_val = 0
         next_add = 0
         for epoch in range(epochs):
-            if self.global_step >= next_val:
-                next_val = self.global_step + self.network_args.val_every
-                print(f'current run stats: {self.logname}')
-                if self.network_args.tboard:
-                    print('_____________________________________________________________')
-                    th.save(self.policy.actor.state_dict(),self.inter_path +  'actor_before')
-                    th.save(self.policy.planner.state_dict(),self.inter_path +  'planner_before')
-
-                    if self.set_best_actor:
-                        self.policy.actor.load_state_dict(th.load(self.inter_path + 'best_actor'))
-                        self.policy.planner.load_state_dict(th.load(self.inter_path + 'best_planner'))
-
-                    self.policy.eval()
-                    self.run_validation(optimize=True)
-                    self.run_validation(optimize=False)
-                    print(f'self.get_num_training_samples(): {self.get_num_training_samples()}')
-                    print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
-                    self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'), strict=False)
-                    self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'), strict=False)
-                    self.scores.reset_min_score(self.scores.mean_actor)
-
-                    if self.get_num_training_samples()>= self.network_args.total_training_epsiodes:
-                        return None
-
 
             if (not self.network_args.imitation_phase) and (self.global_step >= next_add):
                 next_add = self.global_step + self.network_args.add_data_every
                 th.save(self.policy.actor.state_dict(),self.inter_path +  'actor_before')
                 th.save(self.policy.planner.state_dict(),self.inter_path +  'planner_before')
-                if self.set_best_actor:
-                    self.policy.actor.load_state_dict(th.load(self.inter_path + 'best_actor'))
-                    self.policy.planner.load_state_dict(th.load(self.inter_path + 'best_planner'))
                 if (self.train_data.success is not None) and (self.train_data.success.sum() == 0):
                     self.policy.actor.init_model()
                     self.policy.planner.init_model()
                     print(f'_________________________reinit actor__________________________________________')
-                self.add_training_data(episodes=self.network_args.training_epsiodes)
+                self.add_training_data_and_validate(episodes=self.network_args.training_epsiodes)
                 self.policy.actor.load_state_dict(th.load(self.inter_path + 'actor_before'), strict=False)
                 self.policy.planner.load_state_dict(th.load(self.inter_path + 'planner_before'), strict=False)
+                if self.get_num_training_samples()>= self.network_args.total_training_epsiodes + self.network_args.training_epsiodes:
+                    return None
 
                 self.virtual_step += self.network_args.training_epsiodes
 
@@ -396,7 +359,6 @@ class ActiveCriticLearner(nn.Module):
                 print(f'training now: {self.network_args.training_epsiodes}')
                 print(f'self.network_args.total_training_epsiodes: {self.network_args.total_training_epsiodes}')
 
-            #if self.get_num_pos_samples() > self.network_args.explore_cautious_until:
             self.policy.train()
 
             max_actor = float('inf')
@@ -542,124 +504,46 @@ class ActiveCriticLearner(nn.Module):
         return exp_dict
 
 
-    def run_validation(self, optimize):
-        self.policy.training_mode = False
+    def run_validation(self, actions, rewards):
 
-        if optimize:
-            fix = ' optimize'
-            if self.last_trj is not None:
-                self.compare_expecations(self.last_trj, 'Validation')
-            print(f'self.policy.args_obj.opt_steps: {self.policy.args_obj.opt_steps}')
-        else:
-            fix = ''
-            
-        pre_opt = self.policy.args_obj.optimize
-        self.policy.args_obj.optimize = optimize
+        assert actions.shape[0] == self.policy.history.opt_trj_hist[0].shape[0], 'non fitting num cpu'
+        for i in range(min(self.policy.history.opt_trj_hist[0].shape[0], 4)):
 
-        h = time.perf_counter()
-        rewards_cumm = None
+            self.make_time_series(
+                time_series=self.policy.history.opt_trj_hist[0][i],
+                name=f'actions',
+                title=f'Run {i}',
+                max_steps=4,
+                generated=self.policy.history.gen_trj_hist[0][i, -1]
+            )
+            self.make_time_series(
+                time_series=self.policy.history.opt_scores_hist[0][i],
+                name=f'rewards',
+                title=f'Run rewards {i}',
+                max_steps=4,
+                generated=self.policy.history.gen_scores_hist[0][i, -1],
+                gt = rewards[i]
+            )
 
-        for i in range(self.network_args.validation_rep):
-            opt_actions, observations, rewards_run, _ = sample_new_episode(
-                policy=self.policy,
-                env=self.eval_env,
-                dense=self.network_args.dense,
-                extractor=self.network_args.extractor,
-                device=self.network_args.device,
-                episodes=self.network_args.validation_episodes,
-                return_gen_trj=False,
-                start_training=self.get_num_training_samples()> self.network_args.explore_until)
-            if rewards_cumm is None:
-                rewards_cumm = rewards_run
-            else:
-                rewards_cumm = th.cat((rewards_cumm, rewards_run))
+        sparse_reward, _ = rewards.max(dim=1)
 
-        debug_dict = {
-            'Validation epoch time '+fix : th.tensor(time.perf_counter() - h)
-        }
-        self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize)
-        if optimize:
-            for i in range(min(opt_actions.shape[0], 4)):
-
-                self.make_time_series(
-                    time_series=self.policy.history.opt_trj_hist[0][i],
-                    name=f'actions',
-                    title=f'Run {i}',
-                    max_steps=4,
-                    generated=self.policy.history.gen_trj_hist[0][i, -1]
-                )
-                self.make_time_series(
-                    time_series=self.policy.history.opt_scores_hist[0][i],
-                    name=f'rewards',
-                    title=f'Run rewards {i}',
-                    max_steps=4,
-                    generated=self.policy.history.gen_scores_hist[0][i, -1],
-                    gt = rewards_run[i]
-                )
-
-        last_sparse_reward, _ = rewards_run.max(dim=1)
-        sparse_reward, _ = rewards_cumm.max(dim=1)
-
-        best_model = self.scores.update_max_score(
-            self.scores.mean_reward, sparse_reward.mean())
-            
-
-        '''last_expected_rewards_before, _ = expected_rewards_before.max(dim=1)
-        last_expected_reward_after, _ = expected_rewards_after.max(dim=1)
-            
-
-        self.analyze_critic_scores(
-            last_sparse_reward, last_expected_rewards_before,  fix)
-        self.analyze_critic_scores(
-            last_sparse_reward, last_expected_reward_after, ' optimized'+ fix)'''
         success = (sparse_reward == 1)
         success = success.type(th.float)
 
         debug_dict = {
             'Success Rate': success.mean(),
-            'Reward': sparse_reward.mean(),
             'Training Epochs': th.tensor(self.get_num_training_samples())
         }
 
-        if not optimize:
-            if (self.best_success >= 0) and (self.best_success > success.mean()):
-                self.network_args.start_critic = True
 
-            if self.network_args.start_critic:
-                self.train_critic = True
-
-            if success.mean() > self.best_success:
-                self.best_success = success.mean()
-
-
-        print(f'Success Rate: {success.mean()}' + fix)
-        print(f'Reward: {sparse_reward.mean()}' + fix)
+        print(f'Success Rate: {success.mean()}')
         try:
             print(
-                f'training samples: {int(len(self.train_data.obsv))}' + fix)
-            print(f'positive training samples: {int(self.train_data.success.sum()/self.policy.args_obj.epoch_len)}' + fix)
+                f'training samples: {int(len(self.train_data.obsv))}')
+            print(f'positive training samples: {int(self.train_data.success.sum()/self.policy.args_obj.epoch_len)}')
         except:
             pass
-        self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=optimize, step=self.get_num_training_samples())
-
-        self.policy.args_obj.optimize = pre_opt
-
-        '''if optimize:
-            exp_after = expected_rewards_after
-            exp_dict = self.exp_dict_opt
-        else:
-            exp_after = None
-            exp_dict = self.exp_dict
-
-        exp_dict = self.save_stat(success=success, rewards=rewards_cumm, expected_success=expected_rewards_before, opt_exp=exp_after, exp_dict=exp_dict)
-
-        if optimize:
-            self.exp_dict_opt = exp_dict
-            #self.policy.args_obj.opt_steps = opt_steps_before
-            print(f'self.policy.args_obj.opt_steps after: {self.policy.args_obj.opt_steps}')
-        else:
-            self.exp_dict = exp_dict'''
-
+        self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=True, step=self.get_num_training_samples())
 
 
     def analyze_critic_scores(self, reward: th.Tensor, expected_reward: th.Tensor, add: str):

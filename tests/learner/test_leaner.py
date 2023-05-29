@@ -203,7 +203,7 @@ class TestLerner(unittest.TestCase):
             obsv, actions, reward = data
             lenght_before += len(obsv)
 
-        acl.add_training_data()
+        acl.add_training_data_and_validate()
         lenght_after = 0
         for data in acl.train_loader:
             obsv, actions, reward = data
@@ -220,7 +220,7 @@ class TestLerner(unittest.TestCase):
     def test_add_training_data(self):
         acl, env, expert, seq_len, epsiodes, device = self.make_acl()
 
-        acl.add_training_data()
+        acl.add_training_data_and_validate()
         length = 0
         for data in acl.train_loader:
             obsv, actions, reward = data
