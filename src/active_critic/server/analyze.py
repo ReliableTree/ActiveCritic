@@ -305,10 +305,10 @@ def run_eval_stats_env(device, ms):
     val_everys = [20000]
     add_data_everys = [20000]
     opt_modes = ['actor+plan']
-    opt_steps_list = [4]
+    opt_steps_list = [3]
     sparse = False
     seq_len = 100
-    max_epoch_steps = 30000
+    max_epoch_steps = 20000
     manual_seed = ms
     explore_until = 0
     var_gamma = 0.98

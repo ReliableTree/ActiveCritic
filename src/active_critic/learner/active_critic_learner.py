@@ -265,18 +265,18 @@ class ActiveCriticLearner(nn.Module):
             
             mask_pred = reward[:, :-1][prediction_mask] != -3
 
-
+            pred_loss_lr = 1
 
             critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
+
             pred_loss, l2_pred = calcMSE(critic_pred_result_current[mask_pred], critic_pred_result_prev[mask_pred], return_tensor=True)
 
-            #critic_pred_loss_max, l2_loss_max = calcMSE(critic_pred_result_prev.max(dim=1)[0], label[prediction_mask].max(dim=1)[0], return_tensor=True)
+            critic_pred_result_prev[~mask_pred] = -3
+            critic_pred_loss_max, l2_loss_max = calcMSE(critic_pred_result_prev.max(dim=1)[0], label[prediction_mask].max(dim=1)[0], return_tensor=True)
+            
+            l2_pred = th.cat((l2_pred, l2_loss_max), dim=0) * pred_loss_lr
 
-            pred_loss = 1000* pred_loss# + critic_pred_loss_max
-            l2_pred = 1000 * l2_pred
-
-            #l2_pred = th.cat((1000* l2_pred, l2_loss_max), dim=0)
-            loss = reward_loss + pred_loss
+            loss = reward_loss + pred_loss * pred_loss_lr + critic_pred_loss_max * pred_loss_lr
         else:
             l2_pred = th.zeros_like(l2_dist)
             loss = reward_loss
@@ -517,20 +517,22 @@ class ActiveCriticLearner(nn.Module):
     def run_validation(self, actions, rewards):
 
         assert actions.shape[0] == self.policy.history.opt_trj_hist[0].shape[0], 'non fitting num cpu'
-        for i in range(min(self.policy.history.opt_trj_hist[0].shape[0], 4)):
+        max_steps = 3
+        for i in range(min(self.policy.history.opt_trj_hist[0].shape[0], max_steps)):
 
             self.make_time_series(
                 time_series=self.policy.history.opt_trj_hist[0][i],
                 name=f'actions',
                 title=f'Run {i}',
-                max_steps=4,
+                max_steps=max_steps,
                 generated=self.policy.history.gen_trj_hist[0][i, -1]
             )
+
             self.make_time_series(
                 time_series=self.policy.history.opt_scores_hist[0][i],
                 name=f'rewards',
                 title=f'Run rewards {i}',
-                max_steps=4,
+                max_steps=max_steps,
                 generated=self.policy.history.gen_scores_hist[0][i, -1],
                 gt = rewards[i]
             )
@@ -609,6 +611,8 @@ class ActiveCriticLearner(nn.Module):
             time_step = linear_interpolation(total_steps=min(time_series.shape[0], max_steps), current_step=i+1, start=0, end=time_series.shape[0]-1)
             names.append(name + f' time  step {time_step}')
             trjs.append(time_series[time_step])
+            names.append(name + f' time  step {time_step - 1}')
+            trjs.append(time_series[time_step - 1])
         if generated is not None:
             trjs.append(generated)
             names.append(name + ' generated')
