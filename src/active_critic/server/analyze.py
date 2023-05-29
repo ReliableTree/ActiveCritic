@@ -307,7 +307,7 @@ def run_eval_stats_env(device, ms):
     max_epoch_steps = 30000
     manual_seed = ms
     explore_until = 0
-    var_gamma = 0.98
+    var_gamma = 0.9
     th.manual_seed(manual_seed)
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:
