@@ -277,9 +277,6 @@ class ActiveCriticLearner(nn.Module):
 
             #l2_pred = th.cat((1000* l2_pred, l2_loss_max), dim=0)
             loss = reward_loss + pred_loss
-            if loss_critic is None:
-                print(f'critic_pred_result_current: {critic_pred_result_current[0]}')
-                print(f'critic_pred_result_current: {critic_pred_result_prev[0]}')
         else:
             l2_pred = th.zeros_like(l2_dist)
             loss = reward_loss
