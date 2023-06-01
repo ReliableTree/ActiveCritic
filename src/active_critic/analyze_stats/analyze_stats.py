@@ -176,6 +176,8 @@ def make_plot(
     for result in abs_file_path_list:
         dicts.append(parse_data(paths=result, find_closest=find_closest))
 
+    print(dicts)
+
     plot_experiment_data(
         timesteps=[result_dict['step'][0] for result_dict in dicts], 
         experiments=[result_dict['success_rate'] for result_dict in dicts],
