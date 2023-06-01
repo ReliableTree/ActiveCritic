@@ -297,7 +297,7 @@ def run_eval_stats_env(device, ms):
     demonstrations_list = [1]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 10
+    training_episodes = 2
     total_training_epsiodes = 4000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
@@ -307,7 +307,7 @@ def run_eval_stats_env(device, ms):
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = False
-    seq_len = 100
+    seq_len = 10
     max_epoch_steps = 10000
     manual_seed = ms
     explore_until = 0
@@ -337,7 +337,7 @@ def run_eval_stats_env(device, ms):
                                             add_data_every = add_data_everys[val_step],
                                             opt_mode=opt_mode,
                                             make_graphs = True,
-                                            fast=False,
+                                            fast=True,
                                             opt_steps=opt_steps,
                                             sparse=sparse,
                                             seq_len=seq_len,

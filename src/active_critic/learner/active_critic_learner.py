@@ -479,25 +479,19 @@ class ActiveCriticLearner(nn.Module):
         labels = labels.type(th.float)
         return labels
     
-    def save_stat(self, success, rewards, expected_success, opt_exp, exp_dict):
+    def save_stat(self, success, rewards, exp_dict):
         if exp_dict is None:
             exp_dict = {
             'success_rate':success.mean().cpu().numpy(),
-            'expected_success' : expected_success.mean().cpu().numpy(),
             'rewards': rewards.unsqueeze(0).detach().cpu().numpy(),
             'step':np.array(self.get_num_training_samples())
             }
-            if opt_exp is not None:
-                exp_dict['optimized_expected'] =  opt_exp.mean().cpu().numpy()
 
         else:
             exp_dict['success_rate'] = np.append(exp_dict['success_rate'], success.mean().cpu().numpy())
-            exp_dict['expected_success'] = np.append(exp_dict['expected_success'], expected_success.mean().cpu().numpy())
             exp_dict['step'] = np.append(exp_dict['step'], np.array(self.get_num_training_samples()))
             exp_dict['rewards'] = np.append(exp_dict['rewards'], np.array(rewards.unsqueeze(0).detach().cpu().numpy()), axis=0)
 
-            if opt_exp is not None:
-                exp_dict['optimized_expected'] = np.append(exp_dict['optimized_expected'], opt_exp.mean().cpu().numpy())
 
         path_to_stat = os.path.join(self.network_args.data_path, self.network_args.logname)
 
@@ -505,8 +499,6 @@ class ActiveCriticLearner(nn.Module):
             os.makedirs(path_to_stat)
 
         add = ''
-        if opt_exp is not None:
-            add = 'optimized'
 
         with open(path_to_stat + '/stats'+add, 'wb') as handle:
             pickle.dump(exp_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -555,7 +547,12 @@ class ActiveCriticLearner(nn.Module):
             print(f'positive training samples: {int(self.train_data.success.sum()/self.policy.args_obj.epoch_len)}')
         except:
             pass
-        self.write_tboard_scalar(debug_dict=debug_dict, train=False, optimize=True, step=self.get_num_training_samples())
+
+        exp_dict = self.exp_dict_opt
+        
+
+        exp_dict = self.save_stat(success=success, rewards=rewards, exp_dict=exp_dict)
+
 
 
     def analyze_critic_scores(self, reward: th.Tensor, expected_reward: th.Tensor, add: str):
