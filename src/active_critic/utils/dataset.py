@@ -94,14 +94,16 @@ class DatasetAC(torch.utils.data.Dataset):
         self.make_virt_data()
 
     def trunc_data(self):
+        not_exp_trjs = torch.clone(~self.expert_trjs)
+
         if self.max_size is not None:
-            self.reward = self.reward[-self.max_size:]
-            self.obsv = self.obsv[-self.max_size:]
-            self.actions = self.actions[-self.max_size:]
-            self.success = self.success[-self.max_size:]
-            self.expert_trjs = self.expert_trjs[-self.max_size:]
-            self.prev_proposed_acts = self.prev_proposed_acts[-self.max_size:]
-            self.steps = self.steps[-self.max_size:]
+            self.reward = torch.cat((self.reward[self.expert_trjs], self.reward[not_exp_trjs][-self.max_size:]), dim=0)
+            self.obsv = torch.cat((self.obsv[self.expert_trjs], self.obsv[not_exp_trjs][-self.max_size:]), dim=0)
+            self.actions = torch.cat((self.actions[self.expert_trjs], self.actions[not_exp_trjs][-self.max_size:]), dim=0)
+            self.prev_proposed_acts = torch.cat((self.prev_proposed_acts[self.expert_trjs], self.prev_proposed_acts[not_exp_trjs][-self.max_size:]), dim=0)
+            self.steps = torch.cat((self.steps[self.expert_trjs], self.steps[not_exp_trjs][-self.max_size:]), dim=0)
+            self.reward = torch.cat((self.reward[self.expert_trjs], self.reward[not_exp_trjs][-self.max_size:]), dim=0)
+            self.expert_trjs = torch.cat((self.expert_trjs[self.expert_trjs], self.expert_trjs[not_exp_trjs][-self.max_size:]), dim=0)
 
     def __getitem__(self, index):
         assert self.onyl_positiv is not None, 'traindata only positiv not set'
@@ -113,22 +115,6 @@ class DatasetAC(torch.utils.data.Dataset):
                 self.virt_steps[index],
                 self.virt_obsv[max(index-1, 0)],
                 self.virt_success[index])
-    
-        '''if self.onyl_positiv:
-            return (self.virt_obsv[self.virt_success][index], 
-                    self.virt_actions[self.virt_success][index], 
-                    self.virt_reward[self.virt_success][index], 
-                    self.virt_expert_trjs[self.virt_success][index], 
-                    self.virt_prev_proposed_acts[self.virt_success][index],
-                    self.virt_steps[self.virt_success][index],
-                    self.virt_obsv[self.virt_success][max(index-1, 0)])
-        else:
-            return (self.virt_obsv[index], 
-                    self.virt_actions[index], 
-                    self.virt_reward[index], 
-                    self.virt_expert_trjs[index],
-                    self.virt_prev_proposed_acts[index],
-                    self.virt_steps[index],
-                    self.virt_obsv[max(index-1, 0)])'''
+
 
         

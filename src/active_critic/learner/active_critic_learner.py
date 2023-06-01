@@ -95,7 +95,7 @@ class ActiveCriticLearner(nn.Module):
                 self.logname + ' optimized', data_path=network_args_obj.data_path)
         self.global_step = 0
 
-        self.train_data = DatasetAC(batch_size=self.network_args.batch_size, device='cpu', max_size=None)
+        self.train_data = DatasetAC(batch_size=self.network_args.batch_size, device='cpu', max_size=100000)
         self.train_data.onyl_positiv = False
         self.exp_dict_opt = None
         self.exp_dict = None
@@ -348,7 +348,7 @@ class ActiveCriticLearner(nn.Module):
                 self.virtual_step += self.network_args.training_epsiodes
 
                 if self.next_critic_init is None:
-                    self.next_critic_init = self.get_num_training_samples() * 50
+                    self.next_critic_init = self.get_num_training_samples() * 10
                 reward = self.train_data.reward
                 b, _ = th.max(reward, dim=1)
                 successfull_trj = (b == 1)
@@ -538,6 +538,8 @@ class ActiveCriticLearner(nn.Module):
             'Success Rate': success.mean(),
             'Training Epochs': th.tensor(self.get_num_training_samples())
         }
+
+        self.write_tboard_scalar(debug_dict=debug_dict, train=True, optimize=True)
 
 
         print(f'Success Rate: {success.mean()}')

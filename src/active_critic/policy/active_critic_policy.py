@@ -129,7 +129,7 @@ class ActiveCriticPolicy(BaseModel):
             noise_zero_mean,
             variance=self.args_obj.variance * th.ones_like(noise_zero_mean)
         )
-        self.noise = repeat_elements(noise, 4)
+        self.noise = repeat_elements(noise, 2)
         self.init_noise = th.clone(self.noise.detach())
 
     def predict(
@@ -378,7 +378,7 @@ class ActiveCriticPolicy(BaseModel):
         critic_loss_noise = self.critic.loss_fct(result=critic_result_noise, label=goal_label[:, :critic_result.shape[1]])
         critic_sq_loss = self.critic.loss_fct(result=self.noise, label=self.init_noise)
 
-        critic_loss = critic_loss + critic_loss_noise + critic_sq_loss
+        critic_loss = critic_loss + critic_loss_noise + critic_sq_loss * 1e-2
 
         if self.args_obj.use_diff_boundaries or True:
             diff_bound_loss_gene = diff_boundaries(

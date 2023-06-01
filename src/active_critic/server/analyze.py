@@ -108,16 +108,16 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps, var_ga
     acps.clip = True
     acps.use_diff_boundaries = True
     acps.optimizer_mode = opt_mode
-    acps.variance = 1e-2
+    acps.variance = 1e-3
     acps.variance_gamma = var_gamma
-    acps.var_lr = 5e-3
+    acps.var_lr = 1e-3
     return acps
 
 
 def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_episodes, opt_steps, sparse, var_gamma):
     env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len, sparse=sparse)
     d_output = env.action_space.shape[0]
-    d_plan = 1
+    d_plan = 2
     wsm_actor_setup = make_wsm_setup(
         seq_len=seq_len, d_output=d_output, device=device, weight_decay=weight_decay)
     wsm_critic_setup = make_wsm_setup(
@@ -125,7 +125,7 @@ def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_epi
     
     wsm_critic_setup.sparse = False
 
-    wsm_planner_setup = make_wsm_setup_tiny(
+    wsm_planner_setup = make_wsm_setup(
         seq_len=seq_len, d_output=d_plan, weight_decay=weight_decay, device=device)
     acps = make_acps(
         seq_len=seq_len, extractor=DummyExtractor(), new_epoch=new_epoch_reach, device=device, opt_mode=opt_mode, opt_steps=opt_steps, var_gamma=var_gamma)
@@ -297,17 +297,17 @@ def run_eval_stats_env(device, ms):
     demonstrations_list = [1]
     run_ids = [i for i in range(1)]
     s = datetime.today().strftime('%Y-%m-%d')
-    training_episodes = 2
+    training_episodes = 10
     total_training_epsiodes = 4000
     min_critic_threshold = 1e-5
     data_path = '/data/bing/hendrik/AC_var_' + s
-    env_tags = ['windowopen']
-    val_everys = [20000]
-    add_data_everys = [20000]
+    env_tags = ['reach']
+    val_everys = [2000]
+    add_data_everys = [2000]
     opt_modes = ['actor+plan']
     opt_steps_list = [3]
     sparse = False
-    seq_len = 10
+    seq_len = 100
     max_epoch_steps = 10000
     manual_seed = ms
     explore_until = 0
@@ -321,7 +321,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' vg {var_gamma} ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' plan dim 2 ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
@@ -337,7 +337,7 @@ def run_eval_stats_env(device, ms):
                                             add_data_every = add_data_everys[val_step],
                                             opt_mode=opt_mode,
                                             make_graphs = True,
-                                            fast=True,
+                                            fast=False,
                                             opt_steps=opt_steps,
                                             sparse=sparse,
                                             seq_len=seq_len,
