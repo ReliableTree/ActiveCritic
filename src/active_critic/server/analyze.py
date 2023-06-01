@@ -110,7 +110,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps, var_ga
     acps.optimizer_mode = opt_mode
     acps.variance = 1e-2
     acps.variance_gamma = var_gamma
-    acps.var_lr = 1e-3
+    acps.var_lr = 5e-3
     return acps
 
 
@@ -308,11 +308,11 @@ def run_eval_stats_env(device, ms):
     opt_steps_list = [3]
     sparse = False
     seq_len = 100
-    max_epoch_steps = 20000
+    max_epoch_steps = 10000
     manual_seed = ms
     explore_until = 0
     var_gamma = 0.98
-    opt_steps_mult = 1.006
+    opt_steps_mult = 0.04
     th.manual_seed(manual_seed)
     for demonstrations in demonstrations_list:
         for env_tag in env_tags:

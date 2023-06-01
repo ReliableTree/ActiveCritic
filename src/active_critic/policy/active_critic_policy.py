@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch as th
 from active_critic.model_src.whole_sequence_model import WholeSequenceModel, CriticSequenceModel
-from active_critic.utils.pytorch_utils import diff_boundaries, sample_gauss, print_progress
+from active_critic.utils.pytorch_utils import diff_boundaries, sample_gauss, print_progress, repeat_elements
 from stable_baselines3.common.policies import BaseModel
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import os
@@ -125,10 +125,12 @@ class ActiveCriticPolicy(BaseModel):
 
         noise_zero_mean =th.zeros(mean_size, device=vec_obsv.device, dtype=th.float)
 
-        self.noise = sample_gauss(
+        noise = sample_gauss(
             noise_zero_mean,
             variance=self.args_obj.variance * th.ones_like(noise_zero_mean)
         )
+        self.noise = repeat_elements(noise, 4)
+        self.init_noise = th.clone(self.noise.detach())
 
     def predict(
         self,
@@ -261,8 +263,8 @@ class ActiveCriticPolicy(BaseModel):
             self.init_actor = copy.deepcopy(self.actor.state_dict())
             self.init_planner = copy.deepcopy(self.planner.state_dict())
         else:
-            self.actor.load_state_dict(self.opt_actor)
-            self.planner.load_state_dict(self.opt_planner)
+            self.actor.load_state_dict(self.init_actor)
+            self.planner.load_state_dict(self.init_planner)
 
         goals = None
         org_actions = th.clone(actions.detach())
@@ -343,6 +345,7 @@ class ActiveCriticPolicy(BaseModel):
 
         final_actions = final_actions + self.noise
         self.noise = self.noise[:, 1:]
+        self.init_noise = self.init_noise[:, 1:]
         if self.args_obj.clip:
             with th.no_grad():
                 th.clamp(final_actions, min=self.clip_min, max=self.clip_max, out=final_actions)
@@ -373,8 +376,9 @@ class ActiveCriticPolicy(BaseModel):
 
         critic_loss = self.critic.loss_fct(result=critic_result, label=goal_label[:, :critic_result.shape[1]])
         critic_loss_noise = self.critic.loss_fct(result=critic_result_noise, label=goal_label[:, :critic_result.shape[1]])
+        critic_sq_loss = self.critic.loss_fct(result=self.noise, label=self.init_noise)
 
-        critic_loss = critic_loss + critic_loss_noise
+        critic_loss = critic_loss + critic_loss_noise + critic_sq_loss
 
         if self.args_obj.use_diff_boundaries or True:
             diff_bound_loss_gene = diff_boundaries(

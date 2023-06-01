@@ -210,3 +210,9 @@ def print_progress(current_step, total_steps):
     bar = '█' * filled_length + '-' * remaining_length
     percent = int(progress * 100)
     print (f'\rProgress: [{bar}] {percent}%', end="\r")
+
+def repeat_elements(tensor, n):
+    inpt_shape = tensor.shape
+    rep_inpt = tensor.repeat([1,1,n])
+    rep_inpt = rep_inpt.reshape([inpt_shape[0], n*inpt_shape[1], *inpt_shape[2:]])
+    return rep_inpt[:, :inpt_shape[1]]

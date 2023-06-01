@@ -194,7 +194,7 @@ class ActiveCriticLearner(nn.Module):
             print('__________________________________reinit model_________________________________')
         self.policy.args_obj.variance *= self.policy.args_obj.variance_gamma
         print(f'policy variance: {self.policy.args_obj.variance}')
-        self.policy.args_obj.opt_steps *= self.network_args.opt_steps_mult
+        self.policy.args_obj.opt_steps = min(20, self.network_args.opt_steps_mult + self.policy.args_obj.opt_steps)
         print(f'policy opt_steps: {int(self.policy.args_obj.opt_steps)}')
 
         self.run_validation(actions=actions, rewards=rewards)
@@ -265,7 +265,7 @@ class ActiveCriticLearner(nn.Module):
             
             mask_pred = reward[:, :-1][prediction_mask] != -3
 
-            pred_loss_lr = 1
+            pred_loss_lr = 100
 
             critic_pred_result_current = self.policy.critic.forward(critic_predicted_input_current)
 
@@ -348,7 +348,7 @@ class ActiveCriticLearner(nn.Module):
                 self.virtual_step += self.network_args.training_epsiodes
 
                 if self.next_critic_init is None:
-                    self.next_critic_init = self.get_num_training_samples() * 10
+                    self.next_critic_init = self.get_num_training_samples() * 50
                 reward = self.train_data.reward
                 b, _ = th.max(reward, dim=1)
                 successfull_trj = (b == 1)
