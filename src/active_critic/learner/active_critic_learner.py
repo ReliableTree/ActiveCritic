@@ -548,10 +548,7 @@ class ActiveCriticLearner(nn.Module):
         except:
             pass
 
-        exp_dict = self.exp_dict_opt
-        
-
-        exp_dict = self.save_stat(success=success, rewards=rewards, exp_dict=exp_dict)
+        self.exp_dict_opt = self.save_stat(success=success, rewards=rewards, exp_dict=self.exp_dict_opt)
 
 
 
