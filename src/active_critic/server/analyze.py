@@ -117,7 +117,7 @@ def make_acps(seq_len, extractor, new_epoch, device, opt_mode, opt_steps, var_ga
 def setup_ac(seq_len, num_cpu, device, tag, weight_decay, opt_mode, training_episodes, opt_steps, sparse, var_gamma):
     env, expert = make_vec_env(tag, num_cpu, seq_len=seq_len, sparse=sparse)
     d_output = env.action_space.shape[0]
-    d_plan = 2
+    d_plan = 1
     wsm_actor_setup = make_wsm_setup(
         seq_len=seq_len, d_output=d_output, device=device, weight_decay=weight_decay)
     wsm_critic_setup = make_wsm_setup(
@@ -321,7 +321,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' plan dim 2 ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' fast reinit ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,

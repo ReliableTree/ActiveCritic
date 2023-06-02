@@ -102,7 +102,7 @@ class DatasetAC(torch.utils.data.Dataset):
             self.actions = torch.cat((self.actions[self.expert_trjs], self.actions[not_exp_trjs][-self.max_size:]), dim=0)
             self.prev_proposed_acts = torch.cat((self.prev_proposed_acts[self.expert_trjs], self.prev_proposed_acts[not_exp_trjs][-self.max_size:]), dim=0)
             self.steps = torch.cat((self.steps[self.expert_trjs], self.steps[not_exp_trjs][-self.max_size:]), dim=0)
-            self.reward = torch.cat((self.reward[self.expert_trjs], self.reward[not_exp_trjs][-self.max_size:]), dim=0)
+            self.success = torch.cat((self.success[self.expert_trjs], self.success[not_exp_trjs][-self.max_size:]), dim=0)
             self.expert_trjs = torch.cat((self.expert_trjs[self.expert_trjs], self.expert_trjs[not_exp_trjs][-self.max_size:]), dim=0)
 
     def __getitem__(self, index):
