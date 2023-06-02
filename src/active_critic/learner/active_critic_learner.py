@@ -348,7 +348,7 @@ class ActiveCriticLearner(nn.Module):
                 self.virtual_step += self.network_args.training_epsiodes
 
                 if self.next_critic_init is None:
-                    self.next_critic_init = self.get_num_training_samples() * 4
+                    self.next_critic_init = self.get_num_training_samples() * 10
                 reward = self.train_data.reward
                 b, _ = th.max(reward, dim=1)
                 successfull_trj = (b == 1)
@@ -357,7 +357,7 @@ class ActiveCriticLearner(nn.Module):
                     self.policy.critic.init_model()
                     self.policy.actor.init_model()
                     self.policy.planner.init_model()
-                    self.next_critic_init = 4 * self.get_num_training_samples()
+                    self.next_critic_init = 10 * self.get_num_training_samples()
                     print('______________________________init models___________________________________')
 
             elif (self.global_step >= next_add):

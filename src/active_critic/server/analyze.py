@@ -308,7 +308,7 @@ def run_eval_stats_env(device, ms):
     opt_steps_list = [3]
     sparse = False
     seq_len = 100
-    max_epoch_steps = 10000
+    max_epoch_steps = 30000
     manual_seed = ms
     explore_until = 0
     var_gamma = 0.98
@@ -321,7 +321,7 @@ def run_eval_stats_env(device, ms):
                     for run_id in run_ids:
                         for opt_mode in opt_modes:
                             for opt_steps in opt_steps_list:
-                                logname = f' fast reinit ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
+                                logname = f' more compute ms {manual_seed} training eps: {total_training_epsiodes} opt mode: {opt_mode} demonstrations: {demonstrations}, im_ph:{im_ph}, {training_episodes}, run id: {run_id}'
                                 print(f'____________________________________logname: {logname}')
                                 run_experiment(device=device,
                                             env_tag=env_tag,
