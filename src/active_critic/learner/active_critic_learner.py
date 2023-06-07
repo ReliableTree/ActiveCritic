@@ -416,8 +416,8 @@ class ActiveCriticLearner(nn.Module):
             positive_examples = th.tensor(int(successfull_trj.sum()/self.policy.args_obj.epoch_len))
 
             debug_dict = {
-                'Examples': th.tensor(int(len(self.train_data.obsv)/self.policy.args_obj.epoch_len)),
-                'Positive Examples': positive_examples
+                'Examples': th.tensor(self.get_num_training_samples()),
+                'Positive Examples': th.tensor(self.get_num_pos_samples())
             }
             if mean_critic is not None:
                 debug_dict['Loss Critic'] = mean_critic
