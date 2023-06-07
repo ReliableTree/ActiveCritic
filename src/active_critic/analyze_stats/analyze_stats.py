@@ -3,6 +3,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import math
+import cairosvg
 
 def parse_data(paths, find_closest):
     result_dict = {}
@@ -149,7 +150,9 @@ def plot_experiment_data(
         # create directory if it doesn't exist
         os.makedirs(path, exist_ok=True)
         # save the plot
-        plt.savefig(os.path.join(path, plot_name + '.png'), bbox_inches='tight')
+        save_path = os.path.join(path, plot_name)
+        plt.savefig(save_path + '.svg', format='svg', bbox_inches='tight')
+        cairosvg.svg2pdf(url=save_path + '.svg', write_to=save_path + '.pdf')
 def make_plot(
         paths, 
         includes, 
